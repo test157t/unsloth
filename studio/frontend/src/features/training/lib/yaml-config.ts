@@ -90,6 +90,7 @@ export function serializeConfigToYaml(
     save_steps: state.saveSteps,
     eval_steps: state.evalSteps,
     weight_decay: state.weightDecay,
+    max_grad_norm: state.maxGradNorm,
     random_seed: state.randomSeed,
     packing: state.packing,
     train_on_completions: state.trainOnCompletions,

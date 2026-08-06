@@ -16,6 +16,7 @@ export const MODEL_DEFAULT_STATE_KEYS = [
   "batchSize",
   "gradientAccumulation",
   "weightDecay",
+  "maxGradNorm",
   "warmupSteps",
   "maxSteps",
   "saveSteps",

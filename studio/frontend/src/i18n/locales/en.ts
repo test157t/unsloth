@@ -550,6 +550,7 @@ export const en = {
         standard: "Standard",
         classic: "Classic",
         minimal: "Minimal",
+        gothic: "Gothic Glass",
       },
       custom: {
         reset: "Reset",
@@ -1588,6 +1589,8 @@ export const en = {
       gradAccumTooltip: "Simulates larger batch sizes without extra VRAM.",
       weightDecay: "Weight Decay",
       weightDecayTooltip: "L2 regularization to prevent overfitting.",
+      maxGradNorm: "Max Grad Norm",
+      maxGradNormTooltip: "Clip gradient norms above this value. Set 0 to disable clipping.",
       warmupSteps: "Warmup Steps",
       warmupStepsTooltip:
         "Gradually increase LR at training start for stability.",

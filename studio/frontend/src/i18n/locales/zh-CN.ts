@@ -1542,6 +1542,8 @@ export const zhCN = {
       gradAccumTooltip: "在不增加 VRAM 的情况下模拟更大的批大小。",
       weightDecay: "权重衰减",
       weightDecayTooltip: "L2 正则化，用于防止过拟合。",
+      maxGradNorm: "最大梯度范数",
+      maxGradNormTooltip: "裁剪超过此值的梯度范数。设为 0 可禁用裁剪。",
       warmupSteps: "预热步数",
       warmupStepsTooltip: "在训练开始时逐步提高学习率，提升稳定性。",
       scheduleEpochsTooltip: "完整遍历数据集的次数。设为 0 则按最大步数运行。",

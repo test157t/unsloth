@@ -27,6 +27,7 @@ interface BackendTrainingDefaults {
   save_steps?: number;
   eval_steps?: number;
   weight_decay?: number;
+  max_grad_norm?: number;
   random_seed?: number;
   vision_image_size?: number | string | null;
   packing?: boolean;

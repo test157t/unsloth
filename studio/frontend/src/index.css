@@ -582,6 +582,68 @@
 	--sidebar-ring: #ededed;
 }
 
+/* ----------------------------- Gothic Glass -----------------------------
+   A dark-only, translucent violet skin. It overrides mode tokens too, so it
+   remains legible when selected while the app's color scheme was light. */
+:root[data-palette="gothic"] {
+	--background: #09070e;
+	--foreground: #f4efff;
+	--card: rgb(25 18 38 / 78%);
+	--card-foreground: #f4efff;
+	--popover: rgb(22 15 34 / 92%);
+	--popover-foreground: #f4efff;
+	--primary: #a67cff;
+	--primary-foreground: #160d24;
+	--secondary: rgb(62 42 92 / 55%);
+	--secondary-foreground: #eee7ff;
+	--muted: rgb(42 29 61 / 58%);
+	--muted-foreground: #c5b8da;
+	--accent: rgb(116 78 167 / 35%);
+	--accent-foreground: #ffffff;
+	--destructive: #ff6b93;
+	--bypass: #f0c35a;
+	--border: rgb(180 137 255 / 26%);
+	--input: rgb(180 137 255 / 34%);
+	--ring: #c3a5ff;
+	--control-accent: #a67cff;
+	--control-accent-foreground: #160d24;
+	--chart-1: #b692ff;
+	--chart-2: #e6a6ff;
+	--chart-3: #7ce0df;
+	--chart-4: #ff8fbb;
+	--chart-5: #f0c35a;
+	--sidebar: rgb(16 11 25 / 88%);
+	--sidebar-foreground: #f4efff;
+	--sidebar-primary: #a67cff;
+	--sidebar-primary-foreground: #160d24;
+	--sidebar-accent: rgb(116 78 167 / 38%);
+	--sidebar-accent-foreground: #ffffff;
+	--sidebar-border: rgb(180 137 255 / 20%);
+	--sidebar-ring: #c3a5ff;
+	--nav-fg: #e9e0f7;
+	--nav-fg-muted: #aa9bbb;
+	--nav-surface-hover: rgb(130 88 185 / 28%);
+	--nav-icon-idle: #9a86b4;
+	--nav-beta-border: rgb(180 137 255 / 34%);
+	--panel-surface: rgb(10 7 16 / 70%);
+	--panel-surface-hover: rgb(116 78 167 / 28%);
+	--panel-input-surface: rgb(255 255 255 / 7%);
+	--panel-input-surface-hover: rgb(180 137 255 / 16%);
+	--panel-surface-fg-muted: #c5b8da;
+	--panel-slider-fg: #b692ff;
+	--chat-icon-fg: #d7c9ed;
+	--chat-icon-fg-hover: #ffffff;
+	--chat-icon-bg-hover: rgb(130 88 185 / 30%);
+	--font-heading: "Source Serif 4", Georgia, serif;
+}
+
+:root[data-palette="gothic"] body {
+	background:
+		radial-gradient(circle at 72% -12%, rgb(120 73 192 / 20%), transparent 36rem),
+		radial-gradient(circle at -12% 92%, rgb(72 39 121 / 18%), transparent 34rem),
+		var(--background);
+}
+
 /* ---------------------------------------------------------------------------
    Appearance customization hooks (Settings → Appearance).
 

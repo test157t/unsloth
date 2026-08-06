@@ -1565,6 +1565,8 @@ export const ja = {
       gradAccumTooltip: "VRAM を追加消費せずに、疑似的に大きなバッチサイズをシミュレートします。",
       weightDecay: "Weight Decay",
       weightDecayTooltip: "過学習を防ぐための L2 正則化。",
+      maxGradNorm: "最大勾配ノルム",
+      maxGradNormTooltip: "この値を超える勾配ノルムをクリップします。0 で無効化します。",
       warmupSteps: "ウォームアップステップ数",
       warmupStepsTooltip: "安定性の向上を目的として、トレーニング開始時に学習率を徐々に増加させます。",
       scheduleEpochsTooltip: "データセット全体の完全な学習回数。0 に設定すると最大ステップ数に基づいて実行されます。",

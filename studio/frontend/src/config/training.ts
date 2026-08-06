@@ -141,6 +141,8 @@ export const DEFAULT_HYPERPARAMS = {
   batchSize: 4,
   gradientAccumulation: 8,
   weightDecay: 0.001,
+  // Zero disables gradient clipping.
+  maxGradNorm: 1.0,
   warmupSteps: 5,
   maxSteps: 60,
   saveSteps: 0,

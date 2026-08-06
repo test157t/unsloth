@@ -1621,6 +1621,8 @@ export const ptBR = {
       gradAccumTooltip: "Simula tamanhos de lote maiores sem gastar VRAM extra.",
       weightDecay: "Decaimento de Peso",
       weightDecayTooltip: "Regularização L2 para evitar overfitting.",
+      maxGradNorm: "Norma máx. do gradiente",
+      maxGradNormTooltip: "Limita normas de gradiente acima deste valor. Defina 0 para desativar.",
       warmupSteps: "Passos de Aquecimento (Warmup)",
       warmupStepsTooltip:
         "Aumenta gradualmente a LR no início do treino para garantir estabilidade.",

@@ -363,6 +363,7 @@ class UnslothTrainer:
         max_steps_val = training_args.get("max_steps", 0)
         learning_rate = training_args.get("learning_rate", 2e-4)
         weight_decay = training_args.get("weight_decay", 0.001)
+        max_grad_norm = training_args.get("max_grad_norm", 1.0)
         lr_scheduler_type = training_args.get("lr_scheduler_type", "linear")
         random_seed = training_args.get("random_seed", 3407)
         optim_value = training_args.get("optim", "adamw_8bit")
@@ -377,6 +378,7 @@ class UnslothTrainer:
             "logging_steps": 1,
             "optim": optim_value,
             "weight_decay": weight_decay,
+            "max_grad_norm": max_grad_norm,
             "lr_scheduler_type": lr_scheduler_type,
             "seed": random_seed,
             "output_dir": output_dir,
@@ -3411,6 +3413,7 @@ class UnslothTrainer:
                 "bf16": is_bfloat16_supported(),
                 "logging_steps": 1,
                 "weight_decay": training_args.get("weight_decay", 0.001),
+                "max_grad_norm": training_args.get("max_grad_norm", 1.0),
                 "seed": training_args.get("random_seed", 3407),
                 "output_dir": output_dir,
                 "report_to": _build_report_targets(training_args),
@@ -3505,7 +3508,6 @@ class UnslothTrainer:
                         "lr_scheduler_type": lr_scheduler_type_value,
                         "gradient_checkpointing": True,
                         "gradient_checkpointing_kwargs": {"use_reentrant": False},
-                        "max_grad_norm": 0.3,
                         "remove_unused_columns": False,
                         "dataset_text_field": "",
                         "dataset_kwargs": {"skip_prepare_dataset": True},

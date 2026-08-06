@@ -1605,6 +1605,8 @@ export const ar = {
       gradAccumTooltip: "يحاكي أحجام دفعات أكبر دون VRAM إضافي.",
       weightDecay: "اضمحلال الأوزان",
       weightDecayTooltip: "تنظيم L2 لمنع فرط التخصيص.",
+      maxGradNorm: "الحد الأقصى لمعيار التدرج",
+      maxGradNormTooltip: "يقيّد معايير التدرج فوق هذه القيمة. اضبطه على 0 للتعطيل.",
       warmupSteps: "خطوات الإحماء",
       warmupStepsTooltip:
         "زيادة معدل التعلم تدريجيًا في بداية التدريب لتحقيق الاستقرار.",

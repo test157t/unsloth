@@ -305,6 +305,27 @@ class TestTrainingRawSupport(unittest.TestCase):
             source,
         )
 
+    def test_trainers_forward_max_grad_norm(self):
+        source = (_BACKEND_ROOT / "core" / "training" / "trainer.py").read_text(
+            encoding = "utf-8"
+        )
+        worker_source = (_BACKEND_ROOT / "core" / "training" / "worker.py").read_text(
+            encoding = "utf-8"
+        )
+
+        # Text, vision, and audio trainer configs must use the submitted clip
+        # threshold instead of relying on a framework or model-specific value.
+        self.assertGreaterEqual(
+            source.count('"max_grad_norm": training_args.get("max_grad_norm", 1.0)'),
+            2,
+        )
+        self.assertIn('max_grad_norm = training_args.get("max_grad_norm", 1.0)', source)
+        self.assertIn('"max_grad_norm": max_grad_norm,', source)
+        self.assertIn(
+            'max_grad_norm = config.get("max_grad_norm", 1.0),',
+            worker_source,
+        )
+
     def test_training_backend_normalizes_explicit_none_seed_and_dtypes(self):
         # `random_seed=None` and `cast_norm_output_to_input_dtype=None` must not
         # leak past `TrainingBackend.start_training`: set_seed(None) raises, PEFT
@@ -314,6 +335,7 @@ class TestTrainingRawSupport(unittest.TestCase):
             _coerce_seed,
             _coerce_optional_bool,
             _coerce_optional_nonneg_float,
+            _build_training_worker_config,
         )
 
         self.assertEqual(_coerce_seed(None), 3407)
@@ -370,6 +392,17 @@ class TestTrainingRawSupport(unittest.TestCase):
         for name in ("max_grad_value", "max_grad_leaf_norm"):
             self.assertIn(f"if {name} < 0 or not math.isfinite({name}):", source)
         self.assertTrue(math.isfinite(_resolve_mlx_max_grad_norm(None)))
+
+        self.assertEqual(
+            _build_training_worker_config({"model_name": "unsloth/test"})["max_grad_norm"],
+            1.0,
+        )
+        self.assertEqual(
+            _build_training_worker_config(
+                {"model_name": "unsloth/test", "max_grad_norm": 3}
+            )["max_grad_norm"],
+            3.0,
+        )
 
     def test_mlx_worker_feature_detects_optional_mlx_config_fields(self):
         # `cast_norm_output_to_input_dtype`, `dataset_order`, `max_grad_leaf_norm` and `append_eos` ship

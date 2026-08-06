@@ -1612,6 +1612,8 @@ export const hi = {
       gradAccumTooltip: "अतिरिक्त VRAM के बिना बड़े बैच साइज़ का अनुकरण करता है।",
       weightDecay: "वेट डिके",
       weightDecayTooltip: "ओवरफ़िटिंग रोकने के लिए L2 रेगुलराइज़ेशन।",
+      maxGradNorm: "अधिकतम ग्रेडिएंट नॉर्म",
+      maxGradNormTooltip: "इस मान से अधिक ग्रेडिएंट नॉर्म को क्लिप करें। अक्षम करने के लिए 0 सेट करें।",
       warmupSteps: "वार्मअप स्टेप्स",
       warmupStepsTooltip:
         "स्थिरता के लिए ट्रेनिंग की शुरुआत में LR को धीरे-धीरे बढ़ाएं।",

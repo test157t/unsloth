@@ -94,6 +94,9 @@ export function mapBackendModelConfigToTrainingPatch(
   const weightDecay = toNumber(training?.weight_decay);
   if (weightDecay !== undefined) patch.weightDecay = weightDecay;
 
+  const maxGradNorm = toNumber(training?.max_grad_norm);
+  if (maxGradNorm !== undefined) patch.maxGradNorm = maxGradNorm;
+
   const randomSeed = toNumber(training?.random_seed);
   if (randomSeed !== undefined) patch.randomSeed = randomSeed;
 

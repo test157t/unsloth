@@ -1659,6 +1659,8 @@ export const it = {
       gradAccumTooltip: "Simula batch più grandi senza VRAM aggiuntiva.",
       weightDecay: "Decadimento dei pesi",
       weightDecayTooltip: "Regolarizzazione L2 per evitare l'overfitting.",
+      maxGradNorm: "Norma gradiente max",
+      maxGradNormTooltip: "Limita le norme del gradiente sopra questo valore. Imposta 0 per disabilitare.",
       warmupSteps: "Step di warmup",
       warmupStepsTooltip:
         "Aumenta gradualmente il tasso di apprendimento all'inizio dell'addestramento, per stabilità.",

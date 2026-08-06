@@ -1654,6 +1654,8 @@ export const es = {
         "Simula tamaños de batch más grandes sin VRAM adicional.",
       weightDecay: "Decaimiento de pesos",
       weightDecayTooltip: "Regularización L2 para prevenir el sobreajuste.",
+      maxGradNorm: "Norma máx. del gradiente",
+      maxGradNormTooltip: "Recorta normas de gradiente por encima de este valor. Usa 0 para desactivarlo.",
       warmupSteps: "Pasos de calentamiento",
       warmupStepsTooltip:
         "Aumenta gradualmente la LR al inicio del entrenamiento para dar estabilidad.",

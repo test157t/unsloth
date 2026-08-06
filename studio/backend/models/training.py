@@ -459,17 +459,11 @@ class TrainingStartRequest(BaseModel):
     # All three clip knobs are finite as well as non-negative: JSON 1e309 (and
     # FastAPI's Infinity literal) floats to inf, which clears ge=0 but never
     # binds, so the run would train unclipped while reporting a threshold.
-    max_grad_norm: Optional[float] = Field(
-        None,
+    max_grad_norm: float = Field(
+        1.0,
         ge = 0,
         allow_inf_nan = False,
-        description = (
-            "Global gradient norm clipping threshold. Unset keeps the training "
-            "backend's own default; 0 turns global-norm clipping off, which on "
-            "MLX leaves per-parameter clipping in force unless max_grad_leaf_norm "
-            "is also 0. Honored on MLX; the CUDA path trains with its own fixed "
-            "thresholds."
-        ),
+        description = "Global gradient norm clipping threshold. Set 0 to disable.",
     )
     max_grad_value: Optional[float] = Field(
         None,

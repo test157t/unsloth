@@ -5,15 +5,25 @@ import { useSyncExternalStore } from "react";
 
 export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
-export type Palette = "standard" | "classic" | "minimal";
+export type Palette = "standard" | "classic" | "minimal" | "gothic";
 
 const STORAGE_KEY = "theme";
 const PALETTE_STORAGE_KEY = "palette";
 
-export const PALETTES: readonly Palette[] = ["standard", "classic", "minimal"];
+export const PALETTES: readonly Palette[] = [
+  "standard",
+  "classic",
+  "minimal",
+  "gothic",
+];
 
 export function isPalette(value: unknown): value is Palette {
-  return value === "standard" || value === "classic" || value === "minimal";
+  return (
+    value === "standard" ||
+    value === "classic" ||
+    value === "minimal" ||
+    value === "gothic"
+  );
 }
 
 // Persist a re-derived literal from a fixed allow-list rather than the argument,
@@ -28,6 +38,7 @@ const STORED_PALETTE: Record<Palette, Palette> = {
   standard: "standard",
   classic: "classic",
   minimal: "minimal",
+  gothic: "gothic",
 };
 
 function readStoredTheme(): Theme {
@@ -74,10 +85,13 @@ function resolveTheme(theme: Theme): ResolvedTheme {
 function applyToDocument(resolved: ResolvedTheme) {
   if (typeof document === "undefined") return;
   const el = document.documentElement;
-  el.classList.toggle("dark", resolved === "dark");
-  el.classList.toggle("light", resolved === "light");
+  // Gothic Glass is intentionally a dark-only skin so dark: utility variants
+  // and native controls remain readable even if the app theme was light.
+  const effective = currentPalette === "gothic" ? "dark" : resolved;
+  el.classList.toggle("dark", effective === "dark");
+  el.classList.toggle("light", effective === "light");
   // Native controls (scrollbars, spinners, pickers) follow the app mode.
-  el.style.colorScheme = resolved;
+  el.style.colorScheme = effective;
 }
 
 function applyPaletteToDocument(palette: Palette) {
@@ -144,7 +158,7 @@ function getServerSnapshot(): Theme {
 // changes when the OS scheme flips, so consumers keyed on `resolved`
 // (customization applier, mode-scoped settings) would not re-render.
 function getResolvedSnapshot(): ResolvedTheme {
-  return resolveTheme(currentTheme);
+  return currentPalette === "gothic" ? "dark" : resolveTheme(currentTheme);
 }
 
 function getResolvedServerSnapshot(): ResolvedTheme {
@@ -204,6 +218,7 @@ export function setPalette(next: Palette): void {
   } catch {
     // ignore storage failures
   }
+  applyToDocument(resolveTheme(currentTheme));
   applyPaletteToDocument(next);
   listeners.forEach((cb) => cb());
 }
