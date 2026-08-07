@@ -223,13 +223,13 @@ export async function generateStudioTtsAudio(
   text: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const response = await authFetch("/api/inference/audio/generate", {
+  const response = await authFetch("/api/inference/audio/tts/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messages: [{ role: "user", content: text }],
-      stream: false,
-    }),
+    body: JSON.stringify((() => {
+      const { ttsVoice, ttsReferenceAudio, ttsReferenceText } = useVoiceSettingsStore.getState();
+      return { text, voice: ttsVoice || null, reference_audio: ttsReferenceAudio, reference_text: ttsReferenceText || null };
+    })()),
     signal,
   });
   if (!response.ok) {
@@ -237,9 +237,9 @@ export async function generateStudioTtsAudio(
       detail?: string;
     } | null;
     const detail = body?.detail ?? `HTTP ${response.status}`;
-    if (/no model loaded|not an audio model/i.test(detail)) {
+    if (/no tts model is loaded/i.test(detail)) {
       throw new Error(
-        "No TTS model is loaded. Load an audio model (e.g. Orpheus TTS) from the model selector, then try again.",
+        "No model is loaded in the dedicated TTS runtime. Choose and load one in Voice settings.",
       );
     }
     throw new Error(detail);

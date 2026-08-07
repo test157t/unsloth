@@ -16,6 +16,7 @@ import secrets as _secrets
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse, JSONResponse, Response
+from pydantic import BaseModel
 from starlette.requests import ClientDisconnect
 from typing import Any, Callable, Collection, List, NamedTuple, Optional, Union
 import json
@@ -8257,6 +8258,130 @@ async def generate_audio(
             ],
         }
     )
+
+
+# =====================================================================
+# Dedicated TTS sidecar  (/audio/tts/*)
+# =====================================================================
+
+
+class TtsSidecarLoadRequest(BaseModel):
+    model: str
+
+
+class TtsSidecarGenerateRequest(BaseModel):
+    text: str
+    voice: Optional[str] = None
+    reference_audio: Optional[str] = None
+    reference_text: Optional[str] = None
+
+
+@studio_router.get("/audio/tts/status")
+async def tts_sidecar_status(current_subject: str = Depends(get_current_subject)):
+    """Return the independent TTS runtime state, never chat model state."""
+    from core.inference.tts_sidecar import get_tts_sidecar
+
+    return get_tts_sidecar().status()
+
+
+@studio_router.get("/audio/tts/models")
+async def tts_sidecar_models(current_subject: str = Depends(get_current_subject)):
+    """List complete, locally available output-TTS models for the sidecar."""
+    from routes.models import collect_local_models
+    from utils.models.model_config import ModelConfig
+
+    models = [
+        {
+            "id": "onnx-community/Kokoro-82M-v1.0-ONNX",
+            "name": "Kokoro 82M ONNX",
+            "audio_type": "kokoro",
+        }
+        ,
+        {
+            "id": "KevinAHM/pocket-tts-onnx",
+            "name": "Pocket TTS ONNX",
+            "audio_type": "pocket_tts",
+        }
+        ,
+        {
+            "id": "onnx-community/OmniVoice-Onnx",
+            "name": "OmniVoice ONNX",
+            "audio_type": "omnivoice",
+        }
+    ]
+    for candidate in collect_local_models(Path("./models")):
+        if candidate.partial:
+            continue
+        config = ModelConfig.from_identifier(candidate.path)
+        if (
+            config is None
+            or not config.is_audio
+            or config.audio_type not in {"snac", "csm", "bicodec", "dac"}
+            or config.is_gguf
+        ):
+            continue
+        models.append(
+            {
+                "id": config.identifier,
+                "name": config.display_name,
+                "audio_type": config.audio_type,
+            }
+        )
+    return {"models": models}
+
+
+@studio_router.post("/audio/tts/load")
+async def tts_sidecar_load(
+    payload: TtsSidecarLoadRequest,
+    current_subject: str = Depends(get_current_subject),
+    hf_token: Optional[str] = Depends(get_hf_token),
+):
+    from core.inference.tts_sidecar import get_tts_sidecar
+
+    try:
+        return await asyncio.to_thread(get_tts_sidecar().load, payload.model, hf_token = hf_token)
+    except ValueError as exc:
+        raise HTTPException(status_code = 422, detail = str(exc))
+    except Exception as exc:
+        logger.exception("Dedicated TTS runtime load failed")
+        raise HTTPException(status_code = 500, detail = safe_error_detail(exc))
+
+
+@studio_router.post("/audio/tts/unload")
+async def tts_sidecar_unload(current_subject: str = Depends(get_current_subject)):
+    from core.inference.tts_sidecar import get_tts_sidecar
+
+    return await asyncio.to_thread(get_tts_sidecar().unload)
+
+
+@studio_router.post("/audio/tts/generate")
+async def tts_sidecar_generate(
+    payload: TtsSidecarGenerateRequest,
+    current_subject: str = Depends(get_current_subject),
+):
+    import base64
+
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code = 400, detail = "No text provided.")
+    from core.inference.tts_sidecar import get_tts_sidecar
+
+    try:
+        wav_bytes, sample_rate = await asyncio.to_thread(
+            get_tts_sidecar().generate, text, payload.voice, payload.reference_audio, payload.reference_text
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code = 409, detail = str(exc))
+    except Exception as exc:
+        logger.exception("Dedicated TTS runtime generation failed")
+        raise HTTPException(status_code = 500, detail = safe_error_detail(exc))
+    return {
+        "audio": {
+            "data": base64.b64encode(wav_bytes).decode("ascii"),
+            "format": "wav",
+            "sample_rate": sample_rate,
+        }
+    }
 
 
 # =====================================================================
