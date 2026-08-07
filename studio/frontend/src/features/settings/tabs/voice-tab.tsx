@@ -309,8 +309,9 @@ function TtsModelPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
   const filtered = models.filter((model) =>
-    `${model.name} ${model.id} ${model.audio_type}`.toLowerCase().includes(query.toLowerCase()),
+    `${model.name} ${model.id} ${model.audio_type}`.toLowerCase().includes(normalizedQuery),
   );
   const selected = models.find((model) => model.id === value);
   return (
@@ -328,7 +329,7 @@ function TtsModelPicker({
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search TTS models"
+          placeholder="Search supported TTS models"
           className="h-8"
           autoFocus={true}
         />
@@ -348,6 +349,11 @@ function TtsModelPicker({
               <span className="font-mono text-ui-9 text-muted-foreground">{model.id}</span>
             </button>
           ))}
+          {filtered.length === 0 && (
+            <p className="px-2.5 py-3 text-xs text-muted-foreground">
+              No supported TTS model found.
+            </p>
+          )}
         </div>
       </PopoverContent>
     </Popover>
