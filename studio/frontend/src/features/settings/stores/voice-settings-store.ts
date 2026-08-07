@@ -131,16 +131,6 @@ export interface VoiceSettingsState {
   ttsEngine: "system" | "studio";
   setTtsEngine: (value: "system" | "studio") => void;
 
-  /** Model owned by the dedicated TTS runtime, never the chat runtime. */
-  ttsModel: string;
-  setTtsModel: (value: string) => void;
-  ttsVoice: string;
-  setTtsVoice: (value: string) => void;
-  ttsReferenceAudio: string | null;
-  setTtsReferenceAudio: (value: string | null) => void;
-  ttsReferenceText: string;
-  setTtsReferenceText: (value: string) => void;
-
   /** speechSynthesis voiceURI, or "default" for the system voice. */
   ttsVoiceURI: string;
   setTtsVoiceURI: (value: string) => void;
@@ -303,15 +293,6 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>()(
       ttsEngine: "system",
       setTtsEngine: (ttsEngine) => set({ ttsEngine }),
 
-      ttsModel: "",
-      setTtsModel: (ttsModel) => set({ ttsModel }),
-      ttsVoice: "",
-      setTtsVoice: (ttsVoice) => set({ ttsVoice }),
-      ttsReferenceAudio: null,
-      setTtsReferenceAudio: (ttsReferenceAudio) => set({ ttsReferenceAudio }),
-      ttsReferenceText: "",
-      setTtsReferenceText: (ttsReferenceText) => set({ ttsReferenceText }),
-
       ttsVoiceURI: "default",
       setTtsVoiceURI: (ttsVoiceURI) => set({ ttsVoiceURI }),
 
@@ -361,10 +342,6 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>()(
           ttsEnabled:
             typeof saved?.ttsEnabled === "boolean" ? saved.ttsEnabled : true,
           ttsEngine: saved?.ttsEngine === "studio" ? "studio" : "system",
-          ttsModel: asString(saved?.ttsModel, ""),
-          ttsVoice: asString(saved?.ttsVoice, ""),
-          ttsReferenceAudio: typeof saved?.ttsReferenceAudio === "string" ? saved.ttsReferenceAudio : null,
-          ttsReferenceText: asString(saved?.ttsReferenceText, ""),
           ttsVoiceURI: asString(saved?.ttsVoiceURI, "default"),
           ttsRate: clampNumber(saved?.ttsRate, 0.5, 2, 1),
           ttsPitch: clampNumber(saved?.ttsPitch, 0, 2, 1),

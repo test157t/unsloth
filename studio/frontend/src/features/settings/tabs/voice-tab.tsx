@@ -40,7 +40,6 @@ import {
 } from "@/features/hub";
 import { useDebouncedValue, useWheelScrollRef } from "@/hooks";
 import { useT } from "@/i18n";
-import { authFetch } from "@/features/auth";
 import { isTauri } from "@/lib/api-base";
 import { ChevronDownStandardIcon } from "@/lib/chevron-icons";
 import { MicIcon } from "@/lib/mic-icon";
@@ -298,62 +297,6 @@ function SttModelPicker({
   );
 }
 
-function TtsModelPicker({
-  value,
-  models,
-  onChange,
-}: {
-  value: string;
-  models: { id: string; name: string; audio_type: string }[];
-  onChange: (model: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const filtered = models.filter((model) =>
-    `${model.name} ${model.id} ${model.audio_type}`.toLowerCase().includes(query.toLowerCase()),
-  );
-  const selected = models.find((model) => model.id === value);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild={true}>
-        <button
-          type="button"
-          className="border-border bg-background hover:bg-accent/50 dark:border-transparent dark:bg-white/[0.06] dark:hover:bg-white/10 flex h-8 min-w-56 max-w-72 items-center justify-between gap-1.5 rounded-full border px-3.5 text-sm"
-        >
-          <span className="truncate">{selected?.name ?? "Choose TTS model"}</span>
-          <HugeiconsIcon icon={ChevronDownStandardIcon} className="size-4 shrink-0 text-muted-foreground" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={4} className="w-72 p-1.5">
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search TTS models"
-          className="h-8"
-          autoFocus={true}
-        />
-        <div className="mt-1 max-h-64 overflow-y-auto">
-          {filtered.map((model) => (
-            <button
-              key={model.id}
-              type="button"
-              onClick={() => {
-                onChange(model.id);
-                setOpen(false);
-                setQuery("");
-              }}
-              className={`flex w-full flex-col rounded-[10px] px-2.5 py-2 text-left hover:bg-muted ${model.id === value ? "bg-accent" : ""}`}
-            >
-              <span className="text-xs font-medium">{model.name}</span>
-              <span className="font-mono text-ui-9 text-muted-foreground">{model.id}</span>
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function useAudioInputDevices() {
   const t = useT();
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -450,14 +393,6 @@ export function VoiceTab() {
   const ttsEnabled = useVoiceSettingsStore((s) => s.ttsEnabled);
   const setTtsEnabled = useVoiceSettingsStore((s) => s.setTtsEnabled);
   const ttsEngine = useVoiceSettingsStore((s) => s.ttsEngine);
-  const ttsModel = useVoiceSettingsStore((s) => s.ttsModel);
-  const setTtsModel = useVoiceSettingsStore((s) => s.setTtsModel);
-  const ttsVoice = useVoiceSettingsStore((s) => s.ttsVoice);
-  const setTtsVoice = useVoiceSettingsStore((s) => s.setTtsVoice);
-  const ttsReferenceAudio = useVoiceSettingsStore((s) => s.ttsReferenceAudio);
-  const setTtsReferenceAudio = useVoiceSettingsStore((s) => s.setTtsReferenceAudio);
-  const ttsReferenceText = useVoiceSettingsStore((s) => s.ttsReferenceText);
-  const setTtsReferenceText = useVoiceSettingsStore((s) => s.setTtsReferenceText);
   const setTtsEngine = useVoiceSettingsStore((s) => s.setTtsEngine);
   const ttsVoiceURI = useVoiceSettingsStore((s) => s.ttsVoiceURI);
   const setTtsVoiceURI = useVoiceSettingsStore((s) => s.setTtsVoiceURI);
@@ -466,27 +401,6 @@ export function VoiceTab() {
   const ttsPitch = useVoiceSettingsStore((s) => s.ttsPitch);
   const setTtsPitch = useVoiceSettingsStore((s) => s.setTtsPitch);
   const ttsVolume = useVoiceSettingsStore((s) => s.ttsVolume);
-  const [ttsModels, setTtsModels] = useState<
-    { id: string; name: string; audio_type: string }[]
-  >([]);
-  const [ttsLoadedModel, setTtsLoadedModel] = useState<string | null>(null);
-  const [ttsLoading, setTtsLoading] = useState(false);
-  const [ttsVoices, setTtsVoices] = useState<string[]>([]);
-  const [ttsSupportsReferenceAudio, setTtsSupportsReferenceAudio] = useState(false);
-
-  useEffect(() => {
-    void Promise.all([
-      authFetch("/api/inference/audio/tts/models").then((r) => r.json()),
-      authFetch("/api/inference/audio/tts/status").then((r) => r.json()),
-    ])
-      .then(([models, status]) => {
-        setTtsModels(models.models ?? []);
-        setTtsLoadedModel(status.loaded_model ?? null);
-        setTtsVoices(status.voices ?? []);
-        setTtsSupportsReferenceAudio(status.supports_reference_audio ?? false);
-      })
-      .catch(() => undefined);
-  }, []);
   const setTtsVolume = useVoiceSettingsStore((s) => s.setTtsVolume);
 
   const { devices, hasLabels, requestAccess } = useAudioInputDevices();
@@ -1297,39 +1211,7 @@ export function VoiceTab() {
               <SettingsRow
                 label={t("settings.voice.readAloud.modelLabel")}
                 description={t("settings.voice.readAloud.modelDescription")}
-              >
-                <div className="flex items-center gap-2">
-                  <TtsModelPicker
-                    value={ttsModel}
-                    models={ttsModels}
-                    onChange={setTtsModel}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!ttsModel || ttsLoading}
-                    onClick={() => {
-                      setTtsLoading(true);
-                      void authFetch("/api/inference/audio/tts/load", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ model: ttsModel }),
-                      })
-                        .then(async (response) => {
-                          if (!response.ok) throw new Error(await response.text());
-                          const status = await response.json();
-                          setTtsLoadedModel(status.loaded_model ?? null);
-                          setTtsVoices(status.voices ?? []);
-                          setTtsSupportsReferenceAudio(status.supports_reference_audio ?? false);
-                        })
-                        .catch((error) => toast.error(String(error)))
-                        .finally(() => setTtsLoading(false));
-                    }}
-                  >
-                    {ttsLoading ? "Loading" : ttsLoadedModel === ttsModel ? "Loaded" : "Load"}
-                  </Button>
-                </div>
-              </SettingsRow>
+              />
             ) : (
               <SettingsRow
                 label={t("settings.voice.readAloud.voiceLabel")}
@@ -1355,44 +1237,6 @@ export function VoiceTab() {
                   </SelectContent>
                 </Select>
               </SettingsRow>
-            )}
-
-            {effectiveTtsEngine === "studio" && ttsVoices.length > 0 && (
-              <SettingsRow label="TTS voice" description="Voice provided by the selected TTS model.">
-                <Select value={ttsVoice || ttsVoices[0]} onValueChange={setTtsVoice}>
-                  <SelectTrigger className="min-w-56 max-w-72" size="sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ttsVoices.map((voice) => (
-                      <SelectItem key={voice} value={voice}>{voice}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </SettingsRow>
-            )}
-
-            {effectiveTtsEngine === "studio" && ttsSupportsReferenceAudio && (
-              <>
-                <SettingsRow label="Voice reference audio" description="Optional audio prompt for voice-cloning models.">
-                  <Input
-                    type="file"
-                    accept="audio/*"
-                    className="max-w-72"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => setTtsReferenceAudio(typeof reader.result === "string" ? reader.result : null);
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                </SettingsRow>
-                <SettingsRow label="Reference transcript" description="Required by OmniVoice when using a reference audio prompt.">
-                  <Input value={ttsReferenceText} onChange={(event) => setTtsReferenceText(event.target.value)} placeholder="Words spoken in the reference audio" />
-                </SettingsRow>
-                {ttsReferenceAudio && <Button variant="ghost" size="sm" onClick={() => setTtsReferenceAudio(null)}>Clear reference audio</Button>}
-              </>
             )}
 
             <SettingsRow
