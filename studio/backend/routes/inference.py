@@ -8286,8 +8286,11 @@ async def tts_sidecar_status(current_subject: str = Depends(get_current_subject)
 
 @studio_router.get("/audio/tts/models")
 async def tts_sidecar_models(current_subject: str = Depends(get_current_subject)):
-    """List the supported TTS catalog without probing every local model."""
-    return {"models": [
+    """List complete, locally available output-TTS models for the sidecar."""
+    from routes.models import collect_local_models
+    from utils.models.model_config import ModelConfig
+
+    models = [
         {
             "id": "onnx-community/Kokoro-82M-v1.0-ONNX",
             "name": "Kokoro 82M ONNX",
@@ -8305,7 +8308,26 @@ async def tts_sidecar_models(current_subject: str = Depends(get_current_subject)
             "name": "OmniVoice ONNX",
             "audio_type": "omnivoice",
         }
-    ]}
+    ]
+    for candidate in collect_local_models(Path("./models")):
+        if candidate.partial:
+            continue
+        config = ModelConfig.from_identifier(candidate.path)
+        if (
+            config is None
+            or not config.is_audio
+            or config.audio_type not in {"snac", "csm", "bicodec", "dac"}
+            or config.is_gguf
+        ):
+            continue
+        models.append(
+            {
+                "id": config.identifier,
+                "name": config.display_name,
+                "audio_type": config.audio_type,
+            }
+        )
+    return {"models": models}
 
 
 @studio_router.post("/audio/tts/load")
