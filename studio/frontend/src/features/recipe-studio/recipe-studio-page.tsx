@@ -799,7 +799,7 @@ export function RecipeStudioPage({
       className={
         maximized
           ? "fixed inset-x-0 bottom-0 z-50 flex flex-col bg-background"
-          : "flex h-full min-h-0 flex-1 flex-col bg-background"
+          : "flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background"
       }
       style={
         maximized
@@ -811,9 +811,9 @@ export function RecipeStudioPage({
           : undefined
       }
     >
-      <main className="flex min-h-0 w-full flex-1 flex-col">
+      <main className="flex min-h-0 min-w-0 w-full flex-1 flex-col">
         <div
-          className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden border"
+          className="relative flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden border"
           ref={setSheetContainer}
         >
           <RecipeStudioHeader
@@ -831,7 +831,7 @@ export function RecipeStudioPage({
             }}
           />
           <div
-            className="flex min-h-0 w-full flex-1 rounded-t-none"
+            className="flex min-h-0 min-w-0 w-full flex-1 rounded-t-none"
             ref={flowContainerRef}
           >
             {activeView === "easy" ? (

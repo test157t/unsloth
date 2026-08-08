@@ -583,64 +583,64 @@
 }
 
 /* ----------------------------- Gothic Glass -----------------------------
-   A dark-only, translucent violet skin. It overrides mode tokens too, so it
-   remains legible when selected while the app's color scheme was light. */
+   A dark-only black-glass skin. Violet identifies focus and interaction;
+   surfaces stay neutral so the accents retain their weight. */
 :root[data-palette="gothic"] {
-	--background: #09070e;
-	--foreground: #f4efff;
-	--card: rgb(25 18 38 / 78%);
-	--card-foreground: #f4efff;
-	--popover: rgb(22 15 34 / 92%);
-	--popover-foreground: #f4efff;
-	--primary: #a67cff;
-	--primary-foreground: #160d24;
-	--secondary: rgb(62 42 92 / 55%);
-	--secondary-foreground: #eee7ff;
-	--muted: rgb(42 29 61 / 58%);
-	--muted-foreground: #c5b8da;
-	--accent: rgb(116 78 167 / 35%);
+	--background: #07070a;
+	--foreground: #f5f3f7;
+	--card: rgb(18 18 22 / 74%);
+	--card-foreground: #f5f3f7;
+	--popover: rgb(13 13 16 / 90%);
+	--popover-foreground: #f5f3f7;
+	--primary: #9a6cff;
+	--primary-foreground: #110c1a;
+	--secondary: rgb(255 255 255 / 7%);
+	--secondary-foreground: #e4e0e7;
+	--muted: rgb(255 255 255 / 5%);
+	--muted-foreground: #b7b1bd;
+	--accent: rgb(154 108 255 / 18%);
 	--accent-foreground: #ffffff;
-	--destructive: #ff6b93;
-	--bypass: #f0c35a;
-	--border: rgb(180 137 255 / 26%);
-	--input: rgb(180 137 255 / 34%);
-	--ring: #c3a5ff;
-	--control-accent: #a67cff;
-	--control-accent-foreground: #160d24;
-	--chart-1: #b692ff;
-	--chart-2: #e6a6ff;
-	--chart-3: #7ce0df;
-	--chart-4: #ff8fbb;
-	--chart-5: #f0c35a;
-	--sidebar: rgb(16 11 25 / 88%);
-	--sidebar-foreground: #f4efff;
-	--sidebar-primary: #a67cff;
-	--sidebar-primary-foreground: #160d24;
-	--sidebar-accent: rgb(116 78 167 / 38%);
+	--destructive: #dc5365;
+	--bypass: #c8c3cc;
+	--border: rgb(216 211 221 / 18%);
+	--input: rgb(216 211 221 / 26%);
+	--ring: #b394ff;
+	--control-accent: #9a6cff;
+	--control-accent-foreground: #110c1a;
+	--chart-1: #a57aff;
+	--chart-2: #dc5365;
+	--chart-3: #c8c3cc;
+	--chart-4: #852f40;
+	--chart-5: #756d7b;
+	--sidebar: rgb(11 11 13 / 88%);
+	--sidebar-foreground: #f5f3f7;
+	--sidebar-primary: #9a6cff;
+	--sidebar-primary-foreground: #110c1a;
+	--sidebar-accent: rgb(154 108 255 / 18%);
 	--sidebar-accent-foreground: #ffffff;
-	--sidebar-border: rgb(180 137 255 / 20%);
-	--sidebar-ring: #c3a5ff;
-	--nav-fg: #e9e0f7;
-	--nav-fg-muted: #aa9bbb;
-	--nav-surface-hover: rgb(130 88 185 / 28%);
-	--nav-icon-idle: #9a86b4;
-	--nav-beta-border: rgb(180 137 255 / 34%);
-	--panel-surface: rgb(10 7 16 / 70%);
-	--panel-surface-hover: rgb(116 78 167 / 28%);
-	--panel-input-surface: rgb(255 255 255 / 7%);
-	--panel-input-surface-hover: rgb(180 137 255 / 16%);
-	--panel-surface-fg-muted: #c5b8da;
-	--panel-slider-fg: #b692ff;
-	--chat-icon-fg: #d7c9ed;
+	--sidebar-border: rgb(216 211 221 / 14%);
+	--sidebar-ring: #b394ff;
+	--nav-fg: #e4e0e7;
+	--nav-fg-muted: #aaa4b0;
+	--nav-surface-hover: rgb(154 108 255 / 15%);
+	--nav-icon-idle: #9a94a1;
+	--nav-beta-border: rgb(216 211 221 / 22%);
+	--panel-surface: rgb(10 10 12 / 72%);
+	--panel-surface-hover: rgb(154 108 255 / 15%);
+	--panel-input-surface: rgb(255 255 255 / 6%);
+	--panel-input-surface-hover: rgb(154 108 255 / 12%);
+	--panel-surface-fg-muted: #b7b1bd;
+	--panel-slider-fg: #b394ff;
+	--chat-icon-fg: #d5d0d9;
 	--chat-icon-fg-hover: #ffffff;
-	--chat-icon-bg-hover: rgb(130 88 185 / 30%);
+	--chat-icon-bg-hover: rgb(154 108 255 / 18%);
 	--font-heading: "Source Serif 4", Georgia, serif;
 }
 
 :root[data-palette="gothic"] body {
 	background:
-		radial-gradient(circle at 72% -12%, rgb(120 73 192 / 20%), transparent 36rem),
-		radial-gradient(circle at -12% 92%, rgb(72 39 121 / 18%), transparent 34rem),
+		radial-gradient(circle at 72% -12%, rgb(154 108 255 / 10%), transparent 36rem),
+		radial-gradient(circle at -12% 92%, rgb(112 21 43 / 8%), transparent 34rem),
 		var(--background);
 }
 

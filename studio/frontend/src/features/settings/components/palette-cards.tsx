@@ -72,18 +72,18 @@ const PREVIEWS: Record<Palette, Record<ResolvedTheme, PreviewColors>> = {
   },
   gothic: {
     light: {
-      bg: "#09070e",
-      sidebar: "#15101f",
-      accent: "#a67cff",
-      text: "#f4efff",
-      border: "#3c2b5a",
+      bg: "#07070a",
+      sidebar: "#0b0b0d",
+      accent: "#9a6cff",
+      text: "#f5f3f7",
+      border: "#3a3740",
     },
     dark: {
-      bg: "#09070e",
-      sidebar: "#15101f",
-      accent: "#a67cff",
-      text: "#f4efff",
-      border: "#3c2b5a",
+      bg: "#07070a",
+      sidebar: "#0b0b0d",
+      accent: "#9a6cff",
+      text: "#f5f3f7",
+      border: "#3a3740",
     },
   },
 };

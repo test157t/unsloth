@@ -15,13 +15,18 @@ try {
     palette = localStorage.getItem("palette");
   } catch (e) {}
   var dark =
+    palette === "gothic" ||
     theme === "dark" ||
     (theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
   var root = document.documentElement;
   root.classList.toggle("dark", dark);
   root.classList.toggle("light", !dark);
   root.style.colorScheme = dark ? "dark" : "light";
-  if (palette === "classic" || palette === "minimal") {
+  if (
+    palette === "classic" ||
+    palette === "minimal" ||
+    palette === "gothic"
+  ) {
     root.setAttribute("data-palette", palette);
   }
 } catch (e) {}

@@ -370,7 +370,7 @@ export function ExecutionsView({
   }, [terminalLines.length]);
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 min-w-0 w-full">
       <ExecutionSidebar
         executions={executions}
         selectedExecutionId={selectedExecutionId}
