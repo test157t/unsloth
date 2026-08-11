@@ -15,7 +15,7 @@ export type PersonalizationProfile = {
 
 export type PersonalizationAppearance = {
   theme: "light" | "dark" | "system";
-  palette: "standard" | "classic" | "minimal";
+  palette: "standard" | "classic" | "minimal" | "gothic";
   language: string | null;
   customization: AppearanceCustomization;
 };

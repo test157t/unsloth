@@ -89,6 +89,7 @@ export function TrainingHyperparametersSection({
       batchSize: state.batchSize,
       gradientAccumulation: state.gradientAccumulation,
       weightDecay: state.weightDecay,
+      maxGradNorm: state.maxGradNorm,
       warmupSteps: state.warmupSteps,
       saveSteps: state.saveSteps,
       evalSteps: state.evalSteps,
@@ -98,6 +99,7 @@ export function TrainingHyperparametersSection({
       setBatchSize: state.setBatchSize,
       setGradientAccumulation: state.setGradientAccumulation,
       setWeightDecay: state.setWeightDecay,
+      setMaxGradNorm: state.setMaxGradNorm,
       setWarmupSteps: state.setWarmupSteps,
       setEpochs: state.setEpochs,
       setSaveSteps: state.setSaveSteps,
@@ -281,6 +283,21 @@ export function TrainingHyperparametersSection({
                 value={store.weightDecay}
                 onChange={(event) =>
                   store.setWeightDecay(Number(event.target.value))
+                }
+                className="w-28 font-mono"
+              />
+            </ParamsRow>
+            <ParamsRow
+              label={t("studio.params.maxGradNorm")}
+              tooltip={t("studio.params.maxGradNormTooltip")}
+            >
+              <Input
+                type="number"
+                min="0"
+                step="0.1"
+                value={store.maxGradNorm}
+                onChange={(event) =>
+                  store.setMaxGradNorm(Number(event.target.value))
                 }
                 className="w-28 font-mono"
               />

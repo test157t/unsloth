@@ -1642,6 +1642,8 @@ export const ko = {
       gradAccumTooltip: "추가 VRAM 없이 더 큰 배치 크기를 시뮬레이션합니다.",
       weightDecay: "가중치 감쇠",
       weightDecayTooltip: "과적합을 방지하기 위한 L2 정규화입니다.",
+      maxGradNorm: "최대 그래디언트 노름",
+      maxGradNormTooltip: "이 값을 초과하는 그래디언트 노름을 클리핑합니다. 0으로 설정하면 비활성화됩니다.",
       warmupSteps: "워밍업 스텝",
       warmupStepsTooltip:
         "안정성을 위해 학습 시작 시 학습률을 점진적으로 높입니다.",

@@ -75,6 +75,10 @@ const PALETTE_DEFAULT_COLORS: Record<
     light: { accent: "#171717", background: "#ffffff", foreground: "#171717" },
     dark: { accent: "#ededed", background: "#181818", foreground: "#ededed" },
   },
+  gothic: {
+    light: { accent: "#9a6cff", background: "#07070a", foreground: "#f5f3f7" },
+    dark: { accent: "#9a6cff", background: "#07070a", foreground: "#f5f3f7" },
+  },
 };
 
 /**

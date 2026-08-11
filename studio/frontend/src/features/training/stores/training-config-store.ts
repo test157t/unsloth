@@ -1287,6 +1287,7 @@ export const useTrainingConfigStore = create<TrainingConfigStore>()(
           setUserEdit({ gradientAccumulation }),
         setWeightDecay: (weightDecay) => setUserEdit({ weightDecay }),
         setWarmupSteps: (warmupSteps) => setUserEdit({ warmupSteps }),
+        setMaxGradNorm: (maxGradNorm) => setUserEdit({ maxGradNorm }),
         setMaxSteps: (maxSteps) => {
           const state = get();
           // streamingCompatiblePatch already turns streaming off when maxSteps<=0.

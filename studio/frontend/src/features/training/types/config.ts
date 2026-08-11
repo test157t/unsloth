@@ -98,6 +98,7 @@ export interface TrainingConfigState {
   batchSize: number;
   gradientAccumulation: number;
   weightDecay: number;
+  maxGradNorm: number;
   warmupSteps: number;
   maxSteps: number;
   saveSteps: number;
@@ -237,6 +238,7 @@ export interface TrainingConfigActions {
   setBatchSize: (value: number) => void;
   setGradientAccumulation: (value: number) => void;
   setWeightDecay: (value: number) => void;
+  setMaxGradNorm: (value: number) => void;
   setWarmupSteps: (value: number) => void;
   setMaxSteps: (value: number) => void;
   setSaveSteps: (value: number) => void;

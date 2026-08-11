@@ -1705,6 +1705,8 @@ export const fr = {
       weightDecay: "Décroissance des poids",
       weightDecayTooltip:
         "Régularisation L2 pour prévenir le surapprentissage.",
+      maxGradNorm: "Norme max. du gradient",
+      maxGradNormTooltip: "Limite les normes de gradient au-dessus de cette valeur. Réglez sur 0 pour désactiver.",
       warmupSteps: "Étapes de préchauffage",
       warmupStepsTooltip:
         "Augmenter progressivement le taux d'apprentissage au début de l'entraînement pour plus de stabilité.",

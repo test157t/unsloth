@@ -1697,6 +1697,8 @@ export const de = {
         "Simuliert größere Batch-Größen ohne zusätzlichen VRAM.",
       weightDecay: "Weight Decay",
       weightDecayTooltip: "L2-Regularisierung zur Vermeidung von Overfitting.",
+      maxGradNorm: "Max. Gradientennorm",
+      maxGradNormTooltip: "Begrenzt Gradientennormen über diesem Wert. Mit 0 deaktivieren.",
       warmupSteps: "Warmup-Schritte",
       warmupStepsTooltip:
         "Erhöht die Lernrate zu Trainingsbeginn schrittweise für mehr Stabilität.",

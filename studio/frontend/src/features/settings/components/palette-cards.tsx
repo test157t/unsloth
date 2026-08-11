@@ -70,6 +70,22 @@ const PREVIEWS: Record<Palette, Record<ResolvedTheme, PreviewColors>> = {
       border: "#303030",
     },
   },
+  gothic: {
+    light: {
+      bg: "#07070a",
+      sidebar: "#0b0b0d",
+      accent: "#9a6cff",
+      text: "#f5f3f7",
+      border: "#3a3740",
+    },
+    dark: {
+      bg: "#07070a",
+      sidebar: "#0b0b0d",
+      accent: "#9a6cff",
+      text: "#f5f3f7",
+      border: "#3a3740",
+    },
+  },
 };
 
 const OPTIONS: {
@@ -79,6 +95,7 @@ const OPTIONS: {
   { value: "standard", labelKey: "settings.appearance.palette.standard" },
   { value: "classic", labelKey: "settings.appearance.palette.classic" },
   { value: "minimal", labelKey: "settings.appearance.palette.minimal" },
+  { value: "gothic", labelKey: "settings.appearance.palette.gothic" },
 ];
 
 function PalettePreview({ colors }: { colors: PreviewColors }) {
@@ -117,7 +134,7 @@ export function PaletteCards() {
   const { resolved } = useTheme();
   const { palette, setPalette } = usePalette();
   return (
-    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {OPTIONS.map((opt) => {
         const active = palette === opt.value;
         return (
