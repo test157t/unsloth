@@ -15,6 +15,7 @@ export type RecipePayload = {
     tool_configs: Record<string, unknown>[];
     columns: Record<string, unknown>[];
     processors: Record<string, unknown>[];
+    exports?: Record<string, unknown>[];
   };
   run: {
     rows: number;

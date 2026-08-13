@@ -101,6 +101,12 @@ export type JobStatusResponse = {
   // biome-ignore lint/style/useNamingConvention: api schema
   artifact_path?: string | null;
   // biome-ignore lint/style/useNamingConvention: api schema
+  export_files?: Array<{
+    name?: string;
+    filename?: string;
+    rows?: number;
+  }>;
+  // biome-ignore lint/style/useNamingConvention: api schema
   started_at?: number | null;
   // biome-ignore lint/style/useNamingConvention: api schema
   finished_at?: number | null;
@@ -199,6 +205,22 @@ export type McpToolsListResponse = {
   duplicate_tools: Record<string, string[]>;
 };
 
+export class DataRecipeApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "DataRecipeApiError";
+    this.status = status;
+  }
+}
+
+export function isDataRecipeApiError(
+  error: unknown,
+): error is DataRecipeApiError {
+  return error instanceof DataRecipeApiError;
+}
+
 async function parseErrorResponse(response: Response): Promise<string> {
   const text = (await response.text()).trim();
   if (!text) {
@@ -235,7 +257,10 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(await parseErrorResponse(response));
+    throw new DataRecipeApiError(
+      response.status,
+      await parseErrorResponse(response),
+    );
   }
 
   return response.json();
@@ -244,7 +269,10 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
 async function getJson<T>(path: string): Promise<T> {
   const response = await authFetch(`${DATA_DESIGNER_API_BASE}${path}`);
   if (!response.ok) {
-    throw new Error(await parseErrorResponse(response));
+    throw new DataRecipeApiError(
+      response.status,
+      await parseErrorResponse(response),
+    );
   }
   return response.json();
 }
@@ -338,6 +366,36 @@ export async function publishRecipeJob(
   payload: PublishRecipeJobRequest,
 ): Promise<PublishRecipeJobResponse> {
   return postJson<PublishRecipeJobResponse>(`/jobs/${jobId}/publish`, payload);
+}
+
+export async function downloadRecipeJsonl(
+  artifactPath: string,
+  filename: string,
+): Promise<void> {
+  const params = new URLSearchParams({
+    artifact_path: artifactPath,
+    filename,
+  });
+  const response = await authFetch(
+    `${DATA_DESIGNER_API_BASE}/artifacts/jsonl?${params.toString()}`,
+  );
+  if (!response.ok) {
+    const detail = await readFastApiError(response);
+    throw new Error(
+      formatFastApiDetail(detail) ?? "Failed to download JSONL export.",
+    );
+  }
+  const url = URL.createObjectURL(await response.blob());
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 export async function inspectSeedDataset(

@@ -2,25 +2,27 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import type { ReactElement } from "react";
-import type { NodeConfig, SamplerConfig } from "../types";
-import { getBlockDefinitionForConfig } from "./definitions";
 import { ExpressionDialog } from "../dialogs/expression/expression-dialog";
+import { JsonlExportDialog } from "../dialogs/jsonl-export/jsonl-export-dialog";
 import { LlmDialog } from "../dialogs/llm/llm-dialog";
+import { MarkdownNoteDialog } from "../dialogs/markdown-note/markdown-note-dialog";
 import { ModelConfigDialog } from "../dialogs/models/model-config-dialog";
 import { ModelProviderDialog } from "../dialogs/models/model-provider-dialog";
-import { SeedDialog } from "../dialogs/seed/seed-dialog";
+import { RepairWorkflowDialog } from "../dialogs/repair-workflow/repair-workflow-dialog";
+import { BernoulliDialog } from "../dialogs/samplers/bernoulli-dialog";
 import { CategoryDialog } from "../dialogs/samplers/category-dialog";
 import { DatetimeDialog } from "../dialogs/samplers/datetime-dialog";
-import { BernoulliDialog } from "../dialogs/samplers/bernoulli-dialog";
 import { GaussianDialog } from "../dialogs/samplers/gaussian-dialog";
 import { PersonDialog } from "../dialogs/samplers/person-dialog";
 import { SubcategoryDialog } from "../dialogs/samplers/subcategory-dialog";
 import { TimedeltaDialog } from "../dialogs/samplers/timedelta-dialog";
 import { UniformDialog } from "../dialogs/samplers/uniform-dialog";
 import { UuidDialog } from "../dialogs/samplers/uuid-dialog";
-import { MarkdownNoteDialog } from "../dialogs/markdown-note/markdown-note-dialog";
+import { SeedDialog } from "../dialogs/seed/seed-dialog";
 import { ToolProfileDialog } from "../dialogs/tool-profile/tool-profile-dialog";
 import { ValidatorDialog } from "../dialogs/validators/validator-dialog";
+import type { NodeConfig, SamplerConfig } from "../types";
+import { getBlockDefinitionForConfig } from "./definitions";
 
 export function renderBlockDialog(
   config: NodeConfig | null,
@@ -50,7 +52,8 @@ export function renderBlockDialog(
         <CategoryDialog key={config.id} config={config} onUpdate={update} />
       ) : null;
     case "subcategory":
-      return config.kind === "sampler" && config.sampler_type === "subcategory" ? (
+      return config.kind === "sampler" &&
+        config.sampler_type === "subcategory" ? (
         <SubcategoryDialog
           config={config}
           categoryOptions={categoryOptions}
@@ -66,7 +69,8 @@ export function renderBlockDialog(
         <GaussianDialog config={config} onUpdate={update} />
       ) : null;
     case "bernoulli":
-      return config.kind === "sampler" && config.sampler_type === "bernoulli" ? (
+      return config.kind === "sampler" &&
+        config.sampler_type === "bernoulli" ? (
         <BernoulliDialog config={config} onUpdate={update} />
       ) : null;
     case "datetime":
@@ -74,7 +78,8 @@ export function renderBlockDialog(
         <DatetimeDialog config={config} onUpdate={update} />
       ) : null;
     case "timedelta":
-      return config.kind === "sampler" && config.sampler_type === "timedelta" ? (
+      return config.kind === "sampler" &&
+        config.sampler_type === "timedelta" ? (
         <TimedeltaDialog
           config={config}
           datetimeOptions={datetimeOptions}
@@ -88,7 +93,8 @@ export function renderBlockDialog(
     case "person":
       return config.kind === "sampler" &&
         (config.sampler_type === "person" ||
-          config.sampler_type === "person_from_faker") ? (
+          config.sampler_type === "person_from_faker" ||
+          config.sampler_type === "synthetic_persona") ? (
         <PersonDialog config={config} onUpdate={update} />
       ) : null;
     case "llm":
@@ -121,6 +127,14 @@ export function renderBlockDialog(
     case "expression":
       return config.kind === "expression" ? (
         <ExpressionDialog config={config} onUpdate={update} />
+      ) : null;
+    case "repair_workflow":
+      return config.kind === "expression" ? (
+        <RepairWorkflowDialog config={config} onUpdate={update} />
+      ) : null;
+    case "jsonl_export":
+      return config.kind === "expression" ? (
+        <JsonlExportDialog config={config} onUpdate={update} />
       ) : null;
     case "validator":
       return config.kind === "validator" ? (

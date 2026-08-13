@@ -31,8 +31,8 @@ import type { LlmConfig } from "../../types";
 import { isLikelyImageValue } from "../../utils/image-preview";
 import { findInvalidJinjaReferences } from "../../utils/refs";
 import { getAvailableVariables } from "../../utils/variables";
-import { CollapsibleSectionTriggerButton } from "../shared/collapsible-section-trigger";
 import { AvailableVariables } from "../shared/available-variables";
+import { CollapsibleSectionTriggerButton } from "../shared/collapsible-section-trigger";
 import { FieldLabel } from "../shared/field-label";
 import { NameField } from "../shared/name-field";
 
@@ -86,6 +86,7 @@ export function LlmGeneralTab({
   const toolAliasId = `${config.id}-tool-alias`;
   const codeLangId = `${config.id}-code-lang`;
   const promptId = `${config.id}-prompt`;
+  const runIfId = `${config.id}-run-if`;
   const outputFormatId = `${config.id}-output-format`;
   const systemPromptId = `${config.id}-system-prompt`;
   const hasModelConfigs = modelConfigAliases.length > 0;
@@ -102,6 +103,10 @@ export function LlmGeneralTab({
   const invalidSystemRefs = useMemo(
     () => findInvalidJinjaReferences(config.system_prompt, validReferences),
     [config.system_prompt, validReferences],
+  );
+  const invalidRunIfRefs = useMemo(
+    () => findInvalidJinjaReferences(config.run_if ?? "", validReferences),
+    [config.run_if, validReferences],
   );
   const invalidPromptText = invalidPromptRefs
     .slice(0, 3)
@@ -190,7 +195,9 @@ export function LlmGeneralTab({
                   icon={ArrowRight01Icon}
                   className="mt-0.5 size-3.5 shrink-0 text-primary"
                 />
-                <span>Add a Provider connection step in AI generation → Setup.</span>
+                <span>
+                  Add a Provider connection step in AI generation → Setup.
+                </span>
               </p>
             )}
             {!hasModelConfigs && (
@@ -199,7 +206,9 @@ export function LlmGeneralTab({
                   icon={ArrowRight01Icon}
                   className="mt-0.5 size-3.5 shrink-0 text-primary"
                 />
-                <span>Add a Model preset step, connect it, then choose it below.</span>
+                <span>
+                  Add a Model preset step, connect it, then choose it below.
+                </span>
               </p>
             )}
           </div>
@@ -350,6 +359,26 @@ export function LlmGeneralTab({
         )}
       </div>
       <AvailableVariables configId={config.id} />
+      <div className="grid gap-1.5">
+        <FieldLabel
+          label="Only run when (optional)"
+          htmlFor={runIfId}
+          hint="A Jinja boolean expression. Rows that evaluate false skip the model call and store null."
+        />
+        <Textarea
+          id={runIfId}
+          className="corner-squircle nodrag"
+          aria-invalid={invalidRunIfRefs.length > 0}
+          placeholder="{{ repair_tasks.repairs | length > 0 }}"
+          value={config.run_if ?? ""}
+          onChange={(event) => onUpdate({ run_if: event.target.value })}
+        />
+        {invalidRunIfRefs.length > 0 && (
+          <p className="text-xs text-destructive">
+            Unknown field: {invalidRunIfRefs.slice(0, 3).join(", ")}
+          </p>
+        )}
+      </div>
       {hasHfSeed && (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">

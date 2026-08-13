@@ -2,12 +2,17 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import type { ExpressionConfig, RecipeProcessorConfig } from "../../types";
+import { buildSparseRepairColumn } from "../sparse-repair-contract";
 import { parseJsonObject } from "./parse";
 
 export function buildExpressionColumn(
   config: ExpressionConfig,
   errors: string[],
 ): Record<string, unknown> {
+  const sparseRepairColumn = buildSparseRepairColumn(config);
+  if (sparseRepairColumn) {
+    return sparseRepairColumn;
+  }
   if (!config.expr.trim()) {
     errors.push(`Expression ${config.name}: expr required.`);
   }

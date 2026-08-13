@@ -6,6 +6,7 @@ import { readString } from "./helpers";
 import { parseExpression } from "./parsers/expression-parser";
 import { parseLlm } from "./parsers/llm-parser";
 export { parseModelConfig, parseModelProvider } from "./parsers/model-parser";
+import { parseRepairWorkflow } from "./parsers/repair-workflow-parser";
 import { parseSampler } from "./parsers/sampler-parser";
 import { parseValidator } from "./parsers/validator-parser";
 
@@ -17,13 +18,26 @@ type ColumnParser = (
 ) => NodeConfig | null;
 
 const COLUMN_PARSERS: Record<string, ColumnParser> = {
-  sampler: (column, name, id, errors) =>
-    parseSampler(column, name, id, errors),
+  sampler: (column, name, id, errors) => parseSampler(column, name, id, errors),
   expression: (column, name, id) => parseExpression(column, name, id),
   "llm-text": (column, name, id) => parseLlm(column, name, id),
   "llm-structured": (column, name, id) => parseLlm(column, name, id),
   "llm-code": (column, name, id) => parseLlm(column, name, id),
   "llm-judge": (column, name, id) => parseLlm(column, name, id),
+  "unsloth-conditional-llm-text": (column, name, id) =>
+    parseLlm(column, name, id),
+  "unsloth-conditional-llm-structured": (column, name, id) =>
+    parseLlm(column, name, id),
+  "unsloth-conditional-llm-code": (column, name, id) =>
+    parseLlm(column, name, id),
+  "unsloth-conditional-llm-judge": (column, name, id) =>
+    parseLlm(column, name, id),
+  "unsloth-repair-tasks": (column, name, id) =>
+    parseRepairWorkflow(column, name, id, "repair_tasks"),
+  "unsloth-repair-check": (column, name, id) =>
+    parseRepairWorkflow(column, name, id, "repair_check"),
+  "unsloth-repair-merge": (column, name, id) =>
+    parseRepairWorkflow(column, name, id, "repair_merge"),
   validation: (column, name, id) => parseValidator(column, name, id),
 };
 

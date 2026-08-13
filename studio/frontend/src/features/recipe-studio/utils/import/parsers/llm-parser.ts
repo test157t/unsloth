@@ -1,16 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
-import type {
-  LlmConfig,
-  Score,
-  ScoreOption,
-} from "../../../types";
-import {
-  isRecord,
-  normalizeOutputFormat,
-  readString,
-} from "../helpers";
+import type { LlmConfig, Score, ScoreOption } from "../../../types";
+import { isRecord, normalizeOutputFormat, readString } from "../helpers";
 
 function parseTraceMode(value: unknown): LlmConfig["with_trace"] {
   const traceRaw = readString(value) ?? "none";
@@ -25,7 +17,8 @@ export function parseLlm(
   name: string,
   id: string,
 ): LlmConfig {
-  const columnType = readString(column.column_type) ?? "llm-text";
+  const rawColumnType = readString(column.column_type) ?? "llm-text";
+  const columnType = rawColumnType.replace("unsloth-conditional-", "");
   let llmType: LlmConfig["llm_type"] = "text";
   if (columnType === "llm-structured") {
     llmType = "structured";
@@ -100,6 +93,8 @@ export function parseLlm(
     with_trace: withTrace,
     // biome-ignore lint/style/useNamingConvention: api schema
     extract_reasoning_content: extractReasoningContent,
+    // biome-ignore lint/style/useNamingConvention: api schema
+    run_if: readString(column.run_if) ?? "",
     scores: llmType === "judge" ? scores : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
     image_context: imageContext,

@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
-import type {
-  ExpressionConfig,
-  ExpressionDtype,
-} from "../../../types";
+import type { ExpressionConfig, ExpressionDtype } from "../../../types";
 import { readString } from "../helpers";
 
 const EXPRESSION_DTYPES: ExpressionDtype[] = ["str", "int", "float", "bool"];
@@ -25,5 +22,7 @@ export function parseExpression(
     drop: column.drop === true,
     expr: readString(column.expr) ?? "",
     dtype: normalized,
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    expression_type: "formula",
   };
 }

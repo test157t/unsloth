@@ -22,23 +22,30 @@ function buildCategoryConditionalParams(
   for (const [rawCondition, params] of Object.entries(conditional)) {
     const condition = rawCondition.trim();
     if (!condition) {
-      errors.push(`Sampler ${config.name}: conditional rule needs condition text.`);
+      errors.push(
+        `Sampler ${config.name}: conditional rule needs condition text.`,
+      );
       continue;
     }
     const values = (params.values ?? [])
       .map((value) => value.trim())
       .filter(Boolean);
     if (values.length === 0) {
-      errors.push(`Sampler ${config.name}: conditional '${condition}' needs values.`);
+      errors.push(
+        `Sampler ${config.name}: conditional '${condition}' needs values.`,
+      );
       continue;
     }
     const weights = params.weights ?? [];
     const hasWeights = weights.some((weight) => weight !== null);
     if (
       hasWeights &&
-      (weights.length !== values.length || weights.some((weight) => weight === null))
+      (weights.length !== values.length ||
+        weights.some((weight) => weight === null))
     ) {
-      errors.push(`Sampler ${config.name}: conditional '${condition}' weights invalid.`);
+      errors.push(
+        `Sampler ${config.name}: conditional '${condition}' weights invalid.`,
+      );
       continue;
     }
     output[condition] = {
@@ -151,6 +158,41 @@ function buildSamplerParams(
     return {
       prefix: raw,
     };
+  }
+  if (config.sampler_type === "synthetic_persona") {
+    const params: Record<string, unknown> = {};
+    const optionalFields = {
+      name: config.person_name,
+      locale: config.person_locale,
+      gender: config.person_sex,
+      city: config.person_city,
+      planet: config.person_planet,
+      role: config.person_role,
+      description: config.person_description,
+    };
+    for (const [key, rawValue] of Object.entries(optionalFields)) {
+      const value = rawValue?.trim();
+      if (value) {
+        params[key] = value;
+      }
+    }
+    const age = config.person_age_range?.trim();
+    if (age) {
+      if (/^\d+$/.test(age)) {
+        params.age = Number(age);
+      } else {
+        const parsed = parseAgeRange(age);
+        if (parsed) {
+          // biome-ignore lint/style/useNamingConvention: api schema
+          params.age_range = parsed;
+        } else {
+          errors.push(
+            `Persona ${config.name}: age must be a number or range like 24-40.`,
+          );
+        }
+      }
+    }
+    return params;
   }
   const params: Record<string, unknown> = {};
   if (config.person_locale?.trim()) {

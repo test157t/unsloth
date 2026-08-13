@@ -16,6 +16,14 @@ from .local_callable_validators import (
     register_oxc_local_callable_validators,
     split_oxc_local_callable_validators,
 )
+from .sparse_repair_steps import (
+    register_sparse_repair_columns,
+    split_sparse_repair_columns,
+)
+from .synthetic_persona import (
+    register_synthetic_persona_columns,
+    split_synthetic_persona_columns,
+)
 
 _IMAGE_CONTEXT_PATCHED = False
 
@@ -156,7 +164,10 @@ def _recipe_has_llm_columns(recipe: dict[str, Any]) -> bool:
         if not isinstance(column, dict):
             continue
         column_type = column.get("column_type")
-        if isinstance(column_type, str) and column_type.startswith("llm-"):
+        if isinstance(column_type, str) and (
+            column_type.startswith("llm-")
+            or column_type.startswith("unsloth-conditional-llm-")
+        ):
             return True
     return False
 
@@ -260,14 +271,24 @@ def build_config_builder(recipe: dict[str, Any]):
     recipe_core = {
         key: value
         for key, value in recipe.items()
-        if key not in {"model_providers", "mcp_providers"}
+        if key not in {"model_providers", "mcp_providers", "exports"}
     }
     recipe_core = _strip_frontend_model_config_metadata(recipe_core)
+    recipe_core, sparse_repair_specs = split_sparse_repair_columns(recipe_core)
+    recipe_core, synthetic_persona_specs = split_synthetic_persona_columns(recipe_core)
     recipe_core, oxc_local_callable_specs = split_oxc_local_callable_validators(recipe_core)
     builder = DataDesignerConfigBuilder.from_config({"data_designer": recipe_core})
     register_oxc_local_callable_validators(
         builder = builder,
         specs = oxc_local_callable_specs,
+    )
+    register_sparse_repair_columns(
+        builder = builder,
+        specs = sparse_repair_specs,
+    )
+    register_synthetic_persona_columns(
+        builder = builder,
+        specs = synthetic_persona_specs,
     )
 
     # DataDesignerConfigBuilder.from_config currently skips processors.

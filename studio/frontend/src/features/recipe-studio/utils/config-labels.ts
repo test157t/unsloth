@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
-import type {
-  ExpressionDtype,
-  LlmType,
-  SamplerType,
-} from "../types";
+import type { ExpressionDtype, LlmType, SamplerType } from "../types";
 
 const SAMPLER_LABELS: Record<SamplerType, string> = {
   category: "Category",
@@ -18,6 +14,7 @@ const SAMPLER_LABELS: Record<SamplerType, string> = {
   uuid: "Unique ID",
   person: "Synthetic person",
   person_from_faker: "Synthetic person",
+  synthetic_persona: "Synthetic persona",
 };
 
 const LLM_LABELS: Record<LlmType, string> = {

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Annotated, Any, Optional
 from urllib.parse import urlparse
 
@@ -18,7 +19,7 @@ from auth.authentication import (
     require_ui_session_for_local_commands,
 )
 from auth.storage import CredentialRotated
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import ValidationError
 
 from core.data_recipe.huggingface import (
@@ -35,6 +36,7 @@ from models.data_recipe import (
     RecipePayload,
 )
 from utils.utils import safe_error_detail, safe_curated_detail, log_and_http_error
+from utils.paths import recipe_datasets_root
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -86,15 +88,18 @@ def _used_llm_model_aliases(recipe: dict[str, Any]) -> set[str]:
     """Return model_aliases actually referenced by an LLM column.
 
     Narrows the "Chat model loaded" gate so orphan model_config nodes don't
-    block unrelated runs. The ``llm-`` prefix matches
-    ``service.py::_recipe_has_llm_columns`` and covers all LLM column types.
+    block unrelated runs. Native and conditional LLM columns both participate
+    in the same provider/model readiness checks.
     """
     aliases: set[str] = set()
     for column in recipe.get("columns", []):
         if not isinstance(column, dict):
             continue
         column_type = column.get("column_type")
-        if not isinstance(column_type, str) or not column_type.startswith("llm-"):
+        if not isinstance(column_type, str) or not (
+            column_type.startswith("llm-")
+            or column_type.startswith("unsloth-conditional-llm-")
+        ):
             continue
         alias = column.get("model_alias")
         if isinstance(alias, str) and alias:
@@ -218,7 +223,10 @@ def _inject_local_structured_response_format(
     for column in columns:
         if not isinstance(column, dict):
             continue
-        if column.get("column_type") != "llm-structured":
+        if column.get("column_type") not in {
+            "llm-structured",
+            "unsloth-conditional-llm-structured",
+        }:
             continue
         alias = column.get("model_alias")
         if not isinstance(alias, str) or alias not in alias_to_local_mc:
@@ -545,6 +553,33 @@ def job_dataset(
         "limit": limit,
         "offset": offset,
     }
+
+
+@router.get("/artifacts/jsonl")
+def download_jsonl_artifact(
+    artifact_path: str = Query(..., min_length = 1),
+    filename: str = Query(..., min_length = 1),
+):
+    if Path(filename).name != filename or not filename.lower().endswith(".jsonl"):
+        raise HTTPException(status_code = 400, detail = "invalid JSONL filename")
+    root = recipe_datasets_root().resolve()
+    base = Path(artifact_path).expanduser().resolve()
+    try:
+        base.relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(status_code = 400, detail = "invalid artifact path") from exc
+    target = (base / "exports" / filename).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(status_code = 400, detail = "invalid export path") from exc
+    if target.parent != (base / "exports").resolve() or not target.is_file():
+        raise HTTPException(status_code = 404, detail = "JSONL export not found")
+    return FileResponse(
+        target,
+        media_type = "application/x-ndjson",
+        filename = filename,
+    )
 
 
 @router.post(

@@ -2,14 +2,15 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import type {
+  ExpressionConfig,
   LlmConfig,
   LlmMcpProviderConfig,
   LlmToolConfig,
   MarkdownNoteConfig,
   NodeConfig,
   RecipeProcessorConfig,
-  SeedConfig,
   SamplerConfig,
+  SeedConfig,
   SeedSourceType,
   ToolProfileConfig,
   ValidatorConfig,
@@ -18,8 +19,8 @@ import { buildEdges } from "./edges";
 import { isRecord, parseJson, readString } from "./helpers";
 import { parseColumn, parseModelConfig, parseModelProvider } from "./parsers";
 import { parseSeedConfig } from "./parsers/seed-config-parser";
-import { buildNodes, parseUi } from "./ui";
 import type { ImportResult } from "./types";
+import { buildNodes, parseUi } from "./ui";
 
 type RecipeInput = {
   columns?: unknown;
@@ -28,6 +29,7 @@ type RecipeInput = {
   mcp_providers?: unknown;
   tool_configs?: unknown;
   processors?: unknown;
+  exports?: unknown;
   seed_config?: unknown;
 };
 
@@ -490,7 +492,8 @@ export function importRecipePayload(
       seed_columns:
         (uiSeedColumns?.length ?? 0) > 0
           ? uiSeedColumns
-          : uiSeedSourceType === "unstructured" || payloadSeedSourceIsUnstructured
+          : uiSeedSourceType === "unstructured" ||
+              payloadSeedSourceIsUnstructured
             ? ["chunk_text", "source_file"]
             : uiSeedColumns,
       seed_drop_columns:
@@ -601,6 +604,46 @@ export function importRecipePayload(
     nameToId.set(config.name, config.id);
     configs.push(config);
   });
+
+  if (Array.isArray(recipe.exports)) {
+    recipe.exports.forEach((item, index) => {
+      if (!isRecord(item) || readString(item.export_type) !== "jsonl") {
+        errors.push(`Export ${index + 1}: unsupported export definition.`);
+        return;
+      }
+      const name = readString(item.name) ?? `jsonl_export_${index + 1}`;
+      const sourceColumn = readString(item.source_column);
+      const outputField = readString(item.output_field);
+      const filename = readString(item.filename);
+      if (!(sourceColumn && outputField && filename)) {
+        errors.push(
+          `Export ${name}: source, output field, and filename are required.`,
+        );
+        return;
+      }
+      const id = `n${nextId}`;
+      nextId += 1;
+      const config: ExpressionConfig = {
+        id,
+        kind: "expression",
+        name,
+        drop: false,
+        expr: "",
+        dtype: "str",
+        expression_type: "jsonl_export",
+        export_source_column: sourceColumn,
+        export_output_field: outputField,
+        export_uuid_column: readString(item.uuid_column) ?? "",
+        export_filename: filename,
+      };
+      if (nameToId.has(name)) {
+        errors.push(`Duplicate column name: ${name}.`);
+        return;
+      }
+      nameToId.set(name, id);
+      configs.push(config);
+    });
+  }
 
   if (errors.length > 0) {
     return { errors, snapshot: null };

@@ -13,7 +13,8 @@ export type SamplerType =
   | "timedelta"
   | "uuid"
   | "person"
-  | "person_from_faker";
+  | "person_from_faker"
+  | "synthetic_persona";
 
 export type LlmType = "text" | "structured" | "code" | "judge";
 export type ValidatorCodeLang =
@@ -69,6 +70,12 @@ export type RecipeNodeData = {
     | "validator_sql"
     | "validator_oxc"
     | "expression"
+    | "conditional_ai"
+    | "conditional_guard"
+    | "repair_tasks"
+    | "repair_check"
+    | "repair_merge"
+    | "jsonl_export"
     | "seed"
     | "markdown_note"
     | "model_provider"
@@ -130,6 +137,14 @@ export type SamplerConfig = {
   person_age_range?: string;
   // biome-ignore lint/style/useNamingConvention: api schema
   person_city?: string;
+  // biome-ignore lint/style/useNamingConvention: api schema
+  person_name?: string;
+  // biome-ignore lint/style/useNamingConvention: api schema
+  person_planet?: string;
+  // biome-ignore lint/style/useNamingConvention: api schema
+  person_role?: string;
+  // biome-ignore lint/style/useNamingConvention: api schema
+  person_description?: string;
   // biome-ignore lint/style/useNamingConvention: api schema
   person_with_synthetic_personas?: boolean;
   // biome-ignore lint/style/useNamingConvention: api schema
@@ -238,6 +253,9 @@ export type LlmConfig = {
   with_trace?: LlmTraceType;
   // biome-ignore lint/style/useNamingConvention: api schema
   extract_reasoning_content?: boolean;
+  // Unsloth extension: skip the model call unless this Jinja expression is true.
+  // biome-ignore lint/style/useNamingConvention: api schema
+  run_if?: string;
 };
 
 export type ModelProviderConfig = {
@@ -288,6 +306,33 @@ export type ExpressionConfig = {
   drop?: boolean;
   expr: string;
   dtype: ExpressionDtype;
+  // Unsloth-native sparse repair helpers compile to local custom columns.
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  expression_type?:
+    | "formula"
+    | "repair_tasks"
+    | "repair_check"
+    | "repair_merge"
+    | "jsonl_export";
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  uuid_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  judge_column?: string;
+  threshold?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  conversations_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  candidate_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  approval_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  export_source_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  export_output_field?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  export_uuid_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  export_filename?: string;
 };
 
 export type ValidatorConfig = {

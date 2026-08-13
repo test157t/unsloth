@@ -1,15 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
-import type {
-  SamplerConfig,
-  SamplerType,
-} from "../../../types";
-import {
-  isRecord,
-  readNumberString,
-  readString,
-} from "../helpers";
+import type { SamplerConfig, SamplerType } from "../../../types";
+import { isRecord, readNumberString, readString } from "../helpers";
 
 const SAMPLER_TYPES: SamplerType[] = [
   "category",
@@ -22,6 +15,7 @@ const SAMPLER_TYPES: SamplerType[] = [
   "uuid",
   "person",
   "person_from_faker",
+  "synthetic_persona",
 ];
 
 const TIMEDELTA_UNITS = new Set(["D", "h", "m", "s"]);
@@ -33,7 +27,9 @@ function parseCategoryConditionalParams(
     return undefined;
   }
   const conditional: NonNullable<SamplerConfig["conditional_params"]> = {};
-  for (const [condition, rawParams] of Object.entries(column.conditional_params)) {
+  for (const [condition, rawParams] of Object.entries(
+    column.conditional_params,
+  )) {
     if (!isRecord(rawParams)) {
       continue;
     }
@@ -47,7 +43,9 @@ function parseCategoryConditionalParams(
       continue;
     }
     const weights = Array.isArray(rawParams.weights)
-      ? rawParams.weights.map((item) => (typeof item === "number" ? item : null))
+      ? rawParams.weights.map((item) =>
+          typeof item === "number" ? item : null,
+        )
       : undefined;
     conditional[condition] = {
       // biome-ignore lint/style/useNamingConvention: api schema
@@ -234,11 +232,13 @@ export function parseSampler(
   }
 
   const ageRange =
-    Array.isArray(params.age_range) &&
-    params.age_range.length === 2 &&
-    params.age_range.every((item) => typeof item === "number")
-      ? `${params.age_range[0]}-${params.age_range[1]}`
-      : readString(params.age_range) ?? "";
+    typeof params.age === "number"
+      ? String(params.age)
+      : Array.isArray(params.age_range) &&
+          params.age_range.length === 2 &&
+          params.age_range.every((item) => typeof item === "number")
+        ? `${params.age_range[0]}-${params.age_range[1]}`
+        : (readString(params.age_range) ?? "");
 
   const base: SamplerConfig = {
     id,
@@ -252,11 +252,19 @@ export function parseSampler(
     // biome-ignore lint/style/useNamingConvention: api schema
     person_locale: readString(params.locale) ?? "",
     // biome-ignore lint/style/useNamingConvention: api schema
-    person_sex: readString(params.sex) ?? "",
+    person_sex: readString(params.gender) ?? readString(params.sex) ?? "",
     // biome-ignore lint/style/useNamingConvention: api schema
     person_age_range: ageRange,
     // biome-ignore lint/style/useNamingConvention: api schema
     person_city: readString(params.city) ?? "",
+    // biome-ignore lint/style/useNamingConvention: api schema
+    person_name: readString(params.name) ?? "",
+    // biome-ignore lint/style/useNamingConvention: api schema
+    person_planet: readString(params.planet) ?? "",
+    // biome-ignore lint/style/useNamingConvention: api schema
+    person_role: readString(params.role) ?? "",
+    // biome-ignore lint/style/useNamingConvention: api schema
+    person_description: readString(params.description) ?? "",
   };
 
   if (samplerType === "person") {

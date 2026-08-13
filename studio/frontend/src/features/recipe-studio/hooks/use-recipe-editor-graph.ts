@@ -15,8 +15,12 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { RECIPE_BLOCK_DND_MIME, type RecipeBlockDragPayload } from "../components/block-sheet";
 import type { SeedBlockType } from "../blocks/registry";
+import {
+  RECIPE_BLOCK_DND_MIME,
+  type RecipeBlockDragPayload,
+} from "../components/block-sheet";
+import type { RecipeGraphAuxNodeData } from "../components/recipe-graph-aux-node";
 import type {
   LlmType,
   NodeConfig,
@@ -24,8 +28,11 @@ import type {
   RecipeNodeData,
   SamplerType,
 } from "../types";
-import { applyAuxNodeChanges, filterEdgeChangesByIds, filterNodeChangesByIds } from "../utils/reactflow-changes";
-import type { RecipeGraphAuxNodeData } from "../components/recipe-graph-aux-node";
+import {
+  applyAuxNodeChanges,
+  filterEdgeChangesByIds,
+  filterNodeChangesByIds,
+} from "../utils/reactflow-changes";
 
 const SUPPORTED_DRAG_KINDS: RecipeBlockDragPayload["kind"][] = [
   "sampler",
@@ -36,13 +43,19 @@ const SUPPORTED_DRAG_KINDS: RecipeBlockDragPayload["kind"][] = [
   "note",
 ];
 
-function parseRecipeBlockDragPayload(raw: string): RecipeBlockDragPayload | null {
+function parseRecipeBlockDragPayload(
+  raw: string,
+): RecipeBlockDragPayload | null {
   try {
     const parsed = JSON.parse(raw) as {
       kind?: RecipeBlockDragPayload["kind"];
       type?: RecipeBlockDragPayload["type"];
     };
-    if (!parsed.kind || !parsed.type || !SUPPORTED_DRAG_KINDS.includes(parsed.kind)) {
+    if (
+      !parsed.kind ||
+      !parsed.type ||
+      !SUPPORTED_DRAG_KINDS.includes(parsed.kind)
+    ) {
       return null;
     }
     return {
@@ -58,22 +71,46 @@ type UseRecipeEditorGraphArgs = {
   nodes: RecipeBuilderNode[];
   edges: Edge[];
   configs: Record<string, NodeConfig>;
-  reactFlowInstance: ReactFlowInstance<Node<RecipeNodeData | RecipeGraphAuxNodeData>, Edge> | null;
+  reactFlowInstance: ReactFlowInstance<
+    Node<RecipeNodeData | RecipeGraphAuxNodeData>,
+    Edge
+  > | null;
   flowContainerRef: RefObject<HTMLDivElement | null>;
   selectConfig: (id: string) => void;
   openConfig: (id: string) => void;
   onNodesChange: (changes: NodeChange<RecipeBuilderNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<Edge>[]) => void;
   setAuxNodePosition: (id: string, position: XYPosition) => void;
-  addSamplerNode: (type: SamplerType, position?: XYPosition, openDialog?: boolean) => void;
-  addSeedNode: (type: SeedBlockType, position?: XYPosition, openDialog?: boolean) => void;
-  addLlmNode: (type: LlmType, position?: XYPosition, openDialog?: boolean) => void;
+  addSamplerNode: (
+    type: SamplerType,
+    position?: XYPosition,
+    openDialog?: boolean,
+  ) => void;
+  addSeedNode: (
+    type: SeedBlockType,
+    position?: XYPosition,
+    openDialog?: boolean,
+  ) => void;
+  addLlmNode: (
+    type: LlmType | "conditional_ai" | "conditional_guard",
+    position?: XYPosition,
+    openDialog?: boolean,
+  ) => void;
   addModelProviderNode: (position?: XYPosition, openDialog?: boolean) => void;
   addModelConfigNode: (position?: XYPosition, openDialog?: boolean) => void;
   addToolProfileNode: (position?: XYPosition, openDialog?: boolean) => void;
-  addExpressionNode: (position?: XYPosition, openDialog?: boolean) => void;
+  addExpressionNode: (
+    type: "expression" | "repair_merge" | "jsonl_export",
+    position?: XYPosition,
+    openDialog?: boolean,
+  ) => void;
   addValidatorNode: (
-    type: "validator_python" | "validator_sql" | "validator_oxc",
+    type:
+      | "validator_python"
+      | "validator_sql"
+      | "validator_oxc"
+      | "repair_tasks"
+      | "repair_check",
     position?: XYPosition,
     openDialog?: boolean,
   ) => void;
@@ -81,8 +118,14 @@ type UseRecipeEditorGraphArgs = {
 };
 
 type UseRecipeEditorGraphResult = {
-  handleNodeClick: (_: unknown, node: Node<RecipeNodeData | RecipeGraphAuxNodeData>) => void;
-  handleNodeDoubleClick: (_: unknown, node: Node<RecipeNodeData | RecipeGraphAuxNodeData>) => void;
+  handleNodeClick: (
+    _: unknown,
+    node: Node<RecipeNodeData | RecipeGraphAuxNodeData>,
+  ) => void;
+  handleNodeDoubleClick: (
+    _: unknown,
+    node: Node<RecipeNodeData | RecipeGraphAuxNodeData>,
+  ) => void;
   handleNodesChange: (
     changes: NodeChange<Node<RecipeNodeData | RecipeGraphAuxNodeData>>[],
   ) => void;
@@ -91,13 +134,22 @@ type UseRecipeEditorGraphResult = {
   handleDrop: (event: ReactDragEvent<HTMLDivElement>) => void;
   handleAddSamplerFromSheet: (type: SamplerType) => void;
   handleAddSeedFromSheet: (type: SeedBlockType) => void;
-  handleAddLlmFromSheet: (type: LlmType) => void;
+  handleAddLlmFromSheet: (
+    type: LlmType | "conditional_ai" | "conditional_guard",
+  ) => void;
   handleAddModelProviderFromSheet: () => void;
   handleAddModelConfigFromSheet: () => void;
   handleAddToolProfileFromSheet: () => void;
-  handleAddExpressionFromSheet: () => void;
+  handleAddExpressionFromSheet: (
+    type: "expression" | "repair_merge" | "jsonl_export",
+  ) => void;
   handleAddValidatorFromSheet: (
-    type: "validator_python" | "validator_sql" | "validator_oxc",
+    type:
+      | "validator_python"
+      | "validator_sql"
+      | "validator_oxc"
+      | "repair_tasks"
+      | "repair_check",
   ) => void;
   handleAddMarkdownNoteFromSheet: () => void;
 };
@@ -123,8 +175,14 @@ export function useRecipeEditorGraph({
   addValidatorNode,
   addMarkdownNoteNode,
 }: UseRecipeEditorGraphArgs): UseRecipeEditorGraphResult {
-  const baseNodeIds = useMemo(() => new Set(nodes.map((node) => node.id)), [nodes]);
-  const baseEdgeIds = useMemo(() => new Set(edges.map((edge) => edge.id)), [edges]);
+  const baseNodeIds = useMemo(
+    () => new Set(nodes.map((node) => node.id)),
+    [nodes],
+  );
+  const baseEdgeIds = useMemo(
+    () => new Set(edges.map((edge) => edge.id)),
+    [edges],
+  );
 
   const handleNodeClick = useCallback(
     (_: unknown, node: Node<RecipeNodeData | RecipeGraphAuxNodeData>) => {
@@ -173,16 +231,19 @@ export function useRecipeEditorGraph({
     [baseEdgeIds, onEdgesChange],
   );
 
-  const handleDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    if (
-      !event.dataTransfer.types.includes(RECIPE_BLOCK_DND_MIME) &&
-      !event.dataTransfer.types.includes("text/plain")
-    ) {
-      return;
-    }
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-  }, []);
+  const handleDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      if (
+        !event.dataTransfer.types.includes(RECIPE_BLOCK_DND_MIME) &&
+        !event.dataTransfer.types.includes("text/plain")
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    },
+    [],
+  );
 
   const handleDrop = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
@@ -214,12 +275,21 @@ export function useRecipeEditorGraph({
         return;
       }
       if (payload.kind === "expression") {
-        addExpressionNode(position, false);
+        addExpressionNode(
+          payload.type as "expression" | "repair_merge" | "jsonl_export",
+          position,
+          false,
+        );
         return;
       }
       if (payload.kind === "validator") {
         addValidatorNode(
-          payload.type as "validator_python" | "validator_sql" | "validator_oxc",
+          payload.type as
+            | "validator_python"
+            | "validator_sql"
+            | "validator_oxc"
+            | "repair_tasks"
+            | "repair_check",
           position,
           false,
         );
@@ -241,7 +311,11 @@ export function useRecipeEditorGraph({
         addToolProfileNode(position, false);
         return;
       }
-      addLlmNode(payload.type as LlmType, position, false);
+      addLlmNode(
+        payload.type as LlmType | "conditional_ai" | "conditional_guard",
+        position,
+        false,
+      );
     },
     [
       addExpressionNode,
@@ -283,7 +357,7 @@ export function useRecipeEditorGraph({
   );
 
   const handleAddLlmFromSheet = useCallback(
-    (type: LlmType) => {
+    (type: LlmType | "conditional_ai" | "conditional_guard") => {
       addLlmNode(type, getViewportCenterPosition());
     },
     [addLlmNode, getViewportCenterPosition],
@@ -297,16 +371,26 @@ export function useRecipeEditorGraph({
     addModelConfigNode(getViewportCenterPosition());
   }, [addModelConfigNode, getViewportCenterPosition]);
 
-  const handleAddExpressionFromSheet = useCallback(() => {
-    addExpressionNode(getViewportCenterPosition());
-  }, [addExpressionNode, getViewportCenterPosition]);
+  const handleAddExpressionFromSheet = useCallback(
+    (type: "expression" | "repair_merge" | "jsonl_export") => {
+      addExpressionNode(type, getViewportCenterPosition());
+    },
+    [addExpressionNode, getViewportCenterPosition],
+  );
 
   const handleAddToolProfileFromSheet = useCallback(() => {
     addToolProfileNode(getViewportCenterPosition());
   }, [addToolProfileNode, getViewportCenterPosition]);
 
   const handleAddValidatorFromSheet = useCallback(
-    (type: "validator_python" | "validator_sql" | "validator_oxc") => {
+    (
+      type:
+        | "validator_python"
+        | "validator_sql"
+        | "validator_oxc"
+        | "repair_tasks"
+        | "repair_check",
+    ) => {
       addValidatorNode(type, getViewportCenterPosition());
     },
     [addValidatorNode, getViewportCenterPosition],

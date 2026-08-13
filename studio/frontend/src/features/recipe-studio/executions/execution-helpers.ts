@@ -88,6 +88,18 @@ export function isExecutionInProgress(status: RecipeExecutionStatus): boolean {
   );
 }
 
+export function markExecutionUnavailable(
+  record: RecipeExecutionRecord,
+  finishedAt: number = Date.now(),
+): RecipeExecutionRecord {
+  return {
+    ...record,
+    status: "cancelled",
+    finishedAt,
+    error: "Run is no longer available on the server.",
+  };
+}
+
 export function executionLabel(kind: "preview" | "full"): string {
   return kind === "preview" ? "Preview" : "Full run";
 }

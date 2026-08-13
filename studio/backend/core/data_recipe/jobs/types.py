@@ -86,6 +86,7 @@ class Job:
     execution_type: str | None = None
     dataset: list[dict[str, Any]] | None = None
     processor_artifacts: dict[str, Any] | None = None
+    export_files: list[dict[str, Any]] = field(default_factory = list)
     model_usage: dict[str, ModelUsage] = field(default_factory = dict)
     progress_columns_total: int | None = None
     source_progress_estimated_total: int | None = None

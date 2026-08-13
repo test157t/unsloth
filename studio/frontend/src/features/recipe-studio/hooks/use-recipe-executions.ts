@@ -10,6 +10,8 @@ import {
   cancelRecipeJob,
   createRecipeJob,
   getRecipeJobDataset,
+  getRecipeJobStatus,
+  isDataRecipeApiError,
   validateRecipe,
 } from "../api";
 import { saveRecipeExecution } from "../data/executions-db";
@@ -29,11 +31,15 @@ import {
   findResumableExecution,
   loadSortedRecipeExecutions,
 } from "../executions/hydration";
+import { reconcileHydratedExecutions } from "../executions/reconciliation";
 import {
   buildExecutionPayload,
   sanitizeExecutionRows,
 } from "../executions/run-settings";
-import { createBaseExecutionRecord } from "../executions/runtime";
+import {
+  applyExecutionStatusSnapshot,
+  createBaseExecutionRecord,
+} from "../executions/runtime";
 import { trackRecipeExecution } from "../executions/tracker";
 import {
   type RecipeRunSettings,
@@ -599,9 +605,33 @@ export function useRecipeExecutions({
         if (cancelled) {
           return;
         }
-
         setExecutions(records);
-        const resumable = findResumableExecution(records);
+
+        const reconciled = await reconcileHydratedExecutions(
+          records,
+          getRecipeJobStatus,
+          (error) => isDataRecipeApiError(error) && error.status === 404,
+        );
+        if (cancelled) {
+          return;
+        }
+
+        const originalById = new Map(
+          records.map((record) => [record.id, record]),
+        );
+        await Promise.all(
+          reconciled.map((record) =>
+            record === originalById.get(record.id)
+              ? Promise.resolve()
+              : saveRecipeExecution(record),
+          ),
+        );
+        if (cancelled) {
+          return;
+        }
+
+        setExecutions(reconciled);
+        const resumable = findResumableExecution(reconciled);
         if (!resumable?.jobId) {
           return;
         }
@@ -985,11 +1015,8 @@ export function useRecipeExecutions({
         return;
       }
       try {
-        await cancelRecipeJob(execution.jobId);
-        upsertAndPersist({
-          ...execution,
-          status: "cancelling",
-        });
+        const status = await cancelRecipeJob(execution.jobId);
+        upsertAndPersist(applyExecutionStatusSnapshot(execution, status));
       } catch (error) {
         const message = toErrorMessage(error, "Could not cancel execution.");
         toastError("Cancel failed", message);

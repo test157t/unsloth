@@ -2,47 +2,63 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { type ReactElement, useEffect } from "react";
 import type { SamplerConfig } from "../../types";
-import { NameField } from "../shared/name-field";
 import { FieldLabel } from "../shared/field-label";
+import { NameField } from "../shared/name-field";
 
 type PersonDialogProps = {
   config: SamplerConfig;
   onUpdate: (patch: Partial<SamplerConfig>) => void;
 };
 
+type PersonaField =
+  | "person_name"
+  | "person_locale"
+  | "person_sex"
+  | "person_age_range"
+  | "person_city"
+  | "person_planet"
+  | "person_role";
+
 export function PersonDialog({
   config,
   onUpdate,
 }: PersonDialogProps): ReactElement {
-  const localeId = `${config.id}-person-locale`;
-  const sexId = `${config.id}-person-sex`;
-  const ageRangeId = `${config.id}-person-age-range`;
-  const cityId = `${config.id}-person-city`;
-
-  const updateField = <K extends keyof SamplerConfig>(
-    key: K,
-    value: SamplerConfig[K],
-  ) => {
-    onUpdate({ [key]: value } as Partial<SamplerConfig>);
-  };
-
   useEffect(() => {
-    if (config.sampler_type !== "person_from_faker") {
+    if (config.sampler_type !== "synthetic_persona") {
       onUpdate({
-        sampler_type: "person_from_faker",
+        // biome-ignore lint/style/useNamingConvention: ui schema
+        sampler_type: "synthetic_persona",
+        // biome-ignore lint/style/useNamingConvention: legacy ui schema
         person_with_synthetic_personas: undefined,
       });
     }
   }, [config.sampler_type, onUpdate]);
+
+  const field = (
+    key: PersonaField,
+    label: string,
+    hint: string,
+    placeholder: string,
+  ): ReactElement => {
+    const id = `${config.id}-${key}`;
+    return (
+      <div className="grid gap-1.5">
+        <FieldLabel label={label} htmlFor={id} hint={hint} />
+        <Input
+          id={id}
+          className="nodrag"
+          value={config[key] ?? ""}
+          placeholder={placeholder}
+          onChange={(event) =>
+            onUpdate({ [key]: event.target.value } as Partial<SamplerConfig>)
+          }
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -50,83 +66,71 @@ export function PersonDialog({
         value={config.name}
         onChange={(value) => onUpdate({ name: value })}
       />
-      <div className="grid gap-3">
-        <div className="rounded-2xl border border-border/60 px-3 py-2">
-          <p className="text-xs font-semibold uppercase text-muted-foreground">
-            Source
-          </p>
-          <p className="text-sm text-foreground">Faker</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-1.5">
-            <FieldLabel
-              label="Locale"
-              htmlFor={localeId}
-              hint="Faker locale e.g. en_US."
-            />
-            <Input
-              id={localeId}
-              className="nodrag"
-              value={config.person_locale ?? ""}
-              onChange={(event) =>
-                updateField("person_locale", event.target.value)
-              }
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <FieldLabel
-              label="Sex"
-              htmlFor={sexId}
-              hint="Optional demographic filter."
-            />
-            <Select
-              value={config.person_sex?.trim() ? config.person_sex : "any"}
-              onValueChange={(value) =>
-                updateField("person_sex", value === "any" ? "" : value)
-              }
-            >
-              <SelectTrigger className="nodrag w-full" id={sexId}>
-                <SelectValue placeholder="Any" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
-                <SelectItem value="Male">Male</SelectItem>
-                <SelectItem value="Female">Female</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1.5">
-            <FieldLabel
-              label="Age range"
-              htmlFor={ageRangeId}
-              hint="Range format: min-max, e.g. 18-70."
-            />
-            <Input
-              id={ageRangeId}
-              className="nodrag"
-              value={config.person_age_range ?? ""}
-              onChange={(event) =>
-                updateField("person_age_range", event.target.value)
-              }
-              placeholder="18-70"
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <FieldLabel
-              label="City"
-              htmlFor={cityId}
-              hint="Optional city bias for faker generation."
-            />
-            <Input
-              id={cityId}
-              className="nodrag"
-              value={config.person_city ?? ""}
-              onChange={(event) =>
-                updateField("person_city", event.target.value)
-              }
-            />
-          </div>
-        </div>
+      <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-xs text-muted-foreground">
+        This outputs one reusable persona object per row. Reference the whole
+        persona as {`{{ ${config.name} }}`} or individual fields such as
+        {` {{ ${config.name}.description }}`} in repair, judge, and guard
+        prompts.
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {field(
+          "person_name",
+          "Persona name",
+          "Leave blank to generate a Faker name for each row.",
+          "Mia",
+        )}
+        {field(
+          "person_role",
+          "Pipeline role",
+          "Optional purpose carried with the persona.",
+          "Conservative conversation rewriter",
+        )}
+        {field(
+          "person_sex",
+          "Gender or identity",
+          "Optional free text; custom identities are supported.",
+          "woman, nonbinary, synthetic intelligence…",
+        )}
+        {field(
+          "person_age_range",
+          "Age or age range",
+          "Optional. Use 32 or 24-40; blank omits age entirely.",
+          "",
+        )}
+        {field(
+          "person_city",
+          "City",
+          "Optional. Blank means the persona has no defined city.",
+          "",
+        )}
+        {field(
+          "person_planet",
+          "Planet or world",
+          "Optional and entirely custom.",
+          "Earth, Mars, Elysium…",
+        )}
+        {field(
+          "person_locale",
+          "Faker locale",
+          "Used only when the persona name is generated.",
+          "en_US",
+        )}
+      </div>
+      <div className="grid gap-1.5">
+        <FieldLabel
+          label="Persona instructions"
+          htmlFor={`${config.id}-person-description`}
+          hint="Identity, voice, priorities, and constraints exposed to downstream prompts."
+        />
+        <Textarea
+          id={`${config.id}-person-description`}
+          className="nodrag min-h-36"
+          value={config.person_description ?? ""}
+          placeholder="Mia speaks in first person with composed warmth…"
+          onChange={(event) =>
+            onUpdate({ person_description: event.target.value })
+          }
+        />
       </div>
     </div>
   );

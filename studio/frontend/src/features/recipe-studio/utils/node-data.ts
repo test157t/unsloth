@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
-import type { RecipeNodeData, LayoutDirection, NodeConfig } from "../types";
+import type { LayoutDirection, NodeConfig, RecipeNodeData } from "../types";
 import {
   labelForExpression,
   labelForLlm,
@@ -23,6 +23,24 @@ export function nodeDataFromConfig(
     };
   }
   if (config.kind === "expression") {
+    const workflowType = config.expression_type ?? "formula";
+    if (workflowType !== "formula") {
+      const labels = {
+        repair_tasks: ["Repair tasks", "Failed criteria"],
+        repair_check: ["Repair check", "Deterministic"],
+        repair_merge: ["Repair merge", "Approved only"],
+        jsonl_export: ["JSONL output", "Downloadable artifact"],
+      } as const;
+      const [title, subtype] = labels[workflowType];
+      return {
+        title,
+        kind: "expression",
+        subtype,
+        blockType: workflowType,
+        name: config.name,
+        layoutDirection,
+      };
+    }
     return {
       title: "Formula",
       kind: "expression",
@@ -114,10 +132,10 @@ export function nodeDataFromConfig(
     };
   }
   return {
-    title: "AI step",
+    title: config.run_if?.trim() ? "Conditional AI" : "AI step",
     kind: "llm",
     subtype: labelForLlm(config.llm_type),
-    blockType: config.llm_type,
+    blockType: config.run_if?.trim() ? "conditional_ai" : config.llm_type,
     name: config.name,
     layoutDirection,
   };

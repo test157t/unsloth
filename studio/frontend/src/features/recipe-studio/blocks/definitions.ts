@@ -13,10 +13,10 @@ import {
   FingerPrintIcon,
   FunctionIcon,
   GithubIcon,
-  Plug01Icon,
   Parabola02Icon,
   PencilEdit02Icon,
   Plant01Icon,
+  Plug01Icon,
   Shield02Icon,
   Tag01Icon,
   TagsIcon,
@@ -29,14 +29,17 @@ import type {
   SeedSourceType,
 } from "../types";
 import {
+  makeConditionalRepairLlmConfig,
   makeExpressionConfig,
+  makeJsonlExportConfig,
   makeLlmConfig,
   makeMarkdownNoteConfig,
   makeModelConfig,
   makeModelProviderConfig,
-  makeToolProfileConfig,
+  makeRepairWorkflowConfig,
   makeSamplerConfig,
   makeSeedConfig,
+  makeToolProfileConfig,
   makeValidatorConfig,
 } from "../utils";
 
@@ -54,6 +57,12 @@ export type BlockType =
   | "validator_sql"
   | "validator_oxc"
   | "expression"
+  | "conditional_ai"
+  | "conditional_guard"
+  | "repair_tasks"
+  | "repair_check"
+  | "repair_merge"
+  | "jsonl_export"
   | "markdown_note"
   | "seed"
   | "seed_hf"
@@ -96,7 +105,9 @@ export type BlockDialogKey =
   | "model_provider"
   | "model_config"
   | "tool_config"
-  | "expression";
+  | "expression"
+  | "repair_workflow"
+  | "jsonl_export";
 
 export type BlockDefinition = {
   kind: BlockKind;
@@ -130,13 +141,14 @@ export const BLOCK_GROUPS: BlockGroup[] = [
   {
     kind: "validator",
     title: "Checks",
-    description: "Lint or filter generated code as it moves through the recipe.",
+    description:
+      "Validate generated fields and repair candidates as data moves through the recipe.",
     icon: Shield02Icon,
   },
   {
     kind: "expression",
-    title: "Formulas",
-    description: "Build a field from other fields.",
+    title: "Formulas & outputs",
+    description: "Build fields or save the final dataset result.",
     icon: FunctionIcon,
   },
   {
@@ -173,13 +185,15 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     description: "Upload PDF, DOCX, or TXT and turn it into source rows.",
     icon: DocumentAttachmentIcon,
     dialogKey: "seed",
-    createConfig: (id, existing) => makeSeedConfig(id, existing, "unstructured"),
+    createConfig: (id, existing) =>
+      makeSeedConfig(id, existing, "unstructured"),
   },
   {
     kind: "seed",
     type: "seed_github",
     title: "GitHub repositories",
-    description: "Crawl issues, pull requests, and commits from one or more GitHub repos.",
+    description:
+      "Crawl issues, pull requests, and commits from one or more GitHub repos.",
     icon: GithubIcon,
     dialogKey: "seed",
     createConfig: (id, existing) => makeSeedConfig(id, existing, "github_repo"),
@@ -188,7 +202,8 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     kind: "sampler",
     type: "category",
     title: "Category",
-    description: "Generate values from a list you define, with optional weights or rules.",
+    description:
+      "Generate values from a list you define, with optional weights or rules.",
     icon: Tag01Icon,
     dialogKey: "category",
     createConfig: (id, existing) => makeSamplerConfig(id, "category", existing),
@@ -200,7 +215,8 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     description: "Generate values from groups you define for each category.",
     icon: TagsIcon,
     dialogKey: "subcategory",
-    createConfig: (id, existing) => makeSamplerConfig(id, "subcategory", existing),
+    createConfig: (id, existing) =>
+      makeSamplerConfig(id, "subcategory", existing),
   },
   {
     kind: "sampler",
@@ -227,7 +243,8 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     description: "Generate a binary result from a probability.",
     icon: EqualSignIcon,
     dialogKey: "bernoulli",
-    createConfig: (id, existing) => makeSamplerConfig(id, "bernoulli", existing),
+    createConfig: (id, existing) =>
+      makeSamplerConfig(id, "bernoulli", existing),
   },
   {
     kind: "sampler",
@@ -245,7 +262,8 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     description: "Generate a time difference from another date field.",
     icon: Clock01Icon,
     dialogKey: "timedelta",
-    createConfig: (id, existing) => makeSamplerConfig(id, "timedelta", existing),
+    createConfig: (id, existing) =>
+      makeSamplerConfig(id, "timedelta", existing),
   },
   {
     kind: "sampler",
@@ -258,12 +276,14 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
   },
   {
     kind: "sampler",
-    type: "person",
-    title: "Synthetic person",
-    description: "Generate realistic person details.",
+    type: "synthetic_persona",
+    title: "Synthetic persona",
+    description:
+      "Define a reusable identity or generate a Faker-backed person.",
     icon: UserAccountIcon,
     dialogKey: "person",
-    createConfig: (id, existing) => makeSamplerConfig(id, "person", existing),
+    createConfig: (id, existing) =>
+      makeSamplerConfig(id, "synthetic_persona", existing),
   },
   {
     kind: "llm",
@@ -282,6 +302,28 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     icon: CodeIcon,
     dialogKey: "llm",
     createConfig: (id, existing) => makeLlmConfig(id, "structured", existing),
+  },
+  {
+    kind: "llm",
+    type: "conditional_ai",
+    title: "Conditional AI repair",
+    description:
+      "Generate structured output only for rows that match a condition.",
+    icon: PencilEdit02Icon,
+    dialogKey: "llm",
+    createConfig: (id, existing) =>
+      makeConditionalRepairLlmConfig(id, "repair", existing),
+  },
+  {
+    kind: "llm",
+    type: "conditional_guard",
+    title: "Conditional AI validation",
+    description:
+      "Semantically approve only structurally valid repair candidates.",
+    icon: Shield02Icon,
+    dialogKey: "llm",
+    createConfig: (id, existing) =>
+      makeConditionalRepairLlmConfig(id, "guard", existing),
   },
   {
     kind: "llm",
@@ -352,11 +394,34 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     kind: "validator",
     type: "validator_oxc",
     title: "JS/TS check",
-    description: "Lint generated JavaScript or TypeScript and filter out rows that fail.",
+    description:
+      "Lint generated JavaScript or TypeScript and filter out rows that fail.",
     icon: Shield02Icon,
     dialogKey: "validator",
     createConfig: (id, existing) =>
       makeValidatorConfig(id, "oxc", "javascript", existing),
+  },
+  {
+    kind: "validator",
+    type: "repair_tasks",
+    title: "Extract repair tasks",
+    description:
+      "Collect failed judge criteria into compact keyed repair instructions.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(id, "repair_tasks", existing),
+  },
+  {
+    kind: "validator",
+    type: "repair_check",
+    title: "Check repair candidate",
+    description:
+      "Verify UUID, roles, turn count, and protected conversation entries.",
+    icon: Shield02Icon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(id, "repair_check", existing),
   },
   {
     kind: "expression",
@@ -366,6 +431,27 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
     icon: FunctionIcon,
     dialogKey: "expression",
     createConfig: (id, existing) => makeExpressionConfig(id, existing),
+  },
+  {
+    kind: "expression",
+    type: "repair_merge",
+    title: "Apply approved repairs",
+    description:
+      "Replace conversations only when the keyed repair was approved.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(id, "repair_merge", existing),
+  },
+  {
+    kind: "expression",
+    type: "jsonl_export",
+    title: "Export JSONL",
+    description:
+      "Save a final conversation field as a downloadable JSONL artifact.",
+    icon: DocumentAttachmentIcon,
+    dialogKey: "jsonl_export",
+    createConfig: (id, existing) => makeJsonlExportConfig(id, existing),
   },
   {
     kind: "note",
@@ -387,8 +473,9 @@ export function getBlockDefinition(
   type: BlockType,
 ): BlockDefinition | null {
   return (
-    BLOCK_DEFINITIONS.find((block) => block.kind === kind && block.type === type) ??
-    null
+    BLOCK_DEFINITIONS.find(
+      (block) => block.kind === kind && block.type === type,
+    ) ?? null
   );
 }
 
@@ -405,14 +492,23 @@ export function getBlockDefinitionForConfig(
       unstructured: "seed_unstructured",
       github_repo: "seed_github",
     };
-    return getBlockDefinition("seed", seedType[config.seed_source_type ?? "hf"]);
+    return getBlockDefinition(
+      "seed",
+      seedType[config.seed_source_type ?? "hf"],
+    );
   }
   if (config.kind === "sampler") {
     const samplerType =
-      config.sampler_type === "person_from_faker" ? "person" : config.sampler_type;
+      config.sampler_type === "person" ||
+      config.sampler_type === "person_from_faker"
+        ? "synthetic_persona"
+        : config.sampler_type;
     return getBlockDefinition("sampler", samplerType);
   }
   if (config.kind === "llm") {
+    if (config.run_if?.trim()) {
+      return getBlockDefinition("llm", "conditional_ai");
+    }
     return getBlockDefinition("llm", config.llm_type);
   }
   if (config.kind === "validator") {
@@ -436,6 +532,19 @@ export function getBlockDefinitionForConfig(
   }
   if (config.kind === "markdown_note") {
     return getBlockDefinition("note", "markdown_note");
+  }
+  if (
+    config.kind === "expression" &&
+    config.expression_type &&
+    config.expression_type !== "formula"
+  ) {
+    if (config.expression_type === "jsonl_export") {
+      return getBlockDefinition("expression", "jsonl_export");
+    }
+    return getBlockDefinition(
+      config.expression_type === "repair_merge" ? "expression" : "validator",
+      config.expression_type ?? "expression",
+    );
   }
   return getBlockDefinition("expression", "expression");
 }

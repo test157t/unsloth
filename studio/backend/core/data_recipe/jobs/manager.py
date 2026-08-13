@@ -145,7 +145,9 @@ class JobManager:
                 if not isinstance(column, dict):
                     continue
                 column_type = str(column.get("column_type") or "").strip().lower()
-                if column_type.startswith("llm"):
+                if column_type.startswith("llm") or column_type.startswith(
+                    "unsloth-conditional-llm"
+                ):
                     llm_column_count += 1
         if llm_column_count <= 0:
             llm_column_count = 1
@@ -267,6 +269,7 @@ class JobManager:
                 "has_analysis": job.analysis is not None,
                 "dataset_rows": None if job.dataset is None else len(job.dataset),
                 "artifact_path": job.artifact_path,
+                "export_files": job.export_files,
                 "execution_type": job.execution_type,
                 "started_at": job.started_at,
                 "finished_at": job.finished_at,
@@ -554,6 +557,8 @@ class JobManager:
                 self._job.execution_type = event.get("execution_type")
                 self._job.dataset = event.get("dataset")
                 self._job.processor_artifacts = event.get("processor_artifacts")
+                export_files = event.get("export_files")
+                self._job.export_files = export_files if isinstance(export_files, list) else []
                 if self._job.progress.total and self._job.progress.total > 0:
                     self._job.progress.done = self._job.progress.total
                     self._job.progress.percent = 100.0

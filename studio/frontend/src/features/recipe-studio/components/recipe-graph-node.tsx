@@ -129,6 +129,7 @@ const SAMPLER_ICONS: Record<SamplerType, IconType> = {
   uuid: FingerPrintIcon,
   person: UserAccountIcon,
   person_from_faker: UserAccountIcon,
+  synthetic_persona: UserAccountIcon,
 };
 
 const LLM_ICONS: Record<LlmType, IconType> = {
@@ -201,9 +202,15 @@ function getConfigSummary(config: NodeConfig | undefined): string {
     }
     if (
       config.sampler_type === "person" ||
-      config.sampler_type === "person_from_faker"
+      config.sampler_type === "person_from_faker" ||
+      config.sampler_type === "synthetic_persona"
     ) {
-      const locale = config.person_locale?.trim() || "any locale";
+      const personaName = config.person_name?.trim();
+      const role = config.person_role?.trim();
+      if (personaName || role) {
+        return [personaName, role].filter(Boolean).join(" · ");
+      }
+      const locale = config.person_locale?.trim() || "generated name";
       const city = config.person_city?.trim();
       if (city) {
         return `${locale} · ${city}`;
@@ -460,8 +467,7 @@ function RecipeGraphNodeBase({
         ? "border-emerald-500/60 ring-1 ring-emerald-500/20"
         : "";
   const hasConnectionIssue =
-    connectionStatus.isDisconnected ||
-    connectionStatus.missingDataInput;
+    connectionStatus.isDisconnected || connectionStatus.missingDataInput;
 
   return (
     <BaseNode

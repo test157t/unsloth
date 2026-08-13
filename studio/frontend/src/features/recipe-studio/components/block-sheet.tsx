@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -11,39 +11,39 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Tick02Icon } from "@/lib/tick-icon";
 import {
   ArrowLeft02Icon,
   ArrowRight01Icon,
   CodeIcon,
   Copy02Icon,
   type Database02Icon,
-  DragDropVerticalIcon,
   DocumentAttachmentIcon,
+  DragDropVerticalIcon,
   PlusSignIcon,
   Search01Icon,
   Upload01Icon,
 } from "@hugeicons/core-free-icons";
-import { Tick02Icon } from "@/lib/tick-icon";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  useCallback,
   type DragEvent as ReactDragEvent,
   type ReactElement,
+  useCallback,
   useMemo,
   useState,
 } from "react";
-import { RECIPE_FLOATING_ICON_BUTTON_CLASS } from "./recipe-floating-icon-button-class";
-import type { LlmType, SamplerType } from "../types";
 import {
   BLOCK_GROUPS,
-  getBlocksForKind,
   type BlockType,
   type SeedBlockType,
+  getBlocksForKind,
 } from "../blocks/registry";
+import type { LlmType, SamplerType } from "../types";
 import {
   RECIPE_STUDIO_ONBOARDING_ICON_TONE,
   RECIPE_STUDIO_ONBOARDING_SURFACE_TONE,
 } from "../utils/ui-tones";
+import { RECIPE_FLOATING_ICON_BUTTON_CLASS } from "./recipe-floating-icon-button-class";
 
 type SheetView =
   | "root"
@@ -77,13 +77,20 @@ type BlockSheetProps = {
   onOpenChange?: (open: boolean) => void;
   onAddSampler: (type: SamplerType) => void;
   onAddSeed: (type: SeedBlockType) => void;
-  onAddLlm: (type: LlmType) => void;
+  onAddLlm: (type: LlmType | "conditional_ai" | "conditional_guard") => void;
   onAddModelProvider: () => void;
   onAddModelConfig: () => void;
   onAddToolProfile: () => void;
-  onAddExpression: () => void;
+  onAddExpression: (
+    type: "expression" | "repair_merge" | "jsonl_export",
+  ) => void;
   onAddValidator: (
-    type: "validator_python" | "validator_sql" | "validator_oxc",
+    type:
+      | "validator_python"
+      | "validator_sql"
+      | "validator_oxc"
+      | "repair_tasks"
+      | "repair_check",
   ) => void;
   onAddMarkdownNote: () => void;
   onOpenProcessors: () => void;
@@ -310,7 +317,7 @@ export function BlockSheet({
       : [];
   const featuredSeedBlock =
     sheetView === "seed" && !hasSearch
-      ? scopedBlocks.find((item) => item.type === "seed_unstructured") ?? null
+      ? (scopedBlocks.find((item) => item.type === "seed_unstructured") ?? null)
       : null;
   const otherSeedBlocks =
     sheetView === "seed" && !hasSearch
@@ -373,17 +380,22 @@ export function BlockSheet({
         onAddToolProfile();
         return;
       }
-      onAddLlm(type as LlmType);
+      onAddLlm(type as LlmType | "conditional_ai" | "conditional_guard");
       return;
     }
     if (kind === "validator") {
       onAddValidator(
-        type as "validator_python" | "validator_sql" | "validator_oxc",
+        type as
+          | "validator_python"
+          | "validator_sql"
+          | "validator_oxc"
+          | "repair_tasks"
+          | "repair_check",
       );
       return;
     }
     if (kind === "expression") {
-      onAddExpression();
+      onAddExpression(type as "expression" | "repair_merge" | "jsonl_export");
       return;
     }
     onAddMarkdownNote();
@@ -456,9 +468,13 @@ export function BlockSheet({
           <div className="flex-1 min-h-0 overflow-y-auto py-4">
             <div className="mt-4 flex flex-col gap-2">
               {isRootView && !hasSearch && (
-                <div className={`mx-3 mb-2 rounded-2xl border px-4 py-4 ${RECIPE_STUDIO_ONBOARDING_SURFACE_TONE}`}>
+                <div
+                  className={`mx-3 mb-2 rounded-2xl border px-4 py-4 ${RECIPE_STUDIO_ONBOARDING_SURFACE_TONE}`}
+                >
                   <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${RECIPE_STUDIO_ONBOARDING_ICON_TONE}`}>
+                    <div
+                      className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${RECIPE_STUDIO_ONBOARDING_ICON_TONE}`}
+                    >
                       <HugeiconsIcon
                         icon={DocumentAttachmentIcon}
                         className="size-4"
@@ -509,7 +525,9 @@ export function BlockSheet({
                     icon={item.icon}
                     title={item.title}
                     description={item.description}
-                    draggable={item.kind === "expression" || item.kind === "note"}
+                    draggable={
+                      item.kind === "expression" || item.kind === "note"
+                    }
                     onDragStart={
                       item.kind === "expression" && expressionBlocks[0]
                         ? buildDragStart("expression", expressionBlocks[0].type)
@@ -528,9 +546,12 @@ export function BlockSheet({
                         onAddSeed(seedBlocks[0].type as SeedBlockType);
                         return;
                       }
-                      if (item.kind === "expression" && expressionBlocks.length === 1) {
+                      if (
+                        item.kind === "expression" &&
+                        expressionBlocks.length === 1
+                      ) {
                         setSheetOpen(false);
-                        onAddExpression();
+                        onAddExpression("expression");
                         return;
                       }
                       if (item.kind === "note" && noteBlocks.length === 1) {
@@ -542,7 +563,8 @@ export function BlockSheet({
                     }}
                   />
                 ))}
-              {SHOW_PROCESSOR_IN_BLOCK_SHEET && isProcessorView && (
+              {SHOW_PROCESSOR_IN_BLOCK_SHEET &&
+                isProcessorView &&
                 (!hasSearch ||
                   matchesSearch(PROCESSOR_TITLE, PROCESSOR_DESCRIPTION)) && (
                   <BlockSheetButton
@@ -551,8 +573,7 @@ export function BlockSheet({
                     description={PROCESSOR_DESCRIPTION}
                     onClick={onOpenProcessors}
                   />
-                )
-              )}
+                )}
               {isScopedBlockView &&
                 sheetView === "seed" &&
                 featuredSeedBlock && (
@@ -669,20 +690,18 @@ export function BlockSheet({
               {isScopedBlockView &&
                 sheetView !== "llm" &&
                 sheetView !== "seed" &&
-                scopedBlocks.map(
-                  (item) => (
-                    <BlockSheetButton
-                      key={item.type}
-                      icon={item.icon}
-                      title={item.title}
-                      description={item.description}
-                      draggable={true}
-                      onDragStart={buildDragStart(item.kind, item.type)}
-                      trailing={getTrailing()}
-                      onClick={() => onBlockClick(item.kind, item.type)}
-                    />
-                  ),
-                )}
+                scopedBlocks.map((item) => (
+                  <BlockSheetButton
+                    key={item.type}
+                    icon={item.icon}
+                    title={item.title}
+                    description={item.description}
+                    draggable={true}
+                    onDragStart={buildDragStart(item.kind, item.type)}
+                    trailing={getTrailing()}
+                    onClick={() => onBlockClick(item.kind, item.type)}
+                  />
+                ))}
               {SHOW_PROCESSOR_IN_BLOCK_SHEET && isRootView && !hasSearch && (
                 <div className="px-3 pt-3">
                   <button

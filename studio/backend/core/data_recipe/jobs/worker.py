@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from ..jsonable import to_jsonable, to_preview_jsonable
+from ..jsonl_export import write_jsonl_exports
 from .constants import EVENT_JOB_COMPLETED, EVENT_JOB_ERROR, EVENT_JOB_STARTED
 from ..service import build_config_builder, create_data_designer
 from utils.paths import ensure_dir, recipe_datasets_root
@@ -170,12 +171,17 @@ def run_job_process(*, event_queue, recipe: dict[str, Any], run: dict[str, Any])
             if merge_batches:
                 _merge_batches_to_single_parquet(results.artifact_storage.base_dataset_path)
             artifact_path = str(results.artifact_storage.base_dataset_path)
+            export_files = write_jsonl_exports(
+                base_dataset_path = results.artifact_storage.base_dataset_path,
+                specs = recipe.get("exports"),
+            )
             event_queue.put(
                 {
                     "type": EVENT_JOB_COMPLETED,
                     "ts": time.time(),
                     "analysis": analysis,
                     "artifact_path": artifact_path,
+                    "export_files": export_files,
                     "execution_type": execution_type,
                 }
             )

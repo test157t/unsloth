@@ -7,6 +7,7 @@ import type {
   LlmToolConfig,
   ToolProfileConfig,
 } from "../../types";
+import { conditionalLlmColumnType } from "../sparse-repair-contract";
 
 function buildImageContext(
   config: LlmConfig,
@@ -34,6 +35,7 @@ export function buildLlmColumn(
   config: LlmConfig,
   errors: string[],
 ): Record<string, unknown> {
+  const conditional = Boolean(config.run_if?.trim());
   const toolAlias = config.tool_alias?.trim();
   const base = {
     name: config.name,
@@ -56,8 +58,10 @@ export function buildLlmColumn(
   if (config.llm_type === "code") {
     return {
       // biome-ignore lint/style/useNamingConvention: api schema
-      column_type: "llm-code",
+      column_type: conditional ? conditionalLlmColumnType("code") : "llm-code",
       ...base,
+      // biome-ignore lint/style/useNamingConvention: api schema
+      run_if: conditional ? config.run_if?.trim() : undefined,
       // biome-ignore lint/style/useNamingConvention: api schema
       code_lang: config.code_lang || "python",
     };
@@ -73,8 +77,12 @@ export function buildLlmColumn(
     }
     return {
       // biome-ignore lint/style/useNamingConvention: api schema
-      column_type: "llm-structured",
+      column_type: conditional
+        ? conditionalLlmColumnType("structured")
+        : "llm-structured",
       ...base,
+      // biome-ignore lint/style/useNamingConvention: api schema
+      run_if: conditional ? config.run_if?.trim() : undefined,
       // biome-ignore lint/style/useNamingConvention: api schema
       output_format: outputFormat,
     };
@@ -99,22 +107,30 @@ export function buildLlmColumn(
       })
       .filter(
         (score) =>
-          score.name && score.description && Object.keys(score.options).length > 0,
+          score.name &&
+          score.description &&
+          Object.keys(score.options).length > 0,
       );
     if (scores.length === 0) {
       errors.push(`LLM ${config.name}: scores required for LLM Judge.`);
     }
     return {
       // biome-ignore lint/style/useNamingConvention: api schema
-      column_type: "llm-judge",
+      column_type: conditional
+        ? conditionalLlmColumnType("judge")
+        : "llm-judge",
       ...base,
+      // biome-ignore lint/style/useNamingConvention: api schema
+      run_if: conditional ? config.run_if?.trim() : undefined,
       scores,
     };
   }
   return {
     // biome-ignore lint/style/useNamingConvention: api schema
-    column_type: "llm-text",
+    column_type: conditional ? conditionalLlmColumnType("text") : "llm-text",
     ...base,
+    // biome-ignore lint/style/useNamingConvention: api schema
+    run_if: conditional ? config.run_if?.trim() : undefined,
   };
 }
 

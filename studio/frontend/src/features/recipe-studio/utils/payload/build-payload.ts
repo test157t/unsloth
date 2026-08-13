@@ -11,7 +11,6 @@ import type {
   RecipeProcessorConfig,
 } from "../../types";
 import { isSemanticRelation } from "../graph/relations";
-import { getConfigErrors } from "../index";
 import {
   getDefaultDataSourceHandle,
   getDefaultDataTargetHandle,
@@ -23,6 +22,8 @@ import {
   isSemanticTargetHandle,
   normalizeRecipeHandleId,
 } from "../handles";
+import { isLikelyImageValue } from "../image-preview";
+import { getConfigErrors } from "../index";
 import { readNodeWidth } from "../rf-node-dimensions";
 import {
   buildExpressionColumn,
@@ -43,10 +44,9 @@ import {
   validateModelConfigProviders,
   validateSubcategoryConfigs,
   validateTimedeltaConfigs,
-  validateValidatorConfigs,
   validateUsedProviders,
+  validateValidatorConfigs,
 } from "./validate";
-import { isLikelyImageValue } from "../image-preview";
 
 function pushUniqueJson(
   label: string,
@@ -109,6 +109,7 @@ export function buildRecipePayload(
   const mcpProviders: Record<string, unknown>[] = [];
   const modelConfigs: Record<string, unknown>[] = [];
   const toolConfigs: Record<string, unknown>[] = [];
+  const recipeExports: Record<string, unknown>[] = [];
   const modelProviderConfigs: ModelProviderConfig[] = [];
   const modelConfigConfigs: ModelConfig[] = [];
   const llmToolAliasesUsed = new Set<string>();
@@ -183,6 +184,21 @@ export function buildRecipePayload(
       continue;
     }
     if (config.kind === "expression") {
+      if (config.expression_type === "jsonl_export") {
+        recipeExports.push({
+          name: config.name,
+          // biome-ignore lint/style/useNamingConvention: api schema
+          export_type: "jsonl",
+          // biome-ignore lint/style/useNamingConvention: api schema
+          source_column: config.export_source_column?.trim(),
+          // biome-ignore lint/style/useNamingConvention: api schema
+          output_field: config.export_output_field?.trim(),
+          // biome-ignore lint/style/useNamingConvention: api schema
+          uuid_column: config.export_uuid_column?.trim() || undefined,
+          filename: config.export_filename?.trim(),
+        });
+        continue;
+      }
       columns.push(buildExpressionColumn(config, errors));
       nameToConfig.set(config.name, config);
       continue;
@@ -338,19 +354,21 @@ export function buildRecipePayload(
       sourceHandle =
         isSemanticSourceHandle(sourceHandleNormalized) ||
         isDataSourceHandle(sourceHandleNormalized)
-          ? sourceHandleNormalized ?? semanticSourceDefault
+          ? (sourceHandleNormalized ?? semanticSourceDefault)
           : semanticSourceDefault;
       targetHandle =
         isSemanticTargetHandle(targetHandleNormalized) ||
         isDataTargetHandle(targetHandleNormalized)
-          ? targetHandleNormalized ?? semanticTargetDefault
+          ? (targetHandleNormalized ?? semanticTargetDefault)
           : semanticTargetDefault;
     } else {
       sourceHandle = isDataSourceHandle(sourceHandleNormalized)
-        ? sourceHandleNormalized ?? getDefaultDataSourceHandle(layoutDirection)
+        ? (sourceHandleNormalized ??
+          getDefaultDataSourceHandle(layoutDirection))
         : getDefaultDataSourceHandle(layoutDirection);
       targetHandle = isDataTargetHandle(targetHandleNormalized)
-        ? targetHandleNormalized ?? getDefaultDataTargetHandle(layoutDirection)
+        ? (targetHandleNormalized ??
+          getDefaultDataTargetHandle(layoutDirection))
         : getDefaultDataTargetHandle(layoutDirection);
     }
     return [
@@ -410,6 +428,7 @@ export function buildRecipePayload(
         tool_configs: toolConfigs,
         columns,
         processors: recipeProcessors,
+        exports: recipeExports,
       },
       run: {
         rows: 5,

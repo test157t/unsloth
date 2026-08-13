@@ -9,14 +9,14 @@ import type {
   ModelConfig,
   ModelProviderConfig,
   NodeConfig,
-  SeedConfig,
-  SeedSourceType,
   SamplerConfig,
   SamplerType,
+  SeedConfig,
+  SeedSourceType,
   ToolProfileConfig,
   ValidatorCodeLang,
-  ValidatorType,
   ValidatorConfig,
+  ValidatorType,
 } from "../types";
 import { nextName } from "./naming";
 
@@ -175,13 +175,17 @@ export function makeSamplerConfig(
       uuid_format: "",
     };
   }
-  if (samplerType === "person" || samplerType === "person_from_faker") {
+  if (
+    samplerType === "person" ||
+    samplerType === "person_from_faker" ||
+    samplerType === "synthetic_persona"
+  ) {
     return {
       id,
       kind: "sampler",
       // biome-ignore lint/style/useNamingConvention: api schema
-      sampler_type: "person_from_faker",
-      name,
+      sampler_type: "synthetic_persona",
+      name: nextName(existing, "persona"),
       drop: false,
       // biome-ignore lint/style/useNamingConvention: api schema
       person_locale: "",
@@ -191,6 +195,14 @@ export function makeSamplerConfig(
       person_age_range: "",
       // biome-ignore lint/style/useNamingConvention: api schema
       person_city: "",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      person_name: "",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      person_planet: "",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      person_role: "",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      person_description: "",
     };
   }
   return {
@@ -342,6 +354,134 @@ export function makeExpressionConfig(
     drop: false,
     expr: "",
     dtype: "str",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    expression_type: "formula",
+  };
+}
+
+export function makeConditionalRepairLlmConfig(
+  id: string,
+  type: "repair" | "guard",
+  existing: NodeConfig[],
+): LlmConfig {
+  const config = makeLlmConfig(id, "structured", existing);
+  if (type === "guard") {
+    return {
+      ...config,
+      name: nextName(existing, "rewrite_guard"),
+      prompt:
+        "Validate whether {{ rewrite_result }} repairs every item in {{ repair_tasks }} while preserving the original {{ conversations }}.",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      system_prompt:
+        "Approve only a correctly keyed, minimal repair. Reject uncited semantic drift, protected-turn changes, unfixed criteria, or newly introduced defects.",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      output_format: JSON.stringify(
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["row_uuid", "approved", "reasoning"],
+          properties: {
+            row_uuid: { type: "string" },
+            approved: { type: "boolean" },
+            reasoning: { type: "string" },
+          },
+        },
+        null,
+        2,
+      ),
+      // biome-ignore lint/style/useNamingConvention: api schema
+      run_if: "{{ repair_check.valid }}",
+    };
+  }
+  return {
+    ...config,
+    name: nextName(existing, "rewrite_result"),
+    prompt:
+      "Repair only the failed criteria in {{ repair_tasks }} for this conversation:\n{{ conversations }}",
+    // biome-ignore lint/style/useNamingConvention: api schema
+    system_prompt:
+      "Return the complete conversation with the same row UUID, turn count, order, and roles. Change only assistant or model turns needed by the listed repairs.",
+    // biome-ignore lint/style/useNamingConvention: api schema
+    output_format: JSON.stringify(
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["row_uuid", "did_rewrite", "conversations"],
+        properties: {
+          row_uuid: { type: "string" },
+          did_rewrite: { type: "boolean" },
+          conversations: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["from", "value"],
+              properties: {
+                from: { type: "string" },
+                value: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+    // biome-ignore lint/style/useNamingConvention: api schema
+    run_if: "{{ repair_tasks.repairs | length > 0 }}",
+  };
+}
+
+export function makeRepairWorkflowConfig(
+  id: string,
+  type: "repair_tasks" | "repair_check" | "repair_merge",
+  existing: NodeConfig[],
+): ExpressionConfig {
+  const name = nextName(existing, type);
+  return {
+    id,
+    kind: "expression",
+    name,
+    drop: false,
+    expr: "",
+    dtype: "str",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    expression_type: type,
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    uuid_column: "row_uuid",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    judge_column: type === "repair_tasks" ? "llm_judge_1" : undefined,
+    threshold: type === "repair_tasks" ? "4" : undefined,
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    conversations_column: type === "repair_tasks" ? undefined : "conversations",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    candidate_column: type === "repair_tasks" ? undefined : "rewrite_result",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    approval_column: type === "repair_merge" ? "rewrite_guard" : undefined,
+  };
+}
+
+export function makeJsonlExportConfig(
+  id: string,
+  existing: NodeConfig[],
+): ExpressionConfig {
+  return {
+    id,
+    kind: "expression",
+    name: nextName(existing, "jsonl_export"),
+    drop: false,
+    expr: "",
+    dtype: "str",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    expression_type: "jsonl_export",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    export_source_column: "repair_merge",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    export_output_field: "conversations",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    export_uuid_column: "row_uuid",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    export_filename: "final-conversations.jsonl",
   };
 }
 

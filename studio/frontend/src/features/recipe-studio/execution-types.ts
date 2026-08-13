@@ -63,6 +63,12 @@ export type RecipeExecutionAnalysis = {
   column_profiles?: Record<string, unknown>[] | null;
 } & Record<string, unknown>;
 
+export type RecipeExportFile = {
+  name: string;
+  filename: string;
+  rows: number | null;
+};
+
 export type RecipeExecutionRecord = {
   id: string;
   recipeId: string;
@@ -94,6 +100,8 @@ export type RecipeExecutionRecord = {
   lastEventId: number | null;
   // biome-ignore lint/style/useNamingConvention: backend schema
   artifact_path: string | null;
+  // biome-ignore lint/style/useNamingConvention: backend schema
+  export_files: RecipeExportFile[];
   // biome-ignore lint/style/useNamingConvention: backend schema
   log_lines: string[];
   dataset: Record<string, unknown>[];

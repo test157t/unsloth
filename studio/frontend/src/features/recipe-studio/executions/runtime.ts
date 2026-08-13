@@ -24,7 +24,10 @@ function formatEventTime(ts: unknown): string {
   return new Date(ms).toLocaleTimeString();
 }
 
-export function appendExecutionLogLine(lines: string[], nextLine: string): string[] {
+export function appendExecutionLogLine(
+  lines: string[],
+  nextLine: string,
+): string[] {
   const next = [...lines, nextLine];
   if (next.length <= MAX_LOG_LINES) {
     return next;
@@ -39,7 +42,9 @@ export function toExecutionLogLine(event: JobEvent): string | null {
 
   if (eventType === "log") {
     const message =
-      typeof event.payload.message === "string" ? event.payload.message.trim() : "";
+      typeof event.payload.message === "string"
+        ? event.payload.message.trim()
+        : "";
     if (!message) {
       return null;
     }
@@ -101,17 +106,39 @@ export function applyExecutionStatusSnapshot(
     current_column: status.current_column ?? null,
     completed_columns: Array.isArray(status.completed_columns)
       ? status.completed_columns.filter(
-          (value): value is string => typeof value === "string" && value.trim().length > 0,
+          (value): value is string =>
+            typeof value === "string" && value.trim().length > 0,
         )
       : execution.completed_columns,
-    progress: (normalizeObject(status.progress) as RecipeExecutionRecord["progress"]) ?? null,
-    column_progress:
-      (normalizeObject(status.column_progress) as RecipeExecutionRecord["column_progress"]) ??
+    progress:
+      (normalizeObject(status.progress) as RecipeExecutionRecord["progress"]) ??
       null,
+    column_progress:
+      (normalizeObject(
+        status.column_progress,
+      ) as RecipeExecutionRecord["column_progress"]) ?? null,
     batch,
     source_progress: normalizeSourceProgress(status.source_progress),
     model_usage: normalizeObject(status.model_usage),
     artifact_path: status.artifact_path ?? execution.artifact_path,
+    export_files: Array.isArray(status.export_files)
+      ? status.export_files.flatMap((item) => {
+          const name =
+            typeof item.name === "string" ? item.name : "JSONL export";
+          const filename =
+            typeof item.filename === "string" ? item.filename : "";
+          if (!filename) {
+            return [];
+          }
+          return [
+            {
+              name,
+              filename,
+              rows: typeof item.rows === "number" ? item.rows : null,
+            },
+          ];
+        })
+      : (execution.export_files ?? []),
     error: status.error ?? null,
     finishedAt:
       mappedStatus === "completed" ||
@@ -151,6 +178,7 @@ export function createBaseExecutionRecord(input: {
     model_usage: null,
     lastEventId: null,
     artifact_path: null,
+    export_files: [],
     log_lines: [],
     dataset: [],
     datasetTotal: 0,

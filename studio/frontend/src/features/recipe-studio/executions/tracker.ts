@@ -7,6 +7,7 @@ import {
   getRecipeJobAnalysis,
   getRecipeJobDataset,
   getRecipeJobStatus,
+  isDataRecipeApiError,
   streamRecipeJobEvents,
 } from "../api";
 import type {
@@ -19,6 +20,7 @@ import {
   DATASET_PAGE_SIZE,
   delay,
   mapJobStatus,
+  markExecutionUnavailable,
   normalizeAnalysis,
   normalizeDatasetRows,
   toErrorMessage,
@@ -156,6 +158,27 @@ export async function trackRecipeExecution({
             typeof event.payload.artifact_path === "string"
               ? event.payload.artifact_path
               : latestExecution.artifact_path,
+          export_files: Array.isArray(event.payload.export_files)
+            ? event.payload.export_files.flatMap((item) => {
+                if (typeof item !== "object" || item === null) {
+                  return [];
+                }
+                const file = item as Record<string, unknown>;
+                if (typeof file.filename !== "string") {
+                  return [];
+                }
+                return [
+                  {
+                    name:
+                      typeof file.name === "string"
+                        ? file.name
+                        : "JSONL export",
+                    filename: file.filename,
+                    rows: typeof file.rows === "number" ? file.rows : null,
+                  },
+                ];
+              })
+            : (latestExecution.export_files ?? []),
           error: null,
         };
         onUpsert(latestExecution);
@@ -227,6 +250,11 @@ export async function trackRecipeExecution({
   } catch (error) {
     const terminal = isTerminalStatus(lastStatus);
     if (!terminal) {
+      if (isDataRecipeApiError(error) && error.status === 404) {
+        latestExecution = markExecutionUnavailable(latestExecution);
+        onUpsert(latestExecution);
+        return { success: false, terminal: true };
+      }
       const message = toErrorMessage(error, `${label} failed.`);
       latestExecution = {
         ...latestExecution,

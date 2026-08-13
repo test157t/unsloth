@@ -27,6 +27,7 @@ import type {
   SamplerType,
   SeedSourceType,
 } from "../types";
+import { makeUnstructuredUploadUid } from "../utils/config-factories";
 import { applyRecipeConnection, isValidRecipeConnection } from "../utils/graph";
 import { deriveDisplayGraph } from "../utils/graph/derive-display-graph";
 import {
@@ -36,7 +37,6 @@ import {
 } from "../utils/handles";
 import type { RecipeSnapshot } from "../utils/import";
 import { getLayoutedElements } from "../utils/layout";
-import { makeUnstructuredUploadUid } from "../utils/config-factories";
 import {
   centerModelInfraNodes,
   optimizeModelInfraEdgeHandles,
@@ -105,16 +105,25 @@ type RecipeStudioState = {
     openDialog?: boolean,
   ) => void;
   addLlmNode: (
-    type: LlmType,
+    type: LlmType | "conditional_ai" | "conditional_guard",
     position?: XYPosition,
     openDialog?: boolean,
   ) => void;
   addModelProviderNode: (position?: XYPosition, openDialog?: boolean) => void;
   addModelConfigNode: (position?: XYPosition, openDialog?: boolean) => void;
   addToolProfileNode: (position?: XYPosition, openDialog?: boolean) => void;
-  addExpressionNode: (position?: XYPosition, openDialog?: boolean) => void;
+  addExpressionNode: (
+    type: "expression" | "repair_merge" | "jsonl_export",
+    position?: XYPosition,
+    openDialog?: boolean,
+  ) => void;
   addValidatorNode: (
-    type: "validator_python" | "validator_sql" | "validator_oxc",
+    type:
+      | "validator_python"
+      | "validator_sql"
+      | "validator_oxc"
+      | "repair_tasks"
+      | "repair_check",
     position?: XYPosition,
     openDialog?: boolean,
   ) => void;
@@ -684,7 +693,7 @@ export const useRecipeStudioStore = create<RecipeStudioState>((set, get) => ({
       }
       return { ...added, nodes, edges, configs };
     }),
-  addExpressionNode: (position, openDialog = true) =>
+  addExpressionNode: (type, position, openDialog = true) =>
     set((state) => {
       if (state.executionLocked) {
         return state;
@@ -692,7 +701,7 @@ export const useRecipeStudioStore = create<RecipeStudioState>((set, get) => ({
       return buildAddedNodeState(
         state,
         "expression",
-        "expression",
+        type,
         position,
         openDialog,
       );

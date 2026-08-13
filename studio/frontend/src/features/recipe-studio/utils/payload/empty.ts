@@ -16,6 +16,7 @@ export function createEmptyRecipePayload(): RecipePayload {
       tool_configs: [],
       columns: [],
       processors: [],
+      exports: [],
     },
     run: {
       rows: 5,
