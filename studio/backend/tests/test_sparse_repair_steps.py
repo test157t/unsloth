@@ -2,6 +2,7 @@
 # Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import importlib.util
+import inspect
 from pathlib import Path
 
 
@@ -124,3 +125,10 @@ def test_merge_rejects_a_guard_decision_for_another_uuid() -> None:
         candidate_column = "candidate",
         approval_column = "approval",
     ) == ORIGINAL
+
+
+def test_conditional_llm_generator_uses_the_synchronous_model_boundary() -> None:
+    source = inspect.getsource(_MODULE._make_conditional_llm_column)
+    assert "async def generate" not in source
+    assert "model.generate(" in source
+    assert "await model.agenerate(" not in source

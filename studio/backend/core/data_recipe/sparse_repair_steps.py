@@ -279,7 +279,7 @@ def _make_conditional_llm_column(spec: dict[str, Any]):
         side_effect_columns = side_effects,
         model_aliases = [model_alias],
     )
-    async def generate(row, generator_params, models):
+    def generate(row, generator_params, models):
         output = dict(row)
         deserialized = deserialize_json_values(row)
         if not _condition_is_true(run_if, deserialized):
@@ -302,7 +302,7 @@ def _make_conditional_llm_column(spec: dict[str, Any]):
                 "model_alias": model_alias,
             },
         )
-        response, trace = await model.agenerate(
+        response, trace = model.generate(
             prompt = renderer.render(
                 record = deserialized,
                 prompt_template = llm_config.prompt,
