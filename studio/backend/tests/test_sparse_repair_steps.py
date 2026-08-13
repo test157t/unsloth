@@ -108,3 +108,19 @@ def test_sparse_columns_are_removed_before_data_designer_parsing() -> None:
     )
     assert [column["name"] for column in recipe["columns"]] == ["judge"]
     assert [column["name"] for column in specs] == ["tasks"]
+
+
+def test_merge_rejects_a_guard_decision_for_another_uuid() -> None:
+    row = {
+        "row_uuid": "row-1",
+        "conversations": ORIGINAL,
+        "candidate": CANDIDATE,
+        "approval": {"row_uuid": "row-2", "approved": True},
+    }
+    assert merge_approved_repair(
+        row,
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+        approval_column = "approval",
+    ) == ORIGINAL

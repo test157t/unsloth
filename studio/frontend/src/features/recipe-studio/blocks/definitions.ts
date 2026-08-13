@@ -507,7 +507,10 @@ export function getBlockDefinitionForConfig(
   }
   if (config.kind === "llm") {
     if (config.run_if?.trim()) {
-      return getBlockDefinition("llm", "conditional_ai");
+      const conditionalType = config.output_format?.includes('"approved"')
+        ? "conditional_guard"
+        : "conditional_ai";
+      return getBlockDefinition("llm", conditionalType);
     }
     return getBlockDefinition("llm", config.llm_type);
   }

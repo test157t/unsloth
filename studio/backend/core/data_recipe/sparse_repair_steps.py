@@ -124,6 +124,9 @@ def merge_approved_repair(
     approval = _decoded(row.get(approval_column))
     approved = approval is True
     if isinstance(approval, dict):
+        approval_uuid = approval.get("row_uuid")
+        if approval_uuid is not None and approval_uuid != row.get(uuid_column):
+            return original
         approved = approval.get("approved") is True or approval.get("valid") is True
     if not approved or not isinstance(candidate, dict):
         return original
