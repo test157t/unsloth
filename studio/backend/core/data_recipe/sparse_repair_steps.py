@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 from typing import Any
 
@@ -14,6 +15,8 @@ _REPAIR_COLUMN_TYPES = {
     "unsloth-repair-check",
     "unsloth-repair-merge",
 }
+
+logger = logging.getLogger(__name__)
 
 
 def _required_column_name(spec: dict[str, Any], key: str) -> str:
@@ -30,6 +33,20 @@ def _decoded(value: Any) -> Any:
         return json.loads(value)
     except (TypeError, ValueError):
         return value
+
+
+def _decoded_list(value: Any) -> Any:
+    value = _decoded(value)
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    to_list = getattr(value, "tolist", None)
+    if callable(to_list):
+        converted = to_list()
+        if isinstance(converted, list):
+            return converted
+    return value
 
 
 def extract_repair_tasks(
@@ -70,7 +87,7 @@ def validate_repair_candidate(
     candidate_column: str,
 ) -> dict[str, Any]:
     row_uuid = row.get(uuid_column)
-    original = _decoded(row.get(conversations_column))
+    original = _decoded_list(row.get(conversations_column))
     candidate = _decoded(row.get(candidate_column))
     result = {"row_uuid": row_uuid, "valid": False, "reason": ""}
     if not isinstance(original, list):
@@ -85,7 +102,7 @@ def validate_repair_candidate(
     if candidate.get("did_rewrite") is not True:
         result["reason"] = "Repair candidate did not declare an actual rewrite."
         return result
-    conversations = _decoded(candidate.get("conversations"))
+    conversations = _decoded_list(candidate.get("conversations"))
     if not isinstance(conversations, list) or len(conversations) != len(original):
         result["reason"] = "Repair candidate changed the conversation turn count."
         return result
@@ -119,7 +136,7 @@ def merge_approved_repair(
     candidate_column: str,
     approval_column: str,
 ) -> Any:
-    original = _decoded(row.get(conversations_column))
+    original = _decoded_list(row.get(conversations_column))
     candidate = _decoded(row.get(candidate_column))
     approval = _decoded(row.get(approval_column))
     approved = approval is True
@@ -132,7 +149,7 @@ def merge_approved_repair(
         return original
     if candidate.get("row_uuid") != row.get(uuid_column):
         return original
-    conversations = _decoded(candidate.get("conversations"))
+    conversations = _decoded_list(candidate.get("conversations"))
     checked = validate_repair_candidate(
         row,
         uuid_column = uuid_column,
@@ -302,29 +319,40 @@ def _make_conditional_llm_column(spec: dict[str, Any]):
                 "model_alias": model_alias,
             },
         )
-        response, trace = model.generate(
-            prompt = renderer.render(
-                record = deserialized,
-                prompt_template = llm_config.prompt,
-                prompt_type = PromptType.USER_PROMPT,
-            ),
-            system_prompt = renderer.render(
-                record = deserialized,
-                prompt_template = llm_config.system_prompt,
-                prompt_type = PromptType.SYSTEM_PROMPT,
-            ),
-            parser = response_recipe.parse,
-            multi_modal_context = (
-                [
-                    context
-                    for image_context in (llm_config.multi_modal_context or [])
-                    for context in image_context.get_contexts(deserialized, base_path = None)
-                ]
-                or None
-            ),
-            tool_alias = llm_config.tool_alias,
-            purpose = f"running conditional generation for column '{llm_config.name}'",
-        )
+        try:
+            response, trace = model.generate(
+                prompt = renderer.render(
+                    record = deserialized,
+                    prompt_template = llm_config.prompt,
+                    prompt_type = PromptType.USER_PROMPT,
+                ),
+                system_prompt = renderer.render(
+                    record = deserialized,
+                    prompt_template = llm_config.system_prompt,
+                    prompt_type = PromptType.SYSTEM_PROMPT,
+                ),
+                parser = response_recipe.parse,
+                multi_modal_context = (
+                    [
+                        context
+                        for image_context in (llm_config.multi_modal_context or [])
+                        for context in image_context.get_contexts(deserialized, base_path = None)
+                    ]
+                    or None
+                ),
+                tool_alias = llm_config.tool_alias,
+                purpose = f"running conditional generation for column '{llm_config.name}'",
+            )
+        except Exception as exc:
+            logger.warning(
+                "Conditional generation failed for column %r; preserving the source row: %s",
+                llm_config.name,
+                exc,
+            )
+            output[llm_config.name] = None
+            for side_effect in side_effects:
+                output[side_effect] = None
+            return output
         serialized = response_recipe.serialize_output(response)
         output[llm_config.name] = (
             deserialize_json_values(serialized)

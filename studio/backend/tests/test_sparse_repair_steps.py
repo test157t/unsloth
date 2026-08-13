@@ -3,6 +3,7 @@
 
 import importlib.util
 import inspect
+import json
 from pathlib import Path
 
 
@@ -92,6 +93,38 @@ def test_candidate_check_allows_sharegpt_gpt_turns() -> None:
             "row_uuid": "row-1",
             "conversations": original,
             "candidate": candidate,
+        },
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+    )
+    assert result["valid"] is True
+
+
+def test_candidate_check_accepts_array_like_seed_conversations() -> None:
+    class ArrayLike:
+        def tolist(self):
+            return ORIGINAL
+
+    result = validate_repair_candidate(
+        {
+            "row_uuid": "row-1",
+            "conversations": ArrayLike(),
+            "candidate": CANDIDATE,
+        },
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+    )
+    assert result["valid"] is True
+
+
+def test_candidate_check_accepts_json_encoded_conversations() -> None:
+    result = validate_repair_candidate(
+        {
+            "row_uuid": "row-1",
+            "conversations": json.dumps(ORIGINAL),
+            "candidate": json.dumps(CANDIDATE),
         },
         uuid_column = "row_uuid",
         conversations_column = "conversations",
