@@ -98,7 +98,7 @@ def validate_repair_candidate(
             result["reason"] = f"Repair candidate changed the role at turn {index}."
             return result
         role = str(before.get("from") or "").strip().lower()
-        if role not in {"assistant", "model"} and before != after:
+        if role not in {"assistant", "model", "gpt"} and before != after:
             result["reason"] = f"Repair candidate changed protected turn {index}."
             return result
         if before != after:

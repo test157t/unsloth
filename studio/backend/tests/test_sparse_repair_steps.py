@@ -74,6 +74,32 @@ def test_candidate_check_protects_non_assistant_turns() -> None:
     assert "protected turn" in result["reason"]
 
 
+def test_candidate_check_allows_sharegpt_gpt_turns() -> None:
+    original = [
+        {"from": "human", "value": "Hello"},
+        {"from": "gpt", "value": "Plain answer"},
+    ]
+    candidate = {
+        "row_uuid": "row-1",
+        "did_rewrite": True,
+        "conversations": [
+            {"from": "human", "value": "Hello"},
+            {"from": "gpt", "value": "Distinctly repaired answer"},
+        ],
+    }
+    result = validate_repair_candidate(
+        {
+            "row_uuid": "row-1",
+            "conversations": original,
+            "candidate": candidate,
+        },
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+    )
+    assert result["valid"] is True
+
+
 def test_merge_uses_approved_keyed_candidate_and_falls_back_otherwise() -> None:
     row = {
         "row_uuid": "row-1",
