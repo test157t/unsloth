@@ -72,6 +72,7 @@ export type RecipeNodeData = {
     | "expression"
     | "conditional_ai"
     | "conditional_guard"
+    | "conversation_pair"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge"
@@ -310,6 +311,7 @@ export type ExpressionConfig = {
   // biome-ignore lint/style/useNamingConvention: ui schema
   expression_type?:
     | "formula"
+    | "conversation_pair"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge"
@@ -325,6 +327,10 @@ export type ExpressionConfig = {
   candidate_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   approval_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  human_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  assistant_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   export_source_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema

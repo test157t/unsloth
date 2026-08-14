@@ -103,6 +103,15 @@ export function applyRenameToConfig(
       };
     }
   }
+  if (config.kind === "expression") {
+    const base = next as typeof config;
+    if (config.human_column === from) {
+      next = { ...base, human_column: to };
+    }
+    if (config.assistant_column === from) {
+      next = { ...(next as typeof config), assistant_column: to };
+    }
+  }
   return next;
 }
 
@@ -166,6 +175,15 @@ export function applyRemovalToConfig(
         // biome-ignore lint/style/useNamingConvention: api schema
         target_columns: targets,
       };
+    }
+  }
+  if (config.kind === "expression") {
+    const base = next as typeof config;
+    if (config.human_column === ref) {
+      next = { ...base, human_column: "" };
+    }
+    if (config.assistant_column === ref) {
+      next = { ...(next as typeof config), assistant_column: "" };
     }
   }
   return next;

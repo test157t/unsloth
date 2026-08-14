@@ -233,6 +233,13 @@ export function getConfigErrors(config: NodeConfig | null): string[] {
       if (!config.expr.trim()) {
         errors.push("Expression is required.");
       }
+    } else if (expressionType === "conversation_pair") {
+      if (!config.human_column?.trim()) {
+        errors.push("Human message field is required.");
+      }
+      if (!config.assistant_column?.trim()) {
+        errors.push("AI response field is required.");
+      }
     } else {
       if (!config.uuid_column?.trim()) {
         errors.push("Row UUID field is required.");

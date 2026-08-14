@@ -26,6 +26,7 @@ export function nodeDataFromConfig(
     const workflowType = config.expression_type ?? "formula";
     if (workflowType !== "formula") {
       const labels = {
+        conversation_pair: ["Conversation pair", "Fixed human then gpt"],
         repair_tasks: ["Repair tasks", "Failed criteria"],
         repair_check: ["Repair check", "Deterministic"],
         repair_merge: ["Repair merge", "Approved only"],

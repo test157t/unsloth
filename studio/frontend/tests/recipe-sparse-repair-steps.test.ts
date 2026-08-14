@@ -48,3 +48,24 @@ test("repair helpers serialize and import without becoming formulas", () => {
   assert.equal(payload.judge_column, "judge");
   assert.equal(payload.threshold, 4);
 });
+
+test("conversation pair serializes as a deterministic native step", () => {
+  const config: ExpressionConfig = {
+    id: "pair",
+    kind: "expression",
+    expression_type: "conversation_pair",
+    name: "conversations",
+    expr: "",
+    dtype: "str",
+    human_column: "human_message",
+    assistant_column: "mia_response",
+  };
+  const payload = buildSparseRepairColumn(config);
+  assert.deepEqual(payload, {
+    name: "conversations",
+    drop: false,
+    column_type: "unsloth-conversation-pair",
+    human_column: "human_message",
+    assistant_column: "mia_response",
+  });
+});

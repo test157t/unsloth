@@ -434,7 +434,11 @@ export function makeConditionalRepairLlmConfig(
 
 export function makeRepairWorkflowConfig(
   id: string,
-  type: "repair_tasks" | "repair_check" | "repair_merge",
+  type:
+    | "conversation_pair"
+    | "repair_tasks"
+    | "repair_check"
+    | "repair_merge",
   existing: NodeConfig[],
 ): ExpressionConfig {
   const name = nextName(existing, type);
@@ -448,14 +452,24 @@ export function makeRepairWorkflowConfig(
     // biome-ignore lint/style/useNamingConvention: ui schema
     expression_type: type,
     // biome-ignore lint/style/useNamingConvention: ui schema
-    uuid_column: "row_uuid",
+    human_column: type === "conversation_pair" ? "human_message" : undefined,
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    assistant_column: type === "conversation_pair" ? "mia_response" : undefined,
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    uuid_column: type === "conversation_pair" ? undefined : "row_uuid",
     // biome-ignore lint/style/useNamingConvention: ui schema
     judge_column: type === "repair_tasks" ? "llm_judge_1" : undefined,
     threshold: type === "repair_tasks" ? "4" : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
-    conversations_column: type === "repair_tasks" ? undefined : "conversations",
+    conversations_column:
+      type === "repair_check" || type === "repair_merge"
+        ? "conversations"
+        : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
-    candidate_column: type === "repair_tasks" ? undefined : "rewrite_result",
+    candidate_column:
+      type === "repair_check" || type === "repair_merge"
+        ? "rewrite_result"
+        : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
     approval_column: type === "repair_merge" ? "rewrite_guard" : undefined,
   };

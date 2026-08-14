@@ -100,7 +100,11 @@ type UseRecipeEditorGraphArgs = {
   addModelConfigNode: (position?: XYPosition, openDialog?: boolean) => void;
   addToolProfileNode: (position?: XYPosition, openDialog?: boolean) => void;
   addExpressionNode: (
-    type: "expression" | "repair_merge" | "jsonl_export",
+    type:
+      | "expression"
+      | "conversation_pair"
+      | "repair_merge"
+      | "jsonl_export",
     position?: XYPosition,
     openDialog?: boolean,
   ) => void;
@@ -141,7 +145,11 @@ type UseRecipeEditorGraphResult = {
   handleAddModelConfigFromSheet: () => void;
   handleAddToolProfileFromSheet: () => void;
   handleAddExpressionFromSheet: (
-    type: "expression" | "repair_merge" | "jsonl_export",
+    type:
+      | "expression"
+      | "conversation_pair"
+      | "repair_merge"
+      | "jsonl_export",
   ) => void;
   handleAddValidatorFromSheet: (
     type:
@@ -276,7 +284,11 @@ export function useRecipeEditorGraph({
       }
       if (payload.kind === "expression") {
         addExpressionNode(
-          payload.type as "expression" | "repair_merge" | "jsonl_export",
+          payload.type as
+            | "expression"
+            | "conversation_pair"
+            | "repair_merge"
+            | "jsonl_export",
           position,
           false,
         );
@@ -372,7 +384,13 @@ export function useRecipeEditorGraph({
   }, [addModelConfigNode, getViewportCenterPosition]);
 
   const handleAddExpressionFromSheet = useCallback(
-    (type: "expression" | "repair_merge" | "jsonl_export") => {
+    (
+      type:
+        | "expression"
+        | "conversation_pair"
+        | "repair_merge"
+        | "jsonl_export",
+    ) => {
       addExpressionNode(type, getViewportCenterPosition());
     },
     [addExpressionNode, getViewportCenterPosition],

@@ -12,6 +12,7 @@ _SPEC = importlib.util.spec_from_file_location("sparse_repair_steps", _MODULE_PA
 assert _SPEC is not None and _SPEC.loader is not None
 _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
+build_conversation_pair = _MODULE.build_conversation_pair
 extract_repair_tasks = _MODULE.extract_repair_tasks
 merge_approved_repair = _MODULE.merge_approved_repair
 split_sparse_repair_columns = _MODULE.split_sparse_repair_columns
@@ -30,6 +31,35 @@ CANDIDATE = {
         {"from": "assistant", "value": "Distinctly repaired answer"},
     ],
 }
+
+
+def test_builds_exactly_one_human_and_one_gpt_turn() -> None:
+    response = (
+        "<Mia_Internal-Thoughts>Check the constraint.</Mia_Internal-Thoughts>\n"
+        "One spoken answer."
+    )
+    result = build_conversation_pair(
+        {"human_message": "One user message.", "mia_response": response},
+        human_column = "human_message",
+        assistant_column = "mia_response",
+    )
+    assert result == [
+        {"from": "human", "value": "One user message."},
+        {"from": "gpt", "value": response},
+    ]
+
+
+def test_conversation_pair_rejects_missing_text() -> None:
+    try:
+        build_conversation_pair(
+            {"human_message": "Hello", "mia_response": ""},
+            human_column = "human_message",
+            assistant_column = "mia_response",
+        )
+    except ValueError as exc:
+        assert "mia_response" in str(exc)
+    else:
+        raise AssertionError("Expected blank assistant text to be rejected.")
 
 
 def test_extracts_only_failed_judge_criteria() -> None:
@@ -162,12 +192,13 @@ def test_sparse_columns_are_removed_before_data_designer_parsing() -> None:
         {
             "columns": [
                 {"column_type": "llm-judge", "name": "judge"},
+                {"column_type": "unsloth-conversation-pair", "name": "pair"},
                 {"column_type": "unsloth-repair-tasks", "name": "tasks"},
             ]
         }
     )
     assert [column["name"] for column in recipe["columns"]] == ["judge"]
-    assert [column["name"] for column in specs] == ["tasks"]
+    assert [column["name"] for column in specs] == ["pair", "tasks"]
 
 
 def test_merge_rejects_a_guard_decision_for_another_uuid() -> None:

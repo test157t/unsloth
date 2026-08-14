@@ -82,7 +82,11 @@ type BlockSheetProps = {
   onAddModelConfig: () => void;
   onAddToolProfile: () => void;
   onAddExpression: (
-    type: "expression" | "repair_merge" | "jsonl_export",
+    type:
+      | "expression"
+      | "conversation_pair"
+      | "repair_merge"
+      | "jsonl_export",
   ) => void;
   onAddValidator: (
     type:
@@ -395,7 +399,13 @@ export function BlockSheet({
       return;
     }
     if (kind === "expression") {
-      onAddExpression(type as "expression" | "repair_merge" | "jsonl_export");
+      onAddExpression(
+        type as
+          | "expression"
+          | "conversation_pair"
+          | "repair_merge"
+          | "jsonl_export",
+      );
       return;
     }
     onAddMarkdownNote();

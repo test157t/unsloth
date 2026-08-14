@@ -11,6 +11,7 @@ from typing import Any
 
 _CONDITIONAL_PREFIX = "unsloth-conditional-"
 _REPAIR_COLUMN_TYPES = {
+    "unsloth-conversation-pair",
     "unsloth-repair-tasks",
     "unsloth-repair-check",
     "unsloth-repair-merge",
@@ -77,6 +78,27 @@ def extract_repair_tasks(
                 }
             )
     return {"row_uuid": row.get(uuid_column), "repairs": repairs}
+
+
+def build_conversation_pair(
+    row: dict[str, Any],
+    *,
+    human_column: str,
+    assistant_column: str,
+) -> list[dict[str, str]]:
+    """Deterministically pair one human message with one assistant response."""
+    human = row.get(human_column)
+    assistant = row.get(assistant_column)
+    if not isinstance(human, str) or not human.strip():
+        raise ValueError(f"Human message field {human_column!r} must be non-empty text.")
+    if not isinstance(assistant, str) or not assistant.strip():
+        raise ValueError(
+            f"Assistant response field {assistant_column!r} must be non-empty text."
+        )
+    return [
+        {"from": "human", "value": human},
+        {"from": "gpt", "value": assistant},
+    ]
 
 
 def validate_repair_candidate(
@@ -195,9 +217,24 @@ def _make_workflow_column(spec: dict[str, Any]):
 
     name = str(spec["name"])
     column_type = str(spec["column_type"])
-    uuid_column = _required_column_name(spec, "uuid_column")
-    required = [uuid_column]
-    if column_type == "unsloth-repair-tasks":
+    if column_type == "unsloth-conversation-pair":
+        human_column = _required_column_name(spec, "human_column")
+        assistant_column = _required_column_name(spec, "assistant_column")
+        required = [human_column, assistant_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = build_conversation_pair(
+                row,
+                human_column = human_column,
+                assistant_column = assistant_column,
+            )
+            return output
+
+    elif column_type == "unsloth-repair-tasks":
+        uuid_column = _required_column_name(spec, "uuid_column")
+        required = [uuid_column]
         judge_column = _required_column_name(spec, "judge_column")
         threshold = float(spec.get("threshold", 4))
         if not math.isfinite(threshold):
@@ -216,6 +253,8 @@ def _make_workflow_column(spec: dict[str, Any]):
             return output
 
     elif column_type == "unsloth-repair-check":
+        uuid_column = _required_column_name(spec, "uuid_column")
+        required = [uuid_column]
         conversations_column = _required_column_name(spec, "conversations_column")
         candidate_column = _required_column_name(spec, "candidate_column")
         required.extend([conversations_column, candidate_column])
@@ -232,6 +271,8 @@ def _make_workflow_column(spec: dict[str, Any]):
             return output
 
     else:
+        uuid_column = _required_column_name(spec, "uuid_column")
+        required = [uuid_column]
         conversations_column = _required_column_name(spec, "conversations_column")
         candidate_column = _required_column_name(spec, "candidate_column")
         approval_column = _required_column_name(spec, "approval_column")

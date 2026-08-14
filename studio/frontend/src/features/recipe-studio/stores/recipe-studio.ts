@@ -113,7 +113,11 @@ type RecipeStudioState = {
   addModelConfigNode: (position?: XYPosition, openDialog?: boolean) => void;
   addToolProfileNode: (position?: XYPosition, openDialog?: boolean) => void;
   addExpressionNode: (
-    type: "expression" | "repair_merge" | "jsonl_export",
+    type:
+      | "expression"
+      | "conversation_pair"
+      | "repair_merge"
+      | "jsonl_export",
     position?: XYPosition,
     openDialog?: boolean,
   ) => void;

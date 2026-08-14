@@ -59,6 +59,7 @@ export type BlockType =
   | "expression"
   | "conditional_ai"
   | "conditional_guard"
+  | "conversation_pair"
   | "repair_tasks"
   | "repair_check"
   | "repair_merge"
@@ -434,6 +435,17 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
   },
   {
     kind: "expression",
+    type: "conversation_pair",
+    title: "Build conversation pair",
+    description:
+      "Combine one human message and one AI response into fixed human/gpt turns.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(id, "conversation_pair", existing),
+  },
+  {
+    kind: "expression",
     type: "repair_merge",
     title: "Apply approved repairs",
     description:
@@ -545,7 +557,10 @@ export function getBlockDefinitionForConfig(
       return getBlockDefinition("expression", "jsonl_export");
     }
     return getBlockDefinition(
-      config.expression_type === "repair_merge" ? "expression" : "validator",
+      config.expression_type === "repair_merge" ||
+        config.expression_type === "conversation_pair"
+        ? "expression"
+        : "validator",
       config.expression_type ?? "expression",
     );
   }

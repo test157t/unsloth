@@ -8,7 +8,11 @@ export function parseRepairWorkflow(
   column: Record<string, unknown>,
   name: string,
   id: string,
-  expressionType: "repair_tasks" | "repair_check" | "repair_merge",
+  expressionType:
+    | "conversation_pair"
+    | "repair_tasks"
+    | "repair_check"
+    | "repair_merge",
 ): ExpressionConfig {
   return {
     id,
@@ -19,6 +23,10 @@ export function parseRepairWorkflow(
     dtype: "str",
     // biome-ignore lint/style/useNamingConvention: ui schema
     expression_type: expressionType,
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    human_column: readString(column.human_column) ?? "",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    assistant_column: readString(column.assistant_column) ?? "",
     // biome-ignore lint/style/useNamingConvention: ui schema
     uuid_column: readString(column.uuid_column) ?? "row_uuid",
     // biome-ignore lint/style/useNamingConvention: ui schema

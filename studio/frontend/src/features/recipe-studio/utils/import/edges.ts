@@ -148,6 +148,14 @@ export function buildEdges(
       for (const ref of extractRefs(config.expr)) {
         addEdgeByName(ref, config.name);
       }
+      if (config.expression_type === "conversation_pair") {
+        if (config.human_column?.trim()) {
+          addEdgeByName(config.human_column, config.name);
+        }
+        if (config.assistant_column?.trim()) {
+          addEdgeByName(config.assistant_column, config.name);
+        }
+      }
     }
     if (
       config.kind === "sampler" &&

@@ -23,6 +23,8 @@ function TextField({
 }: {
   config: ExpressionConfig;
   field:
+    | "human_column"
+    | "assistant_column"
     | "uuid_column"
     | "judge_column"
     | "threshold"
@@ -61,14 +63,35 @@ export function RepairWorkflowDialog({
         onChange={(value) => onUpdate({ name: value })}
       />
       <AvailableVariables configId={config.id} />
-      <TextField
-        config={config}
-        field="uuid_column"
-        label="Row UUID field"
-        hint="Stable key copied into every repair task and candidate."
-        placeholder="row_uuid"
-        onUpdate={onUpdate}
-      />
+      {type === "conversation_pair" ? (
+        <>
+          <TextField
+            config={config}
+            field="human_column"
+            label="Human message field"
+            hint="One generated human message. It becomes the only human turn."
+            placeholder="human_message"
+            onUpdate={onUpdate}
+          />
+          <TextField
+            config={config}
+            field="assistant_column"
+            label="AI response field"
+            hint="One complete response, including any reasoning tags and visible answer."
+            placeholder="mia_response"
+            onUpdate={onUpdate}
+          />
+        </>
+      ) : (
+        <TextField
+          config={config}
+          field="uuid_column"
+          label="Row UUID field"
+          hint="Stable key copied into every repair task and candidate."
+          placeholder="row_uuid"
+          onUpdate={onUpdate}
+        />
+      )}
       {type === "repair_tasks" ? (
         <>
           <TextField
@@ -88,7 +111,7 @@ export function RepairWorkflowDialog({
             onUpdate={onUpdate}
           />
         </>
-      ) : (
+      ) : type !== "conversation_pair" ? (
         <>
           <TextField
             config={config}
@@ -117,8 +140,10 @@ export function RepairWorkflowDialog({
             />
           )}
         </>
-      )}
+      ) : null}
       <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-xs text-muted-foreground">
+        {type === "conversation_pair" &&
+          "Always outputs exactly two turns: one human followed by one gpt. The AI cannot add roles or split reasoning into another turn."}
         {type === "repair_tasks" &&
           "Outputs { row_uuid, repairs[] }. Empty repairs let conditional AI skip the row without a model request."}
         {type === "repair_check" &&
