@@ -16,6 +16,10 @@ _REPAIR_COLUMN_TYPES = {
     "unsloth-repair-check",
     "unsloth-repair-merge",
 }
+_INTERNAL_THOUGHT_OPEN = "<Mia_Internal-Thoughts>"
+_INTERNAL_THOUGHT_CLOSE = "</Mia_Internal-Thoughts>"
+_INTERNAL_THOUGHT_OPEN_PREFIX = "<Mia_Internal-Thoughts"
+_INTERNAL_THOUGHT_CLOSE_PREFIX = "</Mia_Internal-Thoughts"
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +105,60 @@ def build_conversation_pair(
     ]
 
 
+def _invalid_assistant_content_reason(value: Any) -> str | None:
+    """Return why a rewritten assistant value is unsafe, if it is unsafe."""
+    if not isinstance(value, str) or not value.strip():
+        return "has no non-empty visible answer"
+
+    without_complete_tags = value.replace(_INTERNAL_THOUGHT_OPEN, "").replace(
+        _INTERNAL_THOUGHT_CLOSE, ""
+    )
+    if (
+        _INTERNAL_THOUGHT_OPEN_PREFIX in without_complete_tags
+        or _INTERNAL_THOUGHT_CLOSE_PREFIX in without_complete_tags
+    ):
+        return "contains an incomplete internal-thought tag"
+
+    has_open = _INTERNAL_THOUGHT_OPEN in value
+    has_close = _INTERNAL_THOUGHT_CLOSE in value
+    if not has_open and not has_close:
+        return None
+
+    visible_parts: list[str] = []
+    cursor = 0
+    inside_thoughts = False
+    while cursor < len(value):
+        next_open = value.find(_INTERNAL_THOUGHT_OPEN, cursor)
+        next_close = value.find(_INTERNAL_THOUGHT_CLOSE, cursor)
+        tag_positions = [
+            position for position in (next_open, next_close) if position >= 0
+        ]
+        if not tag_positions:
+            if not inside_thoughts:
+                visible_parts.append(value[cursor:])
+            break
+
+        next_tag = min(tag_positions)
+        if not inside_thoughts:
+            visible_parts.append(value[cursor:next_tag])
+        if next_tag == next_open:
+            if inside_thoughts:
+                return "contains a nested or unclosed internal-thought opening tag"
+            inside_thoughts = True
+            cursor = next_tag + len(_INTERNAL_THOUGHT_OPEN)
+        else:
+            if not inside_thoughts:
+                return "contains an unmatched internal-thought closing tag"
+            inside_thoughts = False
+            cursor = next_tag + len(_INTERNAL_THOUGHT_CLOSE)
+
+    if inside_thoughts:
+        return "contains an unclosed internal-thought opening tag"
+    if not "".join(visible_parts).strip():
+        return "has no non-empty visible answer outside its internal-thought block"
+    return None
+
+
 def validate_repair_candidate(
     row: dict[str, Any],
     *,
@@ -141,12 +199,21 @@ def validate_repair_candidate(
             result["reason"] = f"Repair candidate changed protected turn {index}."
             return result
         if before != after:
+            invalid_content = _invalid_assistant_content_reason(after.get("value"))
+            if invalid_content is not None:
+                result["reason"] = (
+                    f"Repair candidate assistant turn {index} {invalid_content}."
+                )
+                return result
             changed = True
     if not changed:
         result["reason"] = "Repair candidate did not change an assistant or model turn."
         return result
     result["valid"] = True
-    result["reason"] = "Candidate UUID, roles, protected turns, and turn count are valid."
+    result["reason"] = (
+        "Candidate UUID, roles, protected turns, turn count, and assistant content "
+        "are valid."
+    )
     return result
 
 

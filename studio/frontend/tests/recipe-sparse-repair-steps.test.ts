@@ -2,6 +2,7 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import type {
   ExpressionConfig,
@@ -68,4 +69,51 @@ test("conversation pair serializes as a deterministic native step", () => {
     human_column: "human_message",
     assistant_column: "mia_response",
   });
+});
+
+test("default repair and guard contracts lock scope and internal thoughts", () => {
+  const factoriesSource = readFileSync(
+    new URL(
+      "../src/features/recipe-studio/utils/config-factories.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.equal(
+    factoriesSource.match(/non-empty visible answer/g)?.length,
+    2,
+  );
+  assert.equal(
+    factoriesSource.match(/incomplete internal-thought tags/g)?.length,
+    2,
+  );
+  assert.equal(factoriesSource.match(/reasoning-only content/g)?.length, 2);
+  assert.match(
+    factoriesSource,
+    /<Mia_Internal-Thoughts>\.\.\.<\/Mia_Internal-Thoughts>/,
+  );
+  assert.equal(
+    factoriesSource.match(/dataset content/g)?.length,
+    2,
+  );
+  assert.equal(
+    factoriesSource.match(/Do not invent or independently apply safety/g)
+      ?.length,
+    2,
+  );
+  assert.match(
+    factoriesSource,
+    /never reject a candidate merely because it directly complies/,
+  );
+  assert.match(
+    factoriesSource,
+    /a non-refusal regression means the candidate became more refusing/,
+  );
+  assert.match(factoriesSource, /core safety layer/);
+  assert.match(
+    factoriesSource,
+    /identify the exact supplied repair task that remains unfixed/,
+  );
+  assert.match(factoriesSource, /uncited refusal or sanitization/);
 });

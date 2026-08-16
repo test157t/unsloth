@@ -131,6 +131,62 @@ def test_candidate_check_allows_sharegpt_gpt_turns() -> None:
     assert result["valid"] is True
 
 
+def _validate_assistant_rewrite(value: str) -> dict:
+    candidate = {
+        **CANDIDATE,
+        "conversations": [
+            CANDIDATE["conversations"][0],
+            {"from": "assistant", "value": value},
+        ],
+    }
+    return validate_repair_candidate(
+        {
+            "row_uuid": "row-1",
+            "conversations": ORIGINAL,
+            "candidate": candidate,
+        },
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+    )
+
+
+def test_candidate_check_accepts_valid_plain_assistant_response() -> None:
+    assert _validate_assistant_rewrite("A repaired visible answer.")["valid"] is True
+
+
+def test_candidate_check_accepts_closed_thoughts_with_visible_answer() -> None:
+    value = (
+        "<Mia_Internal-Thoughts>Check the repair.</Mia_Internal-Thoughts>\n"
+        "A repaired visible answer."
+    )
+    assert _validate_assistant_rewrite(value)["valid"] is True
+
+
+def test_candidate_check_rejects_unclosed_internal_thought_opening_tag() -> None:
+    result = _validate_assistant_rewrite(
+        "<Mia_Internal-Thoughts>Check the repair.\nA supposed answer."
+    )
+    assert result["valid"] is False
+    assert "unclosed internal-thought opening tag" in result["reason"]
+
+
+def test_candidate_check_rejects_unmatched_internal_thought_closing_tag() -> None:
+    result = _validate_assistant_rewrite(
+        "Check the repair.</Mia_Internal-Thoughts>\nA supposed answer."
+    )
+    assert result["valid"] is False
+    assert "unmatched internal-thought closing tag" in result["reason"]
+
+
+def test_candidate_check_rejects_reasoning_only_content() -> None:
+    result = _validate_assistant_rewrite(
+        "<Mia_Internal-Thoughts>Only private reasoning.</Mia_Internal-Thoughts>"
+    )
+    assert result["valid"] is False
+    assert "no non-empty visible answer" in result["reason"]
+
+
 def test_candidate_check_accepts_array_like_seed_conversations() -> None:
     class ArrayLike:
         def tolist(self):
@@ -207,6 +263,32 @@ def test_merge_rejects_a_guard_decision_for_another_uuid() -> None:
         "conversations": ORIGINAL,
         "candidate": CANDIDATE,
         "approval": {"row_uuid": "row-2", "approved": True},
+    }
+    assert merge_approved_repair(
+        row,
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+        approval_column = "approval",
+    ) == ORIGINAL
+
+
+def test_merge_preserves_original_when_guard_approves_invalid_content() -> None:
+    invalid_candidate = {
+        **CANDIDATE,
+        "conversations": [
+            CANDIDATE["conversations"][0],
+            {
+                "from": "assistant",
+                "value": "<Mia_Internal-Thoughts>Unclosed reasoning",
+            },
+        ],
+    }
+    row = {
+        "row_uuid": "row-1",
+        "conversations": ORIGINAL,
+        "candidate": invalid_candidate,
+        "approval": {"approved": True},
     }
     assert merge_approved_repair(
         row,
