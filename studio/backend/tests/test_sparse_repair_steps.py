@@ -26,10 +26,7 @@ ORIGINAL = [
 CANDIDATE = {
     "row_uuid": "row-1",
     "did_rewrite": True,
-    "conversations": [
-        {"from": "human", "value": "Hello"},
-        {"from": "assistant", "value": "Distinctly repaired answer"},
-    ],
+    "response": "Distinctly repaired answer",
 }
 
 
@@ -83,26 +80,19 @@ def test_extracts_only_failed_judge_criteria() -> None:
     }
 
 
-def test_candidate_check_protects_non_assistant_turns() -> None:
-    altered = {
-        **CANDIDATE,
-        "conversations": [
-            {"from": "human", "value": "Changed request"},
-            CANDIDATE["conversations"][1],
-        ],
-    }
+def test_candidate_check_accepts_a_rewritten_response() -> None:
     result = validate_repair_candidate(
         {
             "row_uuid": "row-1",
             "conversations": ORIGINAL,
-            "candidate": altered,
+            "candidate": CANDIDATE,
         },
         uuid_column = "row_uuid",
         conversations_column = "conversations",
         candidate_column = "candidate",
     )
-    assert result["valid"] is False
-    assert "protected turn" in result["reason"]
+    assert result["valid"] is True
+    assert "assistant response" in result["reason"]
 
 
 def test_candidate_check_allows_sharegpt_gpt_turns() -> None:
@@ -113,10 +103,7 @@ def test_candidate_check_allows_sharegpt_gpt_turns() -> None:
     candidate = {
         "row_uuid": "row-1",
         "did_rewrite": True,
-        "conversations": [
-            {"from": "human", "value": "Hello"},
-            {"from": "gpt", "value": "Distinctly repaired answer"},
-        ],
+        "response": "Distinctly repaired answer",
     }
     result = validate_repair_candidate(
         {
@@ -131,14 +118,57 @@ def test_candidate_check_allows_sharegpt_gpt_turns() -> None:
     assert result["valid"] is True
 
 
-def _validate_assistant_rewrite(value: str) -> dict:
+def test_candidate_check_rejects_an_unchanged_response() -> None:
     candidate = {
         **CANDIDATE,
-        "conversations": [
-            CANDIDATE["conversations"][0],
-            {"from": "assistant", "value": value},
-        ],
+        "response": ORIGINAL[1]["value"],
     }
+    result = validate_repair_candidate(
+        {
+            "row_uuid": "row-1",
+            "conversations": ORIGINAL,
+            "candidate": candidate,
+        },
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+    )
+    assert result["valid"] is False
+    assert "did not change the assistant response" in result["reason"]
+
+
+def test_candidate_check_rejects_a_missing_response() -> None:
+    result = validate_repair_candidate(
+        {
+            "row_uuid": "row-1",
+            "conversations": ORIGINAL,
+            "candidate": {"row_uuid": "row-1", "did_rewrite": True},
+        },
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+    )
+    assert result["valid"] is False
+    assert "did not supply a rewritten response" in result["reason"]
+
+
+def test_candidate_check_requires_an_assistant_turn_to_repair() -> None:
+    result = validate_repair_candidate(
+        {
+            "row_uuid": "row-1",
+            "conversations": [{"from": "human", "value": "Hello"}],
+            "candidate": CANDIDATE,
+        },
+        uuid_column = "row_uuid",
+        conversations_column = "conversations",
+        candidate_column = "candidate",
+    )
+    assert result["valid"] is False
+    assert "no assistant or model turn to repair" in result["reason"]
+
+
+def _validate_assistant_rewrite(value: str) -> dict:
+    candidate = {**CANDIDATE, "response": value}
     return validate_repair_candidate(
         {
             "row_uuid": "row-1",
@@ -219,20 +249,24 @@ def test_candidate_check_accepts_json_encoded_conversations() -> None:
     assert result["valid"] is True
 
 
-def test_merge_uses_approved_keyed_candidate_and_falls_back_otherwise() -> None:
+def test_merge_replaces_only_the_assistant_turn_and_keeps_human_turns() -> None:
     row = {
         "row_uuid": "row-1",
         "conversations": ORIGINAL,
         "candidate": CANDIDATE,
         "approval": {"approved": True},
     }
-    assert merge_approved_repair(
+    merged = merge_approved_repair(
         row,
         uuid_column = "row_uuid",
         conversations_column = "conversations",
         candidate_column = "candidate",
         approval_column = "approval",
-    ) == CANDIDATE["conversations"]
+    )
+    assert merged == [
+        {"from": "human", "value": "Hello"},
+        {"from": "assistant", "value": "Distinctly repaired answer"},
+    ]
     row["approval"] = {"approved": False}
     assert merge_approved_repair(
         row,
@@ -276,13 +310,7 @@ def test_merge_rejects_a_guard_decision_for_another_uuid() -> None:
 def test_merge_preserves_original_when_guard_approves_invalid_content() -> None:
     invalid_candidate = {
         **CANDIDATE,
-        "conversations": [
-            CANDIDATE["conversations"][0],
-            {
-                "from": "assistant",
-                "value": "<Mia_Internal-Thoughts>Unclosed reasoning",
-            },
-        ],
+        "response": "<Mia_Internal-Thoughts>Unclosed reasoning",
     }
     row = {
         "row_uuid": "row-1",

@@ -125,7 +125,7 @@ export function RepairWorkflowDialog({
             config={config}
             field="candidate_column"
             label="Repair candidate field"
-            hint="Structured output containing row_uuid, did_rewrite, and conversations."
+            hint="Structured output containing row_uuid, did_rewrite, and the repaired response."
             placeholder="rewrite_result"
             onUpdate={onUpdate}
           />
@@ -147,9 +147,9 @@ export function RepairWorkflowDialog({
         {type === "repair_tasks" &&
           "Outputs { row_uuid, repairs[] }. Empty repairs let conditional AI skip the row without a model request."}
         {type === "repair_check" &&
-          "Rejects UUID mismatches, changed user/system turns, role changes, and turn-count changes."}
+          "Rejects UUID mismatches, missing or unchanged rewritten responses, and malformed internal-thought content."}
         {type === "repair_merge" &&
-          "Uses the repaired conversations only when the candidate is keyed correctly and approval is true."}
+          "Replaces only the gpt/assistant response with the approved rewrite; human and system turns always come from the original."}
       </div>
     </div>
   );

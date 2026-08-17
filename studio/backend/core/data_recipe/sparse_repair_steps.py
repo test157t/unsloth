@@ -159,6 +159,18 @@ def _invalid_assistant_content_reason(value: Any) -> str | None:
     return None
 
 
+def _last_assistant_turn_index(conversations: list[Any]) -> int | None:
+    """Index of the last assistant/model/gpt turn, or None if there is none."""
+    target: int | None = None
+    for index, turn in enumerate(conversations):
+        if not isinstance(turn, dict):
+            continue
+        role = str(turn.get("from") or "").strip().lower()
+        if role in {"assistant", "model", "gpt"}:
+            target = index
+    return target
+
+
 def validate_repair_candidate(
     row: dict[str, Any],
     *,
@@ -182,37 +194,26 @@ def validate_repair_candidate(
     if candidate.get("did_rewrite") is not True:
         result["reason"] = "Repair candidate did not declare an actual rewrite."
         return result
-    conversations = _decoded_list(candidate.get("conversations"))
-    if not isinstance(conversations, list) or len(conversations) != len(original):
-        result["reason"] = "Repair candidate changed the conversation turn count."
+    response = candidate.get("response")
+    if not isinstance(response, str):
+        result["reason"] = "Repair candidate did not supply a rewritten response."
         return result
-    changed = False
-    for index, (before, after) in enumerate(zip(original, conversations, strict=True)):
-        if not isinstance(before, dict) or not isinstance(after, dict):
-            result["reason"] = f"Conversation turn {index} is not an object."
-            return result
-        if before.get("from") != after.get("from"):
-            result["reason"] = f"Repair candidate changed the role at turn {index}."
-            return result
-        role = str(before.get("from") or "").strip().lower()
-        if role not in {"assistant", "model", "gpt"} and before != after:
-            result["reason"] = f"Repair candidate changed protected turn {index}."
-            return result
-        if before != after:
-            invalid_content = _invalid_assistant_content_reason(after.get("value"))
-            if invalid_content is not None:
-                result["reason"] = (
-                    f"Repair candidate assistant turn {index} {invalid_content}."
-                )
-                return result
-            changed = True
-    if not changed:
-        result["reason"] = "Repair candidate did not change an assistant or model turn."
+    target_index = _last_assistant_turn_index(original)
+    if target_index is None:
+        result["reason"] = "Original conversations have no assistant or model turn to repair."
+        return result
+    if original[target_index].get("value") == response:
+        result["reason"] = "Repair candidate did not change the assistant response."
+        return result
+    invalid_content = _invalid_assistant_content_reason(response)
+    if invalid_content is not None:
+        result["reason"] = (
+            f"Repair candidate assistant turn {target_index} {invalid_content}."
+        )
         return result
     result["valid"] = True
     result["reason"] = (
-        "Candidate UUID, roles, protected turns, turn count, and assistant content "
-        "are valid."
+        "Candidate UUID, rewrite declaration, and assistant response are valid."
     )
     return result
 
@@ -238,14 +239,20 @@ def merge_approved_repair(
         return original
     if candidate.get("row_uuid") != row.get(uuid_column):
         return original
-    conversations = _decoded_list(candidate.get("conversations"))
     checked = validate_repair_candidate(
         row,
         uuid_column = uuid_column,
         conversations_column = conversations_column,
         candidate_column = candidate_column,
     )
-    return conversations if checked["valid"] else original
+    if not checked["valid"]:
+        return original
+    target_index = _last_assistant_turn_index(original)
+    if target_index is None:
+        return original
+    merged = [dict(turn) for turn in original]
+    merged[target_index] = {**merged[target_index], "value": candidate.get("response")}
+    return merged
 
 
 def split_sparse_repair_columns(
