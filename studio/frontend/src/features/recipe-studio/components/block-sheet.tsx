@@ -85,6 +85,7 @@ type BlockSheetProps = {
     type:
       | "expression"
       | "conversation_pair"
+      | "conversation_extend"
       | "repair_merge"
       | "jsonl_export",
   ) => void;
@@ -403,6 +404,7 @@ export function BlockSheet({
         type as
           | "expression"
           | "conversation_pair"
+          | "conversation_extend"
           | "repair_merge"
           | "jsonl_export",
       );

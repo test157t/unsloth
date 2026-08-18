@@ -13,6 +13,7 @@ assert _SPEC is not None and _SPEC.loader is not None
 _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
 build_conversation_pair = _MODULE.build_conversation_pair
+extend_conversation_turns = _MODULE.extend_conversation_turns
 extract_repair_tasks = _MODULE.extract_repair_tasks
 merge_approved_repair = _MODULE.merge_approved_repair
 split_sparse_repair_columns = _MODULE.split_sparse_repair_columns
@@ -59,7 +60,102 @@ def test_conversation_pair_rejects_missing_text() -> None:
         raise AssertionError("Expected blank assistant text to be rejected.")
 
 
-def test_extracts_only_failed_judge_criteria() -> None:
+def test_extend_appends_one_human_and_one_gpt_turn_verbatim() -> None:
+    result = extend_conversation_turns(
+        {
+            "conversations": ORIGINAL,
+            "human_followup": "Tell me more.",
+            "mia_response": "Fresh gpt answer.",
+        },
+        conversations_column = "conversations",
+        human_column = "human_followup",
+        assistant_column = "mia_response",
+    )
+    assert result == [
+        {"from": "human", "value": "Hello"},
+        {"from": "assistant", "value": "Plain answer"},
+        {"from": "human", "value": "Tell me more."},
+        {"from": "gpt", "value": "Fresh gpt answer."},
+    ]
+
+
+def test_extend_preserves_the_source_conversation_objects() -> None:
+    source = [
+        {"from": "human", "value": "First", "extra": "kept?"},
+        {"from": "gpt", "value": "Second"},
+    ]
+    result = extend_conversation_turns(
+        {
+            "conversations": source,
+            "human_followup": "Next",
+            "mia_response": "Reply",
+        },
+        conversations_column = "conversations",
+        human_column = "human_followup",
+        assistant_column = "mia_response",
+    )
+    assert result[0] == {"from": "human", "value": "First", "extra": "kept?"}
+    assert result[0] is not source[0]
+    assert result[1:] == [
+        {"from": "gpt", "value": "Second"},
+        {"from": "human", "value": "Next"},
+        {"from": "gpt", "value": "Reply"},
+    ]
+
+
+def test_extend_decodes_stored_json_conversations() -> None:
+    result = extend_conversation_turns(
+        {
+            "conversations": json.dumps(ORIGINAL),
+            "human_followup": "More",
+            "mia_response": "Answer",
+        },
+        conversations_column = "conversations",
+        human_column = "human_followup",
+        assistant_column = "mia_response",
+    )
+    assert len(result) == len(ORIGINAL) + 2
+    assert result[-2] == {"from": "human", "value": "More"}
+    assert result[-1] == {"from": "gpt", "value": "Answer"}
+
+
+def test_extend_rejects_a_non_list_conversations_value() -> None:
+    try:
+        extend_conversation_turns(
+            {
+                "conversations": "not-a-list",
+                "human_followup": "More",
+                "mia_response": "Answer",
+            },
+            conversations_column = "conversations",
+            human_column = "human_followup",
+            assistant_column = "mia_response",
+        )
+    except ValueError as exc:
+        assert "must be a list" in str(exc)
+    else:
+        raise AssertionError("Expected a non-list value to be rejected.")
+
+
+def test_extend_rejects_missing_new_turn_text() -> None:
+    try:
+        extend_conversation_turns(
+            {
+                "conversations": ORIGINAL,
+                "human_followup": "   ",
+                "mia_response": "Answer",
+            },
+            conversations_column = "conversations",
+            human_column = "human_followup",
+            assistant_column = "mia_response",
+        )
+    except ValueError as exc:
+        assert "human_followup" in str(exc)
+    else:
+        raise AssertionError("Expected blank human text to be rejected.")
+
+
+def test_extract_only_failed_judge_criteria() -> None:
     result = extract_repair_tasks(
         {
             "row_uuid": "row-1",

@@ -34,6 +34,8 @@ const COLUMN_PARSERS: Record<string, ColumnParser> = {
     parseLlm(column, name, id),
   "unsloth-conversation-pair": (column, name, id) =>
     parseRepairWorkflow(column, name, id, "conversation_pair"),
+  "unsloth-conversation-extend": (column, name, id) =>
+    parseRepairWorkflow(column, name, id, "conversation_extend"),
   "unsloth-repair-tasks": (column, name, id) =>
     parseRepairWorkflow(column, name, id, "repair_tasks"),
   "unsloth-repair-check": (column, name, id) =>

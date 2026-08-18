@@ -10,6 +10,7 @@ export function parseRepairWorkflow(
   id: string,
   expressionType:
     | "conversation_pair"
+    | "conversation_extend"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge",

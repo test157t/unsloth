@@ -60,6 +60,7 @@ export type BlockType =
   | "conditional_ai"
   | "conditional_guard"
   | "conversation_pair"
+  | "conversation_extend"
   | "repair_tasks"
   | "repair_check"
   | "repair_merge"
@@ -446,6 +447,17 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
   },
   {
     kind: "expression",
+    type: "conversation_extend",
+    title: "Extend conversation",
+    description:
+      "Append one new human message and one new AI response onto an existing conversation.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(id, "conversation_extend", existing),
+  },
+  {
+    kind: "expression",
     type: "repair_merge",
     title: "Apply approved repairs",
     description:
@@ -558,7 +570,8 @@ export function getBlockDefinitionForConfig(
     }
     return getBlockDefinition(
       config.expression_type === "repair_merge" ||
-        config.expression_type === "conversation_pair"
+        config.expression_type === "conversation_pair" ||
+        config.expression_type === "conversation_extend"
         ? "expression"
         : "validator",
       config.expression_type ?? "expression",

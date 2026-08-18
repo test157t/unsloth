@@ -12,6 +12,7 @@ from typing import Any
 _CONDITIONAL_PREFIX = "unsloth-conditional-"
 _REPAIR_COLUMN_TYPES = {
     "unsloth-conversation-pair",
+    "unsloth-conversation-extend",
     "unsloth-repair-tasks",
     "unsloth-repair-check",
     "unsloth-repair-merge",
@@ -103,6 +104,33 @@ def build_conversation_pair(
         {"from": "human", "value": human},
         {"from": "gpt", "value": assistant},
     ]
+
+
+def extend_conversation_turns(
+    row: dict[str, Any],
+    *,
+    conversations_column: str,
+    human_column: str,
+    assistant_column: str,
+) -> Any:
+    """Append exactly one new human/gpt pair onto an existing conversation list."""
+    original = _decoded_list(row.get(conversations_column))
+    if not isinstance(original, list):
+        raise ValueError(
+            f"Conversations field {conversations_column!r} must be a list."
+        )
+    human = row.get(human_column)
+    assistant = row.get(assistant_column)
+    if not isinstance(human, str) or not human.strip():
+        raise ValueError(f"Human message field {human_column!r} must be non-empty text.")
+    if not isinstance(assistant, str) or not assistant.strip():
+        raise ValueError(
+            f"Assistant response field {assistant_column!r} must be non-empty text."
+        )
+    merged = [dict(turn) for turn in original]
+    merged.append({"from": "human", "value": human})
+    merged.append({"from": "gpt", "value": assistant})
+    return merged
 
 
 def _invalid_assistant_content_reason(value: Any) -> str | None:
@@ -301,6 +329,23 @@ def _make_workflow_column(spec: dict[str, Any]):
             output = dict(row)
             output[name] = build_conversation_pair(
                 row,
+                human_column = human_column,
+                assistant_column = assistant_column,
+            )
+            return output
+
+    elif column_type == "unsloth-conversation-extend":
+        conversations_column = _required_column_name(spec, "conversations_column")
+        human_column = _required_column_name(spec, "human_column")
+        assistant_column = _required_column_name(spec, "assistant_column")
+        required = [conversations_column, human_column, assistant_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = extend_conversation_turns(
+                row,
+                conversations_column = conversations_column,
                 human_column = human_column,
                 assistant_column = assistant_column,
             )

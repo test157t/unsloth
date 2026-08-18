@@ -103,6 +103,7 @@ type UseRecipeEditorGraphArgs = {
     type:
       | "expression"
       | "conversation_pair"
+      | "conversation_extend"
       | "repair_merge"
       | "jsonl_export",
     position?: XYPosition,
@@ -148,6 +149,7 @@ type UseRecipeEditorGraphResult = {
     type:
       | "expression"
       | "conversation_pair"
+      | "conversation_extend"
       | "repair_merge"
       | "jsonl_export",
   ) => void;
@@ -287,6 +289,7 @@ export function useRecipeEditorGraph({
           payload.type as
             | "expression"
             | "conversation_pair"
+            | "conversation_extend"
             | "repair_merge"
             | "jsonl_export",
           position,
@@ -388,6 +391,7 @@ export function useRecipeEditorGraph({
       type:
         | "expression"
         | "conversation_pair"
+        | "conversation_extend"
         | "repair_merge"
         | "jsonl_export",
     ) => {

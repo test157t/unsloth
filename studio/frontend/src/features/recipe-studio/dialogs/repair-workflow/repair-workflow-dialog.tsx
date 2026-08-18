@@ -63,21 +63,31 @@ export function RepairWorkflowDialog({
         onChange={(value) => onUpdate({ name: value })}
       />
       <AvailableVariables configId={config.id} />
-      {type === "conversation_pair" ? (
+      {type === "conversation_pair" || type === "conversation_extend" ? (
         <>
+          {type === "conversation_extend" && (
+            <TextField
+              config={config}
+              field="conversations_column"
+              label="Original conversations field"
+              hint="The conversation this step appends one new human/gpt pair onto."
+              placeholder="conversations"
+              onUpdate={onUpdate}
+            />
+          )}
           <TextField
             config={config}
             field="human_column"
-            label="Human message field"
-            hint="One generated human message. It becomes the only human turn."
-            placeholder="human_message"
+            label="New human message field"
+            hint="One generated raw human message. It becomes the appended human turn."
+            placeholder="human_followup"
             onUpdate={onUpdate}
           />
           <TextField
             config={config}
             field="assistant_column"
-            label="AI response field"
-            hint="One complete response, including any reasoning tags and visible answer."
+            label="New AI response field"
+            hint="One complete raw response, including any reasoning tags and visible answer."
             placeholder="mia_response"
             onUpdate={onUpdate}
           />
@@ -111,7 +121,7 @@ export function RepairWorkflowDialog({
             onUpdate={onUpdate}
           />
         </>
-      ) : type !== "conversation_pair" ? (
+      ) : type === "repair_check" || type === "repair_merge" ? (
         <>
           <TextField
             config={config}
@@ -144,6 +154,8 @@ export function RepairWorkflowDialog({
       <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-xs text-muted-foreground">
         {type === "conversation_pair" &&
           "Always outputs exactly two turns: one human followed by one gpt. The AI cannot add roles or split reasoning into another turn."}
+        {type === "conversation_extend" &&
+          "Appends exactly one human followed by one gpt turn onto the original array in code; the original turns are never re-emitted by a model."}
         {type === "repair_tasks" &&
           "Outputs { row_uuid, repairs[] }. Empty repairs let conditional AI skip the row without a model request."}
         {type === "repair_check" &&

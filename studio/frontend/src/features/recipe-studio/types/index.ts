@@ -73,6 +73,7 @@ export type RecipeNodeData = {
     | "conditional_ai"
     | "conditional_guard"
     | "conversation_pair"
+    | "conversation_extend"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge"
@@ -312,6 +313,7 @@ export type ExpressionConfig = {
   expression_type?:
     | "formula"
     | "conversation_pair"
+    | "conversation_extend"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge"

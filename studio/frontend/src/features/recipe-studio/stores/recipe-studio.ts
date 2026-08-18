@@ -116,6 +116,7 @@ type RecipeStudioState = {
     type:
       | "expression"
       | "conversation_pair"
+      | "conversation_extend"
       | "repair_merge"
       | "jsonl_export",
     position?: XYPosition,

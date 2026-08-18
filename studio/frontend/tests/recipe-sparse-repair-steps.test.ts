@@ -71,6 +71,29 @@ test("conversation pair serializes as a deterministic native step", () => {
   });
 });
 
+test("conversation extend serializes as a deterministic native step", () => {
+  const config: ExpressionConfig = {
+    id: "extend",
+    kind: "expression",
+    expression_type: "conversation_extend",
+    name: "extended_conversations",
+    expr: "",
+    dtype: "str",
+    conversations_column: "conversations",
+    human_column: "human_followup",
+    assistant_column: "mia_response",
+  };
+  const payload = buildSparseRepairColumn(config);
+  assert.deepEqual(payload, {
+    name: "extended_conversations",
+    drop: false,
+    column_type: "unsloth-conversation-extend",
+    conversations_column: "conversations",
+    human_column: "human_followup",
+    assistant_column: "mia_response",
+  });
+});
+
 test("default repair and guard contracts lock scope and internal thoughts", () => {
   const factoriesSource = readFileSync(
     new URL(

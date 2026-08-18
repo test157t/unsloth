@@ -26,6 +26,20 @@ export function buildSparseRepairColumn(
       assistant_column: config.assistant_column?.trim(),
     };
   }
+  if (expressionType === "conversation_extend") {
+    return {
+      name: config.name,
+      drop: config.drop ?? false,
+      // biome-ignore lint/style/useNamingConvention: api schema
+      column_type: "unsloth-conversation-extend",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      conversations_column: config.conversations_column?.trim(),
+      // biome-ignore lint/style/useNamingConvention: api schema
+      human_column: config.human_column?.trim(),
+      // biome-ignore lint/style/useNamingConvention: api schema
+      assistant_column: config.assistant_column?.trim(),
+    };
+  }
   const base = {
     name: config.name,
     drop: config.drop ?? false,

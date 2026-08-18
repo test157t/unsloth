@@ -425,6 +425,7 @@ export function makeRepairWorkflowConfig(
   id: string,
   type:
     | "conversation_pair"
+    | "conversation_extend"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge",
@@ -441,9 +442,19 @@ export function makeRepairWorkflowConfig(
     // biome-ignore lint/style/useNamingConvention: ui schema
     expression_type: type,
     // biome-ignore lint/style/useNamingConvention: ui schema
-    human_column: type === "conversation_pair" ? "human_message" : undefined,
+    human_column:
+      type === "conversation_pair"
+        ? "human_message"
+        : type === "conversation_extend"
+          ? "human_followup"
+          : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
-    assistant_column: type === "conversation_pair" ? "mia_response" : undefined,
+    assistant_column:
+      type === "conversation_pair"
+        ? "mia_response"
+        : type === "conversation_extend"
+          ? "mia_response"
+          : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
     uuid_column: type === "conversation_pair" ? undefined : "row_uuid",
     // biome-ignore lint/style/useNamingConvention: ui schema
@@ -451,7 +462,9 @@ export function makeRepairWorkflowConfig(
     threshold: type === "repair_tasks" ? "4" : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
     conversations_column:
-      type === "repair_check" || type === "repair_merge"
+      type === "conversation_extend" ||
+      type === "repair_check" ||
+      type === "repair_merge"
         ? "conversations"
         : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema

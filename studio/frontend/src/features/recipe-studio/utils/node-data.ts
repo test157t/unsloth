@@ -27,6 +27,7 @@ export function nodeDataFromConfig(
     if (workflowType !== "formula") {
       const labels = {
         conversation_pair: ["Conversation pair", "Fixed human then gpt"],
+        conversation_extend: ["Conversation extend", "Append human/gpt"],
         repair_tasks: ["Repair tasks", "Failed criteria"],
         repair_check: ["Repair check", "Deterministic"],
         repair_merge: ["Repair merge", "Approved only"],
