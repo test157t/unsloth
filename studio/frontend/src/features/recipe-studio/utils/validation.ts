@@ -143,12 +143,13 @@ export function getConfigErrors(config: NodeConfig | null): string[] {
       }
     }
     if (
-      config.sampler_type === "synthetic_persona" &&
+      (config.sampler_type === "synthetic_persona" ||
+        config.sampler_type === "identity") &&
       config.person_age_range?.trim()
     ) {
       const age = config.person_age_range.trim();
       if (!/^\d+$/.test(age) && !parseAgeRange(age)) {
-        errors.push("Persona age must be a number or range like 24-40.");
+        errors.push("Identity age must be a number or range like 24-40.");
       }
     }
   }
@@ -256,6 +257,28 @@ export function getConfigErrors(config: NodeConfig | null): string[] {
       }
       if (!config.assistant_column?.trim()) {
         errors.push("AI response field is required.");
+      }
+    } else if (expressionType === "content_hash") {
+      if (!config.source_column?.trim()) {
+        errors.push("Source field is required.");
+      }
+      const hashLength = Number(config.hash_length);
+      if (!Number.isFinite(hashLength) || hashLength <= 0) {
+        errors.push("Hash length must be a positive number.");
+      }
+    } else if (expressionType === "repair_patch") {
+      if (!config.uuid_column?.trim()) {
+        errors.push("Row UUID field is required.");
+      }
+      if (!config.source_column?.trim()) {
+        errors.push("Source field is required.");
+      }
+      if (!config.patch_column?.trim()) {
+        errors.push("Patch field is required.");
+      }
+      const hashLength = Number(config.hash_length);
+      if (!Number.isFinite(hashLength) || hashLength <= 0) {
+        errors.push("Hash length must be a positive number.");
       }
     } else {
       if (!config.uuid_column?.trim()) {

@@ -159,7 +159,10 @@ function buildSamplerParams(
       prefix: raw,
     };
   }
-  if (config.sampler_type === "synthetic_persona") {
+  if (
+    config.sampler_type === "synthetic_persona" ||
+    config.sampler_type === "identity"
+  ) {
     const params: Record<string, unknown> = {};
     const optionalFields = {
       name: config.person_name,
@@ -187,7 +190,7 @@ function buildSamplerParams(
           params.age_range = parsed;
         } else {
           errors.push(
-            `Persona ${config.name}: age must be a number or range like 24-40.`,
+            `Identity ${config.name}: age must be a number or range like 24-40.`,
           );
         }
       }

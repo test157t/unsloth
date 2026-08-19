@@ -59,7 +59,7 @@ test("conversation pair serializes as a deterministic native step", () => {
     expr: "",
     dtype: "str",
     human_column: "human_message",
-    assistant_column: "mia_response",
+    assistant_column: "assistant_response",
   };
   const payload = buildSparseRepairColumn(config);
   assert.deepEqual(payload, {
@@ -67,7 +67,7 @@ test("conversation pair serializes as a deterministic native step", () => {
     drop: false,
     column_type: "unsloth-conversation-pair",
     human_column: "human_message",
-    assistant_column: "mia_response",
+    assistant_column: "assistant_response",
   });
 });
 
@@ -81,7 +81,7 @@ test("conversation extend serializes as a deterministic native step", () => {
     dtype: "str",
     conversations_column: "conversations",
     human_column: "human_followup",
-    assistant_column: "mia_response",
+    assistant_column: "assistant_response",
   };
   const payload = buildSparseRepairColumn(config);
   assert.deepEqual(payload, {
@@ -90,7 +90,7 @@ test("conversation extend serializes as a deterministic native step", () => {
     column_type: "unsloth-conversation-extend",
     conversations_column: "conversations",
     human_column: "human_followup",
-    assistant_column: "mia_response",
+    assistant_column: "assistant_response",
   });
 });
 
@@ -136,6 +136,111 @@ test("string replace defaults regex to false", () => {
   assert.equal(payload.use_regex, false);
 });
 
+test("content hash serializes as a deterministic hash column", () => {
+  const config: ExpressionConfig = {
+    id: "hash",
+    kind: "expression",
+    expression_type: "content_hash",
+    name: "cell_hash",
+    expr: "",
+    dtype: "str",
+    source_column: "assistant_response",
+    hash_length: "64",
+  };
+  const payload = buildSparseRepairColumn(config);
+  assert.deepEqual(payload, {
+    name: "cell_hash",
+    drop: false,
+    column_type: "unsloth-content-hash",
+    source_column: "assistant_response",
+    hash_length: 64,
+  });
+});
+
+test("content hash round-trips through the import parser", () => {
+  const parserSource = readFileSync(
+    new URL(
+      "../src/features/recipe-studio/utils/import/parsers/repair-workflow-parser.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(
+    parserSource,
+    /export function parseContentHash[\s\S]*?expression_type: "content_hash"[\s\S]*?hash_length:/,
+  );
+  assert.match(
+    parserSource,
+    /export function parseRepairPatch[\s\S]*?patch_column: readString\(column.patch_column\)/,
+  );
+});
+
+test("repair patch serializes as a hash-aware patch column", () => {
+  const config: ExpressionConfig = {
+    id: "patch",
+    kind: "expression",
+    expression_type: "repair_patch",
+    name: "apply_patch",
+    expr: "",
+    dtype: "str",
+    uuid_column: "row_uuid",
+    source_column: "rewrite_result",
+    patch_column: "candidate_patch",
+    hash_length: "64",
+  };
+  const payload = buildSparseRepairColumn(config);
+  assert.deepEqual(payload, {
+    name: "apply_patch",
+    drop: false,
+    column_type: "unsloth-repair-patch",
+    uuid_column: "row_uuid",
+    source_column: "rewrite_result",
+    patch_column: "candidate_patch",
+    hash_length: 64,
+  });
+});
+
+test("repair patch round-trips through the import parser", () => {
+  const parserSource = readFileSync(
+    new URL(
+      "../src/features/recipe-studio/utils/import/parsers/repair-workflow-parser.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(
+    parserSource,
+    /expression_type: "repair_patch"[\s\S]*?uuid_column: readString\(column.uuid_column\)/,
+  );
+  assert.match(parserSource, /hash_length:/);
+});
+
+test("repair check serializes the configured reasoning tag", () => {
+  const config: ExpressionConfig = {
+    id: "check",
+    kind: "expression",
+    expression_type: "repair_check",
+    name: "repair_check",
+    expr: "",
+    dtype: "str",
+    uuid_column: "row_uuid",
+    conversations_column: "conversations",
+    candidate_column: "rewrite_result",
+    internal_thought_tag: "Hidden-Reasoning",
+  };
+  const payload = buildSparseRepairColumn(config);
+  assert.deepEqual(payload, {
+    name: "repair_check",
+    drop: false,
+    column_type: "unsloth-repair-check",
+    uuid_column: "row_uuid",
+    conversations_column: "conversations",
+    candidate_column: "rewrite_result",
+    approval_column: undefined,
+    internal_thought_tag: "Hidden-Reasoning",
+  });
+});
+
 test("default repair and guard contracts lock scope and internal thoughts", () => {
   const factoriesSource = readFileSync(
     new URL(
@@ -144,20 +249,23 @@ test("default repair and guard contracts lock scope and internal thoughts", () =
     ),
     "utf8",
   );
+  const reasoningSource = readFileSync(
+    new URL(
+      "../src/features/recipe-studio/utils/repair-reasoning.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
 
+  assert.equal(reasoningSource.match(/non-empty visible answer/g)?.length, 2);
   assert.equal(
-    factoriesSource.match(/non-empty visible answer/g)?.length,
+    reasoningSource.match(/incomplete internal-thought tags/g)?.length,
     2,
   );
-  assert.equal(
-    factoriesSource.match(/incomplete internal-thought tags/g)?.length,
-    2,
-  );
-  assert.equal(factoriesSource.match(/reasoning-only content/g)?.length, 2);
-  assert.match(
-    factoriesSource,
-    /<Mia_Internal-Thoughts>\.\.\.<\/Mia_Internal-Thoughts>/,
-  );
+  assert.equal(reasoningSource.match(/reasoning-only content/g)?.length, 2);
+  assert.match(reasoningSource, /Internal-Thoughts/);
+  assert.match(reasoningSource, /\.\.\.\$\{close\}/);
+  assert.match(reasoningSource, /\$\{open\}/);
   assert.equal(
     factoriesSource.match(/dataset content/g)?.length,
     2,

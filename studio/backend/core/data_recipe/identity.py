@@ -6,7 +6,8 @@ from __future__ import annotations
 from typing import Any
 
 
-_SAMPLER_TYPE = "synthetic_persona"
+_SAMPLER_TYPE = "identity"
+_LEGACY_SAMPLER_TYPES = frozenset({"synthetic_persona"})
 
 
 def _optional_text(params: dict[str, Any], key: str) -> str | None:
@@ -17,18 +18,18 @@ def _optional_text(params: dict[str, Any], key: str) -> str | None:
     return value or None
 
 
-def build_synthetic_persona(params: dict[str, Any], *, faker: Any) -> dict[str, Any]:
-    """Build a compact persona, omitting every demographic the user left blank."""
+def build_identity(params: dict[str, Any], *, faker: Any) -> dict[str, Any]:
+    """Build a compact identity, omitting every demographic the user left blank."""
     fixed_name = _optional_text(params, "name")
-    persona: dict[str, Any] = {"name": fixed_name or faker.name()}
+    identity: dict[str, Any] = {"name": fixed_name or faker.name()}
     for key in ("gender", "city", "planet", "role", "description"):
         value = _optional_text(params, key)
         if value is not None:
-            persona[key] = value
+            identity[key] = value
 
     raw_age = params.get("age")
     if isinstance(raw_age, int) and not isinstance(raw_age, bool) and raw_age >= 0:
-        persona["age"] = raw_age
+        identity["age"] = raw_age
     else:
         age_range = params.get("age_range")
         if (
@@ -38,35 +39,33 @@ def build_synthetic_persona(params: dict[str, Any], *, faker: Any) -> dict[str, 
         ):
             low, high = age_range
             if 0 <= low <= high:
-                persona["age"] = faker.random_int(min = low, max = high)
-    return persona
+                identity["age"] = faker.random_int(min = low, max = high)
+    return identity
 
 
-def split_synthetic_persona_columns(
+def split_identity_columns(
     recipe: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     columns = recipe.get("columns")
     if not isinstance(columns, list):
         return recipe, []
     regular: list[Any] = []
-    persona_specs: list[dict[str, Any]] = []
+    identity_specs: list[dict[str, Any]] = []
     for column in columns:
         if (
             isinstance(column, dict)
             and column.get("column_type") == "sampler"
-            and column.get("sampler_type") == _SAMPLER_TYPE
+            and column.get("sampler_type") in (_SAMPLER_TYPE, *_LEGACY_SAMPLER_TYPES)
         ):
-            persona_specs.append(dict(column))
+            identity_specs.append(dict(column))
         else:
             regular.append(column)
-    if not persona_specs:
+    if not identity_specs:
         return recipe, []
-    return {**recipe, "columns": regular}, persona_specs
+    return {**recipe, "columns": regular}, identity_specs
 
 
-def register_synthetic_persona_columns(
-    *, builder: Any, specs: list[dict[str, Any]]
-) -> None:
+def register_identity_columns(*, builder: Any, specs: list[dict[str, Any]]) -> None:
     if not specs:
         return
 
@@ -78,7 +77,7 @@ def register_synthetic_persona_columns(
         @custom_column_generator(required_columns = [])
         def generate(row):
             output = dict(row)
-            output[name] = build_synthetic_persona(params, faker = faker)
+            output[name] = build_identity(params, faker = faker)
             return output
 
         return generate
@@ -86,7 +85,7 @@ def register_synthetic_persona_columns(
     for spec in specs:
         name = str(spec.get("name") or "").strip()
         if not name:
-            raise ValueError("Synthetic persona step requires a name.")
+            raise ValueError("Identity step requires a name.")
         params = spec.get("params")
         if not isinstance(params, dict):
             params = {}
@@ -94,7 +93,7 @@ def register_synthetic_persona_columns(
         try:
             faker = Faker(locale) if locale else Faker()
         except (AttributeError, TypeError, ValueError) as exc:
-            raise ValueError(f"Synthetic persona {name!r} has an invalid Faker locale.") from exc
+            raise ValueError(f"Identity {name!r} has an invalid Faker locale.") from exc
 
         builder.add_column(
             CustomColumnConfig(

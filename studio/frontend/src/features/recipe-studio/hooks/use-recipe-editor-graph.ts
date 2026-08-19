@@ -103,6 +103,8 @@ type UseRecipeEditorGraphArgs = {
     type:
       | "expression"
       | "string_replace"
+      | "content_hash"
+      | "repair_patch"
       | "conversation_pair"
       | "conversation_extend"
       | "repair_merge"
@@ -150,6 +152,8 @@ type UseRecipeEditorGraphResult = {
     type:
       | "expression"
       | "string_replace"
+      | "content_hash"
+      | "repair_patch"
       | "conversation_pair"
       | "conversation_extend"
       | "repair_merge"
@@ -291,6 +295,8 @@ export function useRecipeEditorGraph({
           payload.type as
             | "expression"
             | "string_replace"
+            | "content_hash"
+            | "repair_patch"
             | "conversation_pair"
             | "conversation_extend"
             | "repair_merge"
@@ -394,6 +400,8 @@ export function useRecipeEditorGraph({
       type:
         | "expression"
         | "string_replace"
+        | "content_hash"
+        | "repair_patch"
         | "conversation_pair"
         | "conversation_extend"
         | "repair_merge"

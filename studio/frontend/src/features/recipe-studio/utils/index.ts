@@ -3,12 +3,14 @@
 
 export {
   makeConditionalRepairLlmConfig,
+  makeContentHashConfig,
   makeExpressionConfig,
   makeJsonlExportConfig,
   makeLlmConfig,
   makeMarkdownNoteConfig,
   makeModelConfig,
   makeModelProviderConfig,
+  makeRepairPatchConfig,
   makeRepairWorkflowConfig,
   makeSamplerConfig,
   makeSeedConfig,
@@ -32,4 +34,11 @@ export {
 export { getGraphWarnings, type GraphWarning } from "./graph-warnings";
 export { nextName } from "./naming";
 export { nodeDataFromConfig } from "./node-data";
+export {
+  DEFAULT_INTERNAL_THOUGHT_TAG,
+  internalThoughtClose,
+  internalThoughtOpen,
+  internalThoughtRequirement,
+  renamedPromptTokens,
+} from "./repair-reasoning";
 export { getConfigErrors } from "./validation";

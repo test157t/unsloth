@@ -49,6 +49,7 @@ const SAMPLER_ICONS: Record<SamplerType, IconType> = {
   person: UserAccountIcon,
   person_from_faker: UserAccountIcon,
   synthetic_persona: UserAccountIcon,
+  identity: UserAccountIcon,
 };
 
 const LLM_ICONS: Record<LlmType, IconType> = {

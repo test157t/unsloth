@@ -85,6 +85,8 @@ type BlockSheetProps = {
     type:
       | "expression"
       | "string_replace"
+      | "content_hash"
+      | "repair_patch"
       | "conversation_pair"
       | "conversation_extend"
       | "repair_merge"
@@ -405,6 +407,8 @@ export function BlockSheet({
         type as
           | "expression"
           | "string_replace"
+          | "content_hash"
+          | "repair_patch"
           | "conversation_pair"
           | "conversation_extend"
           | "repair_merge"

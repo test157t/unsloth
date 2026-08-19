@@ -30,12 +30,14 @@ import type {
 } from "../types";
 import {
   makeConditionalRepairLlmConfig,
+  makeContentHashConfig,
   makeExpressionConfig,
   makeJsonlExportConfig,
   makeLlmConfig,
   makeMarkdownNoteConfig,
   makeModelConfig,
   makeModelProviderConfig,
+  makeRepairPatchConfig,
   makeRepairWorkflowConfig,
   makeSamplerConfig,
   makeSeedConfig,
@@ -59,6 +61,8 @@ export type BlockType =
   | "validator_oxc"
   | "expression"
   | "string_replace"
+  | "content_hash"
+  | "repair_patch"
   | "conditional_ai"
   | "conditional_guard"
   | "conversation_pair"
@@ -111,6 +115,7 @@ export type BlockDialogKey =
   | "tool_config"
   | "expression"
   | "string_replace"
+  | "content_hash"
   | "repair_workflow"
   | "jsonl_export";
 
@@ -281,14 +286,13 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
   },
   {
     kind: "sampler",
-    type: "synthetic_persona",
-    title: "Synthetic persona",
-    description:
-      "Define a reusable identity or generate a Faker-backed person.",
+    type: "identity",
+    title: "Identity",
+    description: "Define a reusable identity or generate a Faker-backed one.",
     icon: UserAccountIcon,
     dialogKey: "person",
     createConfig: (id, existing) =>
-      makeSamplerConfig(id, "synthetic_persona", existing),
+      makeSamplerConfig(id, "identity", existing),
   },
   {
     kind: "llm",
@@ -449,6 +453,26 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
   },
   {
     kind: "expression",
+    type: "content_hash",
+    title: "Content hash",
+    description:
+      "Compute a stable sha256 content hash of a field, addressable as a block id.",
+    icon: FunctionIcon,
+    dialogKey: "content_hash",
+    createConfig: (id, existing) => makeContentHashConfig(id, existing),
+  },
+  {
+    kind: "expression",
+    type: "repair_patch",
+    title: "Apply repair patch",
+    description:
+      "Apply hash-aware edits to a text field and emit child hash metadata.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) => makeRepairPatchConfig(id, existing),
+  },
+  {
+    kind: "expression",
     type: "conversation_pair",
     title: "Build conversation pair",
     description:
@@ -537,8 +561,9 @@ export function getBlockDefinitionForConfig(
   if (config.kind === "sampler") {
     const samplerType =
       config.sampler_type === "person" ||
-      config.sampler_type === "person_from_faker"
-        ? "synthetic_persona"
+      config.sampler_type === "person_from_faker" ||
+      config.sampler_type === "synthetic_persona"
+        ? "identity"
         : config.sampler_type;
     return getBlockDefinition("sampler", samplerType);
   }
@@ -585,7 +610,9 @@ export function getBlockDefinitionForConfig(
       config.expression_type === "repair_merge" ||
         config.expression_type === "conversation_pair" ||
         config.expression_type === "conversation_extend" ||
-        config.expression_type === "string_replace"
+        config.expression_type === "string_replace" ||
+        config.expression_type === "content_hash" ||
+        config.expression_type === "repair_patch"
         ? "expression"
         : "validator",
       config.expression_type ?? "expression",

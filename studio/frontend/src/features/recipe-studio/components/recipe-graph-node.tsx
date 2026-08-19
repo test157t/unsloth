@@ -130,6 +130,7 @@ const SAMPLER_ICONS: Record<SamplerType, IconType> = {
   person: UserAccountIcon,
   person_from_faker: UserAccountIcon,
   synthetic_persona: UserAccountIcon,
+  identity: UserAccountIcon,
 };
 
 const LLM_ICONS: Record<LlmType, IconType> = {
@@ -203,12 +204,13 @@ function getConfigSummary(config: NodeConfig | undefined): string {
     if (
       config.sampler_type === "person" ||
       config.sampler_type === "person_from_faker" ||
-      config.sampler_type === "synthetic_persona"
+      config.sampler_type === "synthetic_persona" ||
+      config.sampler_type === "identity"
     ) {
-      const personaName = config.person_name?.trim();
+      const identityName = config.person_name?.trim();
       const role = config.person_role?.trim();
-      if (personaName || role) {
-        return [personaName, role].filter(Boolean).join(" · ");
+      if (identityName || role) {
+        return [identityName, role].filter(Boolean).join(" · ");
       }
       const locale = config.person_locale?.trim() || "generated name";
       const city = config.person_city?.trim();

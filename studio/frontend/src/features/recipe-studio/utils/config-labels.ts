@@ -12,9 +12,10 @@ const SAMPLER_LABELS: Record<SamplerType, string> = {
   datetime: "Date and time",
   timedelta: "Time offset",
   uuid: "Unique ID",
-  person: "Synthetic person",
-  person_from_faker: "Synthetic person",
-  synthetic_persona: "Synthetic persona",
+  person: "Generated person",
+  person_from_faker: "Generated person",
+  synthetic_persona: "Identity",
+  identity: "Identity",
 };
 
 const LLM_LABELS: Record<LlmType, string> = {

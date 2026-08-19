@@ -28,6 +28,34 @@ export function buildSparseRepairColumn(
       use_regex: Boolean(config.use_regex),
     };
   }
+  if (expressionType === "content_hash") {
+    return {
+      name: config.name,
+      drop: config.drop ?? false,
+      // biome-ignore lint/style/useNamingConvention: api schema
+      column_type: "unsloth-content-hash",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      source_column: config.source_column?.trim(),
+      // biome-ignore lint/style/useNamingConvention: api schema
+      hash_length: Number(config.hash_length ?? "64"),
+    };
+  }
+  if (expressionType === "repair_patch") {
+    return {
+      name: config.name,
+      drop: config.drop ?? false,
+      // biome-ignore lint/style/useNamingConvention: api schema
+      column_type: "unsloth-repair-patch",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      uuid_column: config.uuid_column?.trim(),
+      // biome-ignore lint/style/useNamingConvention: api schema
+      source_column: config.source_column?.trim(),
+      // biome-ignore lint/style/useNamingConvention: api schema
+      patch_column: config.patch_column?.trim(),
+      // biome-ignore lint/style/useNamingConvention: api schema
+      hash_length: Number(config.hash_length ?? "64"),
+    };
+  }
   if (expressionType === "conversation_pair") {
     return {
       name: config.name,
@@ -86,5 +114,7 @@ export function buildSparseRepairColumn(
       expressionType === "repair_merge"
         ? config.approval_column?.trim()
         : undefined,
+    // biome-ignore lint/style/useNamingConvention: api schema
+    internal_thought_tag: config.internal_thought_tag?.trim() || undefined,
   };
 }

@@ -14,6 +14,8 @@ _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
 build_conversation_pair = _MODULE.build_conversation_pair
 apply_string_replace = _MODULE.apply_string_replace
+apply_repair_patch = _MODULE.apply_repair_patch
+compute_content_hash = _MODULE.compute_content_hash
 extend_conversation_turns = _MODULE.extend_conversation_turns
 extract_repair_tasks = _MODULE.extract_repair_tasks
 merge_approved_repair = _MODULE.merge_approved_repair
@@ -34,13 +36,13 @@ CANDIDATE = {
 
 def test_builds_exactly_one_human_and_one_gpt_turn() -> None:
     response = (
-        "<Mia_Internal-Thoughts>Check the constraint.</Mia_Internal-Thoughts>\n"
+        "<Internal-Thoughts>Check the constraint.</Internal-Thoughts>\n"
         "One spoken answer."
     )
     result = build_conversation_pair(
-        {"human_message": "One user message.", "mia_response": response},
+        {"human_message": "One user message.", "assistant_response": response},
         human_column = "human_message",
-        assistant_column = "mia_response",
+        assistant_column = "assistant_response",
     )
     assert result == [
         {"from": "human", "value": "One user message."},
@@ -51,12 +53,12 @@ def test_builds_exactly_one_human_and_one_gpt_turn() -> None:
 def test_conversation_pair_rejects_missing_text() -> None:
     try:
         build_conversation_pair(
-            {"human_message": "Hello", "mia_response": ""},
+            {"human_message": "Hello", "assistant_response": ""},
             human_column = "human_message",
-            assistant_column = "mia_response",
+            assistant_column = "assistant_response",
         )
     except ValueError as exc:
-        assert "mia_response" in str(exc)
+        assert "assistant_response" in str(exc)
     else:
         raise AssertionError("Expected blank assistant text to be rejected.")
 
@@ -66,11 +68,11 @@ def test_extend_appends_one_human_and_one_gpt_turn_verbatim() -> None:
         {
             "conversations": ORIGINAL,
             "human_followup": "Tell me more.",
-            "mia_response": "Fresh gpt answer.",
+            "assistant_response": "Fresh gpt answer.",
         },
         conversations_column = "conversations",
         human_column = "human_followup",
-        assistant_column = "mia_response",
+        assistant_column = "assistant_response",
     )
     assert result == [
         {"from": "human", "value": "Hello"},
@@ -89,11 +91,11 @@ def test_extend_preserves_the_source_conversation_objects() -> None:
         {
             "conversations": source,
             "human_followup": "Next",
-            "mia_response": "Reply",
+            "assistant_response": "Reply",
         },
         conversations_column = "conversations",
         human_column = "human_followup",
-        assistant_column = "mia_response",
+        assistant_column = "assistant_response",
     )
     assert result[0] == {"from": "human", "value": "First", "extra": "kept?"}
     assert result[0] is not source[0]
@@ -109,11 +111,11 @@ def test_extend_decodes_stored_json_conversations() -> None:
         {
             "conversations": json.dumps(ORIGINAL),
             "human_followup": "More",
-            "mia_response": "Answer",
+            "assistant_response": "Answer",
         },
         conversations_column = "conversations",
         human_column = "human_followup",
-        assistant_column = "mia_response",
+        assistant_column = "assistant_response",
     )
     assert len(result) == len(ORIGINAL) + 2
     assert result[-2] == {"from": "human", "value": "More"}
@@ -126,11 +128,11 @@ def test_extend_rejects_a_non_list_conversations_value() -> None:
             {
                 "conversations": "not-a-list",
                 "human_followup": "More",
-                "mia_response": "Answer",
+                "assistant_response": "Answer",
             },
             conversations_column = "conversations",
             human_column = "human_followup",
-            assistant_column = "mia_response",
+            assistant_column = "assistant_response",
         )
     except ValueError as exc:
         assert "must be a list" in str(exc)
@@ -144,11 +146,11 @@ def test_extend_rejects_missing_new_turn_text() -> None:
             {
                 "conversations": ORIGINAL,
                 "human_followup": "   ",
-                "mia_response": "Answer",
+                "assistant_response": "Answer",
             },
             conversations_column = "conversations",
             human_column = "human_followup",
-            assistant_column = "mia_response",
+            assistant_column = "assistant_response",
         )
     except ValueError as exc:
         assert "human_followup" in str(exc)
@@ -264,7 +266,7 @@ def test_candidate_check_requires_an_assistant_turn_to_repair() -> None:
     assert "no assistant or model turn to repair" in result["reason"]
 
 
-def _validate_assistant_rewrite(value: str) -> dict:
+def _validate_assistant_rewrite(value: str, internal_thought_tag: str = "") -> dict:
     candidate = {**CANDIDATE, "response": value}
     return validate_repair_candidate(
         {
@@ -275,6 +277,7 @@ def _validate_assistant_rewrite(value: str) -> dict:
         uuid_column = "row_uuid",
         conversations_column = "conversations",
         candidate_column = "candidate",
+        internal_thought_tag = internal_thought_tag,
     )
 
 
@@ -284,7 +287,7 @@ def test_candidate_check_accepts_valid_plain_assistant_response() -> None:
 
 def test_candidate_check_accepts_closed_thoughts_with_visible_answer() -> None:
     value = (
-        "<Mia_Internal-Thoughts>Check the repair.</Mia_Internal-Thoughts>\n"
+        "<Internal-Thoughts>Check the repair.</Internal-Thoughts>\n"
         "A repaired visible answer."
     )
     assert _validate_assistant_rewrite(value)["valid"] is True
@@ -292,7 +295,7 @@ def test_candidate_check_accepts_closed_thoughts_with_visible_answer() -> None:
 
 def test_candidate_check_rejects_unclosed_internal_thought_opening_tag() -> None:
     result = _validate_assistant_rewrite(
-        "<Mia_Internal-Thoughts>Check the repair.\nA supposed answer."
+        "<Internal-Thoughts>Check the repair.\nA supposed answer."
     )
     assert result["valid"] is False
     assert "unclosed internal-thought opening tag" in result["reason"]
@@ -300,7 +303,7 @@ def test_candidate_check_rejects_unclosed_internal_thought_opening_tag() -> None
 
 def test_candidate_check_rejects_unmatched_internal_thought_closing_tag() -> None:
     result = _validate_assistant_rewrite(
-        "Check the repair.</Mia_Internal-Thoughts>\nA supposed answer."
+        "Check the repair.</Internal-Thoughts>\nA supposed answer."
     )
     assert result["valid"] is False
     assert "unmatched internal-thought closing tag" in result["reason"]
@@ -308,10 +311,44 @@ def test_candidate_check_rejects_unmatched_internal_thought_closing_tag() -> Non
 
 def test_candidate_check_rejects_reasoning_only_content() -> None:
     result = _validate_assistant_rewrite(
-        "<Mia_Internal-Thoughts>Only private reasoning.</Mia_Internal-Thoughts>"
+        "<Internal-Thoughts>Only private reasoning.</Internal-Thoughts>"
     )
     assert result["valid"] is False
     assert "no non-empty visible answer" in result["reason"]
+
+
+def test_candidate_check_honors_a_custom_reasoning_tag() -> None:
+    result = _validate_assistant_rewrite(
+        "<Hidden-Reasoning>Plan the repair.</Hidden-Reasoning>\nA visible answer.",
+        internal_thought_tag = "Hidden-Reasoning",
+    )
+    assert result["valid"] is True
+
+
+def test_candidate_check_rejects_unclosed_custom_reasoning_tag() -> None:
+    result = _validate_assistant_rewrite(
+        "<Hidden-Reasoning>Plan the repair.\nNo visible answer.",
+        internal_thought_tag = "Hidden-Reasoning",
+    )
+    assert result["valid"] is False
+    assert "unclosed internal-thought opening tag" in result["reason"]
+
+
+def test_candidate_check_defaults_to_the_generic_reasoning_tag() -> None:
+    result = _validate_assistant_rewrite(
+        "<Internal-Thoughts>Plan the repair.</Internal-Thoughts>\nA visible answer."
+    )
+    assert result["valid"] is True
+    assert result["reason"] == (
+        "Candidate UUID, rewrite declaration, and assistant response are valid."
+    )
+
+
+def test_candidate_check_ignores_other_reasoning_tags_by_default() -> None:
+    result = _validate_assistant_rewrite(
+        "<Other-Thoughts>Unclosed reasoning.</Other-Thoughts>\nA visible answer."
+    )
+    assert result["valid"] is True
 
 
 def test_candidate_check_accepts_array_like_seed_conversations() -> None:
@@ -509,7 +546,7 @@ def test_merge_rejects_a_guard_decision_for_another_uuid() -> None:
 def test_merge_preserves_original_when_guard_approves_invalid_content() -> None:
     invalid_candidate = {
         **CANDIDATE,
-        "response": "<Mia_Internal-Thoughts>Unclosed reasoning",
+        "response": "<Internal-Thoughts>Unclosed reasoning",
     }
     row = {
         "row_uuid": "row-1",
@@ -531,3 +568,218 @@ def test_conditional_llm_generator_uses_the_synchronous_model_boundary() -> None
     assert "async def generate" not in source
     assert "model.generate(" in source
     assert "await model.agenerate(" not in source
+
+
+def test_content_hash_is_stable_and_truncatable() -> None:
+    row = {"assistant_response": "The quick brown fox"}
+    full = compute_content_hash(row, source_column = "assistant_response")
+    assert len(full) == 64
+    assert compute_content_hash(row, source_column = "assistant_response") == full
+    short = compute_content_hash(row, source_column = "assistant_response", hash_length = 12)
+    assert len(short) == 12
+    assert full.startswith(short)
+
+
+def test_content_hash_distinguishes_content_and_reuses_row_agnostic_cells() -> None:
+    a = compute_content_hash({"text": "same"}, source_column = "text")
+    b = compute_content_hash({"text": "same"}, source_column = "text")
+    c = compute_content_hash({"text": "different"}, source_column = "text")
+    assert a == b
+    assert a != c
+
+
+def test_patch_applies_literal_edits_sequentially_and_hashes_children() -> None:
+    source = "The llama 8B is small. The llama 70B is big."
+    patch = {
+        "row_uuid": "row-1",
+        "parent_hash": compute_content_hash({"source": source}, source_column = "source"),
+        "edits": [
+            {"span": {"find": "8B"}, "replacement": "8B-4bit"},
+            {"span": {"find": "70B"}, "replacement": "70B-8bit"},
+        ],
+    }
+    result = apply_repair_patch(
+        {
+            "row_uuid": "row-1",
+            "source": source,
+            "patch": json.dumps(patch),
+        },
+        uuid_column = "row_uuid",
+        source_column = "source",
+        patch_column = "patch",
+    )
+    assert result["valid"] is True
+    assert result["did_rewrite"] is True
+    assert result["response"] == "The llama 8B-4bit is small. The llama 70B-8bit is big."
+    assert result["parent_hash"] == patch["parent_hash"]
+    assert result["child_hash"] == compute_content_hash(
+        {"source": result["response"]},
+        source_column = "source",
+    )
+    assert result["edits"] == patch["edits"]
+    assert result["row_uuid"] == "row-1"
+
+
+def test_patch_supports_regex_spans_with_occurrence_addressing() -> None:
+    source = "item 1\nitem 2\nitem 3"
+    patch = {
+        "row_uuid": "row-1",
+        "edits": [
+            {"span": {"find": r"\d+", "use_regex": True, "occurrence": 1}, "replacement": "7"},
+        ],
+    }
+    result = apply_repair_patch(
+        {
+            "row_uuid": "row-1",
+            "source": source,
+            "patch": patch,
+        },
+        uuid_column = "row_uuid",
+        source_column = "source",
+        patch_column = "patch",
+    )
+    assert result["valid"] is True
+    assert result["response"] == "item 1\nitem 7\nitem 3"
+
+
+def test_patch_verifies_an_addressed_span_hash() -> None:
+    source = "Fix this typo  here."
+    block_hash = compute_content_hash({"source": "typo  here"}, source_column = "source")
+    patch = {
+        "row_uuid": "row-1",
+        "edits": [
+            {
+                "span": {"find": "typo  here", "hash": block_hash},
+                "replacement": "typo here",
+            }
+        ],
+    }
+    result = apply_repair_patch(
+        {
+            "row_uuid": "row-1",
+            "source": source,
+            "patch": patch,
+        },
+        uuid_column = "row_uuid",
+        source_column = "source",
+        patch_column = "patch",
+    )
+    assert result["valid"] is True
+    assert result["response"] == "Fix this typo here."
+
+
+def test_patch_rejects_when_the_span_hash_does_not_match() -> None:
+    source = "Safety first."
+    patch = {
+        "row_uuid": "row-1",
+        "edits": [
+            {
+                "span": {"find": "Safety", "hash": "deadbeef"},
+                "replacement": "Cautious",
+            }
+        ],
+    }
+    result = apply_repair_patch(
+        {
+            "row_uuid": "row-1",
+            "source": source,
+            "patch": patch,
+        },
+        uuid_column = "row_uuid",
+        source_column = "source",
+        patch_column = "patch",
+    )
+    assert result["valid"] is False
+    assert "span hash does not match" in result["reason"]
+    assert "response" not in result
+
+
+def test_patch_rejects_an_unrelated_row_uuid() -> None:
+    patch = {
+        "row_uuid": "row-9",
+        "edits": [{"span": {"find": "a"}, "replacement": "b"}],
+    }
+    result = apply_repair_patch(
+        {
+            "row_uuid": "row-1",
+            "source": "banana",
+            "patch": patch,
+        },
+        uuid_column = "row_uuid",
+        source_column = "source",
+        patch_column = "patch",
+    )
+    assert result["valid"] is False
+    assert "UUID does not match" in result["reason"]
+
+
+def test_patch_rejects_a_stale_parent_hash() -> None:
+    patch = {
+        "row_uuid": "row-1",
+        "parent_hash": "deadbeef",
+        "edits": [{"span": {"find": "a"}, "replacement": "b"}],
+    }
+    result = apply_repair_patch(
+        {
+            "row_uuid": "row-1",
+            "source": "banana",
+            "patch": patch,
+        },
+        uuid_column = "row_uuid",
+        source_column = "source",
+        patch_column = "patch",
+    )
+    assert result["valid"] is False
+    assert "parent hash does not match" in result["reason"]
+
+
+def test_patch_rejects_a_missing_find_pattern() -> None:
+    patch = {
+        "row_uuid": "row-1",
+        "edits": [{"span": {}, "replacement": "b"}],
+    }
+    result = apply_repair_patch(
+        {
+            "row_uuid": "row-1",
+            "source": "banana",
+            "patch": patch,
+        },
+        uuid_column = "row_uuid",
+        source_column = "source",
+        patch_column = "patch",
+    )
+    assert result["valid"] is False
+    assert "no find pattern" in result["reason"]
+
+
+def test_patch_rejects_missing_spans_and_edits() -> None:
+    for missing in [
+        {"replacement": "b"},
+        {"span": {"find": "a"}},
+    ]:
+        result = apply_repair_patch(
+            {
+                "row_uuid": "row-1",
+                "source": "banana",
+                "patch": {
+                    "row_uuid": "row-1",
+                    "edits": [missing],
+                },
+            },
+            uuid_column = "row_uuid",
+            source_column = "source",
+            patch_column = "patch",
+        )
+        assert result["valid"] is False
+    result = apply_repair_patch(
+        {
+            "row_uuid": "row-1",
+            "source": "banana",
+            "patch": {"row_uuid": "row-1"},
+        },
+        uuid_column = "row_uuid",
+        source_column = "source",
+        patch_column = "patch",
+    )
+    assert result["valid"] is False
+    assert "no edits" in result["reason"]

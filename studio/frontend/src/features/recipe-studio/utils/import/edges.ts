@@ -151,6 +151,12 @@ export function buildEdges(
       if (config.source_column?.trim()) {
         addEdgeByName(config.source_column, config.name);
       }
+      if (config.patch_column?.trim()) {
+        addEdgeByName(config.patch_column, config.name);
+      }
+      if (config.uuid_column?.trim()) {
+        addEdgeByName(config.uuid_column, config.name);
+      }
       if (config.expression_type === "conversation_pair") {
         if (config.human_column?.trim()) {
           addEdgeByName(config.human_column, config.name);

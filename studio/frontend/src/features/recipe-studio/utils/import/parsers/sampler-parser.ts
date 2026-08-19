@@ -16,6 +16,7 @@ const SAMPLER_TYPES: SamplerType[] = [
   "person",
   "person_from_faker",
   "synthetic_persona",
+  "identity",
 ];
 
 const TIMEDELTA_UNITS = new Set(["D", "h", "m", "s"]);
@@ -240,13 +241,18 @@ export function parseSampler(
         ? `${params.age_range[0]}-${params.age_range[1]}`
         : (readString(params.age_range) ?? "");
 
+  const normalizedSamplerType: SamplerType =
+    samplerType === "synthetic_persona"
+      ? "identity"
+      : (samplerType as SamplerType);
+
   const base: SamplerConfig = {
     id,
     kind: "sampler",
     name,
     drop,
     // biome-ignore lint/style/useNamingConvention: api schema
-    sampler_type: samplerType as SamplerType,
+    sampler_type: normalizedSamplerType,
     // biome-ignore lint/style/useNamingConvention: api schema
     convert_to: normalizedConvertTo,
     // biome-ignore lint/style/useNamingConvention: api schema

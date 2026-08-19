@@ -114,6 +114,9 @@ export function applyRenameToConfig(
     if (config.source_column === from) {
       next = { ...(next as typeof config), source_column: to };
     }
+    if (config.patch_column === from) {
+      next = { ...(next as typeof config), patch_column: to };
+    }
   }
   return next;
 }
@@ -190,6 +193,9 @@ export function applyRemovalToConfig(
     }
     if (config.source_column === ref) {
       next = { ...(next as typeof config), source_column: "" };
+    }
+    if (config.patch_column === ref) {
+      next = { ...(next as typeof config), patch_column: "" };
     }
   }
   return next;

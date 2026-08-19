@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactElement, type RefObject, useMemo, useRef } from "react";
@@ -30,6 +31,10 @@ import { useRecipeStudioStore } from "../../stores/recipe-studio";
 import type { LlmConfig } from "../../types";
 import { isLikelyImageValue } from "../../utils/image-preview";
 import { findInvalidJinjaReferences } from "../../utils/refs";
+import {
+  DEFAULT_INTERNAL_THOUGHT_TAG,
+  renamedPromptTokens,
+} from "../../utils/repair-reasoning";
 import { getAvailableVariables } from "../../utils/variables";
 import { AvailableVariables } from "../shared/available-variables";
 import { CollapsibleSectionTriggerButton } from "../shared/collapsible-section-trigger";
@@ -456,6 +461,43 @@ export function LlmGeneralTab({
             onChange={(event) =>
               onUpdate({ output_format: event.target.value })
             }
+          />
+        </div>
+      )}
+      {config.llm_type === "structured" && (
+        <div className="grid gap-1.5">
+          <FieldLabel
+            label="Reasoning tag"
+            htmlFor={`${config.id}-internal-thought-tag`}
+            hint="The tag the model wraps private reasoning in. Changing it renames matching tokens in the prompt and instructions."
+          />
+          <Input
+            id={`${config.id}-internal-thought-tag`}
+            className="nodrag"
+            value={config.internal_thought_tag ?? ""}
+            placeholder={DEFAULT_INTERNAL_THOUGHT_TAG}
+            onChange={(event) => {
+              const next = event.target.value;
+              const renamed = renamedPromptTokens(
+                config.prompt,
+                config.system_prompt,
+                config.internal_thought_tag ?? "",
+                next,
+              );
+              onUpdate(
+                renamed
+                  ? {
+                      // biome-ignore lint/style/useNamingConvention: ui schema
+                      internal_thought_tag: next,
+                      prompt: renamed.prompt,
+                      system_prompt: renamed.system_prompt,
+                    }
+                  : {
+                      // biome-ignore lint/style/useNamingConvention: ui schema
+                      internal_thought_tag: next,
+                    },
+              );
+            }}
           />
         </div>
       )}

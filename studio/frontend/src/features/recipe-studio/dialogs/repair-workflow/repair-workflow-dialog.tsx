@@ -30,7 +30,11 @@ function TextField({
     | "threshold"
     | "conversations_column"
     | "candidate_column"
-    | "approval_column";
+    | "approval_column"
+    | "internal_thought_tag"
+    | "source_column"
+    | "patch_column"
+    | "hash_length";
   label: string;
   hint: string;
   placeholder: string;
@@ -56,6 +60,7 @@ export function RepairWorkflowDialog({
   onUpdate,
 }: RepairWorkflowDialogProps): ReactElement {
   const type = config.expression_type ?? "repair_tasks";
+  const isPatch = type === "repair_patch";
   return (
     <div className="space-y-4">
       <NameField
@@ -88,7 +93,7 @@ export function RepairWorkflowDialog({
             field="assistant_column"
             label="New AI response field"
             hint="One complete raw response, including any reasoning tags and visible answer."
-            placeholder="mia_response"
+            placeholder="assistant_response"
             onUpdate={onUpdate}
           />
         </>
@@ -102,7 +107,34 @@ export function RepairWorkflowDialog({
           onUpdate={onUpdate}
         />
       )}
-      {type === "repair_tasks" ? (
+      {isPatch ? (
+        <>
+          <TextField
+            config={config}
+            field="source_column"
+            label="Source field"
+            hint="The exact text block being patched. Hashing it must match the patch parent_hash."
+            placeholder="rewrite_result"
+            onUpdate={onUpdate}
+          />
+          <TextField
+            config={config}
+            field="patch_column"
+            label="Patch field"
+            hint="Structured edits containing row_uuid, parent_hash, and an edits list of hash-addressed spans."
+            placeholder="repair_patch"
+            onUpdate={onUpdate}
+          />
+          <TextField
+            config={config}
+            field="hash_length"
+            label="Hash length"
+            hint="Leading hex characters kept when hashing parent, child, and span blocks."
+            placeholder="64"
+            onUpdate={onUpdate}
+          />
+        </>
+      ) : type === "repair_tasks" ? (
         <>
           <TextField
             config={config}
@@ -149,6 +181,14 @@ export function RepairWorkflowDialog({
               onUpdate={onUpdate}
             />
           )}
+          <TextField
+            config={config}
+            field="internal_thought_tag"
+            label="Reasoning tag"
+            hint="The tag the model wraps private reasoning in. The repair and guard prompts must use the same tag."
+            placeholder="Internal-Thoughts"
+            onUpdate={onUpdate}
+          />
         </>
       ) : null}
       <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-xs text-muted-foreground">
@@ -162,6 +202,8 @@ export function RepairWorkflowDialog({
           "Rejects UUID mismatches, missing or unchanged rewritten responses, and malformed internal-thought content."}
         {type === "repair_merge" &&
           "Replaces only the gpt/assistant response with the approved rewrite; human and system turns always come from the original."}
+        {isPatch &&
+          "Applies the structured patch deterministically: verifies the row UUID and parent hash, splices each hash-addressed span, and emits the patched response plus parent and child hashes as metadata."}
       </div>
     </div>
   );

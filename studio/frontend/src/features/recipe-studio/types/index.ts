@@ -14,7 +14,21 @@ export type SamplerType =
   | "uuid"
   | "person"
   | "person_from_faker"
-  | "synthetic_persona";
+  | "synthetic_persona"
+  | "identity";
+
+// The identity node family. `identity` is canonical; `synthetic_persona` is a
+// legacy alias kept so old snapshots, imports, and saved recipes parse intact.
+export const IDENTITY_SAMPLER_TYPES = new Set<SamplerType>([
+  "identity",
+  "synthetic_persona",
+]);
+
+// Legacy DataDesigner person samplers, distinct from the identity node.
+export const LEGACY_PERSON_SAMPLER_TYPES = new Set<SamplerType>([
+  "person",
+  "person_from_faker",
+]);
 
 export type LlmType = "text" | "structured" | "code" | "judge";
 export type ValidatorCodeLang =
@@ -71,6 +85,8 @@ export type RecipeNodeData = {
     | "validator_oxc"
     | "expression"
     | "string_replace"
+    | "content_hash"
+    | "repair_patch"
     | "conditional_ai"
     | "conditional_guard"
     | "conversation_pair"
@@ -259,6 +275,9 @@ export type LlmConfig = {
   // Unsloth extension: skip the model call unless this Jinja expression is true.
   // biome-ignore lint/style/useNamingConvention: api schema
   run_if?: string;
+  // Reasoning block tag this step's prompts instruct the model to emit.
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  internal_thought_tag?: string;
 };
 
 export type ModelProviderConfig = {
@@ -314,6 +333,8 @@ export type ExpressionConfig = {
   expression_type?:
     | "formula"
     | "string_replace"
+    | "content_hash"
+    | "repair_patch"
     | "conversation_pair"
     | "conversation_extend"
     | "repair_tasks"
@@ -331,6 +352,9 @@ export type ExpressionConfig = {
   candidate_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   approval_column?: string;
+  // Reasoning block tag checked on repaired assistant responses.
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  internal_thought_tag?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   human_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
@@ -343,6 +367,10 @@ export type ExpressionConfig = {
   replace_with?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   use_regex?: boolean;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  patch_column?: string;
+  // UI ergonomics (serialized to a number in payload)
+  hash_length?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   export_source_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema

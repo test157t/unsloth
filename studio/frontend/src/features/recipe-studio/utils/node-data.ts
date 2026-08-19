@@ -27,6 +27,8 @@ export function nodeDataFromConfig(
     if (workflowType !== "formula") {
       const labels = {
         string_replace: ["String replace", "Deterministic"],
+        content_hash: ["Content hash", "sha256"],
+        repair_patch: ["Repair patch", "Hash-guided"],
         conversation_pair: ["Conversation pair", "Fixed human then gpt"],
         conversation_extend: ["Conversation extend", "Append human/gpt"],
         repair_tasks: ["Repair tasks", "Failed criteria"],

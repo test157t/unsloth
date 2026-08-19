@@ -11,9 +11,9 @@ MODULE_PATH = (
     Path(__file__).resolve().parents[1]
     / "core"
     / "data_recipe"
-    / "synthetic_persona.py"
+    / "identity.py"
 )
-SPEC = importlib.util.spec_from_file_location("synthetic_persona_under_test", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location("identity_under_test", MODULE_PATH)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
@@ -27,10 +27,10 @@ class _Fake:
         return min + ((max - min) // 2)
 
 
-def test_fixed_persona_keeps_custom_identity_and_omits_blank_demographics() -> None:
-    persona = MODULE.build_synthetic_persona(
+def test_fixed_identity_keeps_custom_name_and_omits_blank_demographics() -> None:
+    identity = MODULE.build_identity(
         {
-            "name": "Mia",
+            "name": "Ari",
             "gender": "synthetic woman",
             "planet": "Elysium",
             "role": "conversation rewriter",
@@ -39,38 +39,44 @@ def test_fixed_persona_keeps_custom_identity_and_omits_blank_demographics() -> N
         },
         faker = _Fake(),
     )
-    assert persona == {
-        "name": "Mia",
+    assert identity == {
+        "name": "Ari",
         "gender": "synthetic woman",
         "planet": "Elysium",
         "role": "conversation rewriter",
         "description": "Repair only judged defects.",
     }
-    assert "age" not in persona
-    assert "city" not in persona
+    assert "age" not in identity
+    assert "city" not in identity
 
 
 def test_blank_name_uses_faker_and_optional_range_generates_age() -> None:
-    persona = MODULE.build_synthetic_persona(
+    identity = MODULE.build_identity(
         {"age_range": [20, 40]},
         faker = _Fake(),
     )
-    assert persona == {"name": "Generated Person", "age": 30}
+    assert identity == {"name": "Generated Person", "age": 30}
 
 
-def test_persona_sampler_is_removed_before_native_builder_validation() -> None:
-    recipe, specs = MODULE.split_synthetic_persona_columns(
+def test_sample_recipe_uses_new_and_legacy_identity_sampler() -> None:
+    recipe, specs = MODULE.split_identity_columns(
         {
             "columns": [
                 {
                     "column_type": "sampler",
+                    "sampler_type": "identity",
+                    "name": "ari",
+                    "params": {"name": "Ari"},
+                },
+                {
+                    "column_type": "sampler",
                     "sampler_type": "synthetic_persona",
-                    "name": "mia",
-                    "params": {"name": "Mia"},
+                    "name": "legacy_ari",
+                    "params": {"name": "Legacy Ari"},
                 },
                 {"column_type": "sampler", "sampler_type": "uuid", "name": "id"},
             ]
         }
     )
     assert [column["name"] for column in recipe["columns"]] == ["id"]
-    assert [column["name"] for column in specs] == ["mia"]
+    assert [column["name"] for column in specs] == ["ari", "legacy_ari"]

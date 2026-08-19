@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -17,13 +18,24 @@ _REPAIR_COLUMN_TYPES = {
     "unsloth-repair-check",
     "unsloth-repair-merge",
     "unsloth-string-replace",
+    "unsloth-content-hash",
+    "unsloth-repair-patch",
 }
-_INTERNAL_THOUGHT_OPEN = "<Mia_Internal-Thoughts>"
-_INTERNAL_THOUGHT_CLOSE = "</Mia_Internal-Thoughts>"
-_INTERNAL_THOUGHT_OPEN_PREFIX = "<Mia_Internal-Thoughts"
-_INTERNAL_THOUGHT_CLOSE_PREFIX = "</Mia_Internal-Thoughts"
+DEFAULT_INTERNAL_THOUGHT_TAG = "Internal-Thoughts"
 
 logger = logging.getLogger(__name__)
+
+
+def _internal_thought_tokens(
+    tag: str,
+) -> tuple[str, str, str, str]:
+    """Expand a reasoning-tag name into open, close, and prefix strings.
+
+    An empty tag falls back to the generic default so existing workflows keep
+    their reasoning-tag validation without an explicit value.
+    """
+    name = tag.strip() or DEFAULT_INTERNAL_THOUGHT_TAG
+    return f"<{name}>", f"</{name}>", f"<{name}", f"</{name}"
 
 
 def _required_column_name(spec: dict[str, Any], key: str) -> str:
@@ -134,22 +146,26 @@ def extend_conversation_turns(
     return merged
 
 
-def _invalid_assistant_content_reason(value: Any) -> str | None:
+def _invalid_assistant_content_reason(
+    value: Any,
+    internal_thought_tag: str,
+) -> str | None:
     """Return why a rewritten assistant value is unsafe, if it is unsafe."""
     if not isinstance(value, str) or not value.strip():
         return "has no non-empty visible answer"
 
-    without_complete_tags = value.replace(_INTERNAL_THOUGHT_OPEN, "").replace(
-        _INTERNAL_THOUGHT_CLOSE, ""
-    )
-    if (
-        _INTERNAL_THOUGHT_OPEN_PREFIX in without_complete_tags
-        or _INTERNAL_THOUGHT_CLOSE_PREFIX in without_complete_tags
-    ):
+    (
+        open_tag,
+        close_tag,
+        open_prefix,
+        close_prefix,
+    ) = _internal_thought_tokens(internal_thought_tag)
+    without_complete_tags = value.replace(open_tag, "").replace(close_tag, "")
+    if open_prefix in without_complete_tags or close_prefix in without_complete_tags:
         return "contains an incomplete internal-thought tag"
 
-    has_open = _INTERNAL_THOUGHT_OPEN in value
-    has_close = _INTERNAL_THOUGHT_CLOSE in value
+    has_open = open_tag in value
+    has_close = close_tag in value
     if not has_open and not has_close:
         return None
 
@@ -157,8 +173,8 @@ def _invalid_assistant_content_reason(value: Any) -> str | None:
     cursor = 0
     inside_thoughts = False
     while cursor < len(value):
-        next_open = value.find(_INTERNAL_THOUGHT_OPEN, cursor)
-        next_close = value.find(_INTERNAL_THOUGHT_CLOSE, cursor)
+        next_open = value.find(open_tag, cursor)
+        next_close = value.find(close_tag, cursor)
         tag_positions = [
             position for position in (next_open, next_close) if position >= 0
         ]
@@ -174,12 +190,12 @@ def _invalid_assistant_content_reason(value: Any) -> str | None:
             if inside_thoughts:
                 return "contains a nested or unclosed internal-thought opening tag"
             inside_thoughts = True
-            cursor = next_tag + len(_INTERNAL_THOUGHT_OPEN)
+            cursor = next_tag + len(open_tag)
         else:
             if not inside_thoughts:
                 return "contains an unmatched internal-thought closing tag"
             inside_thoughts = False
-            cursor = next_tag + len(_INTERNAL_THOUGHT_CLOSE)
+            cursor = next_tag + len(close_tag)
 
     if inside_thoughts:
         return "contains an unclosed internal-thought opening tag"
@@ -206,6 +222,7 @@ def validate_repair_candidate(
     uuid_column: str,
     conversations_column: str,
     candidate_column: str,
+    internal_thought_tag: str = "",
 ) -> dict[str, Any]:
     row_uuid = row.get(uuid_column)
     original = _decoded_list(row.get(conversations_column))
@@ -234,7 +251,10 @@ def validate_repair_candidate(
     if original[target_index].get("value") == response:
         result["reason"] = "Repair candidate did not change the assistant response."
         return result
-    invalid_content = _invalid_assistant_content_reason(response)
+    invalid_content = _invalid_assistant_content_reason(
+        response,
+        internal_thought_tag,
+    )
     if invalid_content is not None:
         result["reason"] = (
             f"Repair candidate assistant turn {target_index} {invalid_content}."
@@ -254,6 +274,7 @@ def merge_approved_repair(
     conversations_column: str,
     candidate_column: str,
     approval_column: str,
+    internal_thought_tag: str = "",
 ) -> Any:
     original = _decoded_list(row.get(conversations_column))
     candidate = _decoded(row.get(candidate_column))
@@ -273,6 +294,7 @@ def merge_approved_repair(
         uuid_column = uuid_column,
         conversations_column = conversations_column,
         candidate_column = candidate_column,
+        internal_thought_tag = internal_thought_tag,
     )
     if not checked["valid"]:
         return original
@@ -307,6 +329,170 @@ def apply_string_replace(
             raise ValueError(f"String replace has an invalid regex pattern: {exc}") from exc
         return pattern.sub(replace_with, value)
     return value.replace(find, replace_with)
+
+
+def _content_digest(value: Any, hash_length: int) -> str:
+    """Stable sha256 hex digest of one cell's canonical text, optionally truncated."""
+    if isinstance(value, str):
+        raw = value
+    else:
+        try:
+            raw = json.dumps(
+                value,
+                sort_keys = True,
+                ensure_ascii = False,
+                separators = (",", ":"),
+                default = str,
+            )
+        except (TypeError, ValueError):
+            raw = repr(value)
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    if hash_length and hash_length < len(digest):
+        return digest[:hash_length]
+    return digest
+
+
+def compute_content_hash(
+    row: dict[str, Any],
+    *,
+    source_column: str,
+    hash_length: int = 64,
+) -> str:
+    """Stable content hash of one cell, addressable as a row-agnostic block id."""
+    return _content_digest(row.get(source_column), hash_length)
+
+
+def _replace_occurrence(
+    value: str,
+    find: str,
+    use_regex: bool,
+    occurrence: int,
+) -> tuple[int, int, str] | None:
+    """Locate one span in ``value`` for hashing and splicing.
+
+    Returns ``(start, end, matched_block)`` where ``value[start:end]`` is exactly
+    the located block (so span hashes can be verified against the block text), or
+    ``None`` when the occurrence does not exist.
+    """
+    if use_regex:
+        import re
+
+        try:
+            pattern = re.compile(find)
+        except re.error as exc:
+            raise ValueError(f"Repair patch has an invalid regex pattern: {exc}") from exc
+        count = 0
+        for match in pattern.finditer(value):
+            if match.start() == match.end():
+                continue
+            if count == occurrence:
+                block = match.group(0)
+                return match.start(), match.end(), block
+            count += 1
+        return None
+    pos = -1
+    for _ in range(occurrence + 1):
+        pos = value.find(find, pos + 1)
+        if pos < 0:
+            return None
+    return pos, pos + len(find), find
+
+
+def apply_repair_patch(
+    row: dict[str, Any],
+    *,
+    uuid_column: str,
+    source_column: str,
+    patch_column: str,
+    hash_length: int = 64,
+) -> dict[str, Any]:
+    """Apply a hash-aware, structured patch to one text cell.
+
+    The patch targets the row UUID plus the source/parent hash and zero or more
+    hash-addressed blocks. Each edit only supplies replacement content; the
+    deterministic node stitches the result and hashes it, so the model never has
+    to re-emit the surrounding text. The patch, parent hash, and child hash are
+    preserved in the returned object as dataset metadata.
+    """
+    source = row.get(source_column)
+    patch = _decoded(row.get(patch_column))
+    row_uuid = row.get(uuid_column)
+    result = {"row_uuid": row_uuid}
+    if not isinstance(source, str):
+        result["valid"] = False
+        result["reason"] = "Repair patch source must be text."
+        return result
+    if not isinstance(patch, dict):
+        result["valid"] = False
+        result["reason"] = "Repair patch is not a structured object."
+        return result
+    if patch.get("row_uuid") != row_uuid:
+        result["valid"] = False
+        result["reason"] = "Repair patch UUID does not match the source row."
+        return result
+    parent_hash = _content_digest(source, hash_length)
+    if patch.get("parent_hash") and patch["parent_hash"] != parent_hash:
+        result["valid"] = False
+        result["reason"] = "Repair patch parent hash does not match the source content."
+        return result
+    edits = patch.get("edits")
+    if not isinstance(edits, list) or not edits:
+        result["valid"] = False
+        result["reason"] = "Repair patch supplied no edits."
+        return result
+    value = source
+    for index, edit in enumerate(edits):
+        if not isinstance(edit, dict):
+            result["valid"] = False
+            result["reason"] = f"Repair patch edit {index} is not an object."
+            return result
+        span = edit.get("span")
+        if not isinstance(span, dict):
+            result["valid"] = False
+            result["reason"] = f"Repair patch edit {index} has no span."
+            return result
+        find = span.get("find")
+        if not isinstance(find, str) or not find:
+            result["valid"] = False
+            result["reason"] = f"Repair patch edit {index} has no find pattern."
+            return result
+        replacement = edit.get("replacement")
+        if not isinstance(replacement, str):
+            result["valid"] = False
+            result["reason"] = f"Repair patch edit {index} has no replacement content."
+            return result
+        use_regex = bool(span.get("use_regex", False))
+        occurrence = int(span.get("occurrence", 0) or 0)
+        try:
+            located = _replace_occurrence(value, find, use_regex, occurrence)
+        except ValueError as exc:
+            result["valid"] = False
+            result["reason"] = str(exc)
+            return result
+        if located is None:
+            result["valid"] = False
+            result["reason"] = f"Repair patch edit {index} did not find its span."
+            return result
+        start, end, block_text = located
+        span_hash = span.get("hash")
+        if span_hash and _content_digest(block_text, hash_length) != span_hash:
+            result["valid"] = False
+            result["reason"] = f"Repair patch edit {index} span hash does not match its content."
+            return result
+        value = value[:start] + replacement + value[end:]
+    if value == source:
+        result["valid"] = False
+        result["reason"] = "Repair patch did not change the source content."
+        return result
+    result["valid"] = True
+    result["did_rewrite"] = True
+    result["response"] = value
+    result["parent_hash"] = parent_hash
+    result["child_hash"] = _content_digest(value, hash_length)
+    result["patched"] = True
+    result["edits"] = edits
+    result["reason"] = "Repair patch applied with matching parent and child hashes."
+    return result
 
 
 def split_sparse_repair_columns(
@@ -396,6 +582,40 @@ def _make_workflow_column(spec: dict[str, Any]):
             )
             return output
 
+    elif column_type == "unsloth-content-hash":
+        source_column = _required_column_name(spec, "source_column")
+        hash_length = int(spec.get("hash_length") or 64)
+        required = [source_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = compute_content_hash(
+                row,
+                source_column = source_column,
+                hash_length = hash_length,
+            )
+            return output
+
+    elif column_type == "unsloth-repair-patch":
+        uuid_column = _required_column_name(spec, "uuid_column")
+        source_column = _required_column_name(spec, "source_column")
+        patch_column = _required_column_name(spec, "patch_column")
+        hash_length = int(spec.get("hash_length") or 64)
+        required = [uuid_column, source_column, patch_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = apply_repair_patch(
+                row,
+                uuid_column = uuid_column,
+                source_column = source_column,
+                patch_column = patch_column,
+                hash_length = hash_length,
+            )
+            return output
+
     elif column_type == "unsloth-repair-tasks":
         uuid_column = _required_column_name(spec, "uuid_column")
         required = [uuid_column]
@@ -421,6 +641,7 @@ def _make_workflow_column(spec: dict[str, Any]):
         required = [uuid_column]
         conversations_column = _required_column_name(spec, "conversations_column")
         candidate_column = _required_column_name(spec, "candidate_column")
+        internal_thought_tag = str(spec.get("internal_thought_tag") or "")
         required.extend([conversations_column, candidate_column])
 
         @custom_column_generator(required_columns = required)
@@ -431,6 +652,7 @@ def _make_workflow_column(spec: dict[str, Any]):
                 uuid_column = uuid_column,
                 conversations_column = conversations_column,
                 candidate_column = candidate_column,
+                internal_thought_tag = internal_thought_tag,
             )
             return output
 
@@ -440,6 +662,7 @@ def _make_workflow_column(spec: dict[str, Any]):
         conversations_column = _required_column_name(spec, "conversations_column")
         candidate_column = _required_column_name(spec, "candidate_column")
         approval_column = _required_column_name(spec, "approval_column")
+        internal_thought_tag = str(spec.get("internal_thought_tag") or "")
         required.extend([conversations_column, candidate_column, approval_column])
 
         @custom_column_generator(required_columns = required)
@@ -451,6 +674,7 @@ def _make_workflow_column(spec: dict[str, Any]):
                 conversations_column = conversations_column,
                 candidate_column = candidate_column,
                 approval_column = approval_column,
+                internal_thought_tag = internal_thought_tag,
             )
             return output
 

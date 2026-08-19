@@ -13,7 +13,7 @@ type PersonDialogProps = {
   onUpdate: (patch: Partial<SamplerConfig>) => void;
 };
 
-type PersonaField =
+type IdentityField =
   | "person_name"
   | "person_locale"
   | "person_sex"
@@ -27,10 +27,10 @@ export function PersonDialog({
   onUpdate,
 }: PersonDialogProps): ReactElement {
   useEffect(() => {
-    if (config.sampler_type !== "synthetic_persona") {
+    if (config.sampler_type !== "identity") {
       onUpdate({
-        // biome-ignore lint/style/useNamingConvention: ui schema
-        sampler_type: "synthetic_persona",
+        // biome-ignore lint/style/useNamingConvention: api schema
+        sampler_type: "identity",
         // biome-ignore lint/style/useNamingConvention: legacy ui schema
         person_with_synthetic_personas: undefined,
       });
@@ -38,7 +38,7 @@ export function PersonDialog({
   }, [config.sampler_type, onUpdate]);
 
   const field = (
-    key: PersonaField,
+    key: IdentityField,
     label: string,
     hint: string,
     placeholder: string,
@@ -67,22 +67,22 @@ export function PersonDialog({
         onChange={(value) => onUpdate({ name: value })}
       />
       <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 text-xs text-muted-foreground">
-        This outputs one reusable persona object per row. Reference the whole
-        persona as {`{{ ${config.name} }}`} or individual fields such as
+        This outputs one reusable identity object per row. Reference the whole
+        identity as {`{{ ${config.name} }}`} or individual fields such as
         {` {{ ${config.name}.description }}`} in repair, judge, and guard
         prompts.
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {field(
           "person_name",
-          "Persona name",
+          "Identity name",
           "Leave blank to generate a Faker name for each row.",
-          "Mia",
+          "Ari, Kim, Robin…",
         )}
         {field(
           "person_role",
           "Pipeline role",
-          "Optional purpose carried with the persona.",
+          "Optional purpose carried with the identity.",
           "Conservative conversation rewriter",
         )}
         {field(
@@ -100,7 +100,7 @@ export function PersonDialog({
         {field(
           "person_city",
           "City",
-          "Optional. Blank means the persona has no defined city.",
+          "Optional. Blank means the identity has no defined city.",
           "",
         )}
         {field(
@@ -112,13 +112,13 @@ export function PersonDialog({
         {field(
           "person_locale",
           "Faker locale",
-          "Used only when the persona name is generated.",
+          "Used only when the identity name is generated.",
           "en_US",
         )}
       </div>
       <div className="grid gap-1.5">
         <FieldLabel
-          label="Persona instructions"
+          label="Identity details"
           htmlFor={`${config.id}-person-description`}
           hint="Identity, voice, priorities, and constraints exposed to downstream prompts."
         />
@@ -126,7 +126,7 @@ export function PersonDialog({
           id={`${config.id}-person-description`}
           className="nodrag min-h-36"
           value={config.person_description ?? ""}
-          placeholder="Mia speaks in first person with composed warmth…"
+          placeholder="Describe the identity in first person, with their voice, priorities, and boundaries…"
           onChange={(event) =>
             onUpdate({ person_description: event.target.value })
           }

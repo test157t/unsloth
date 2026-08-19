@@ -40,6 +40,8 @@ export function parseRepairWorkflow(
     candidate_column: readString(column.candidate_column) ?? "",
     // biome-ignore lint/style/useNamingConvention: ui schema
     approval_column: readString(column.approval_column) ?? "",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    internal_thought_tag: readString(column.internal_thought_tag) ?? "",
   };
 }
 
@@ -63,5 +65,55 @@ export function parseStringReplace(
     replace_with: readString(column.replace_with) ?? "",
     // biome-ignore lint/style/useNamingConvention: ui schema
     use_regex: readBoolean(column.use_regex) ?? false,
+  };
+}
+
+export function parseContentHash(
+  column: Record<string, unknown>,
+  name: string,
+  id: string,
+): ExpressionConfig {
+  return {
+    id,
+    kind: "expression",
+    name,
+    drop: column.drop === true,
+    expr: "",
+    dtype: "str",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    expression_type: "content_hash",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    source_column: readString(column.source_column) ?? "",
+    hash_length:
+      typeof column.hash_length === "number"
+        ? String(column.hash_length)
+        : "64",
+  };
+}
+
+export function parseRepairPatch(
+  column: Record<string, unknown>,
+  name: string,
+  id: string,
+): ExpressionConfig {
+  return {
+    id,
+    kind: "expression",
+    name,
+    drop: column.drop === true,
+    expr: "",
+    dtype: "str",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    expression_type: "repair_patch",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    uuid_column: readString(column.uuid_column) ?? "row_uuid",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    source_column: readString(column.source_column) ?? "",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    patch_column: readString(column.patch_column) ?? "",
+    hash_length:
+      typeof column.hash_length === "number"
+        ? String(column.hash_length)
+        : "64",
   };
 }

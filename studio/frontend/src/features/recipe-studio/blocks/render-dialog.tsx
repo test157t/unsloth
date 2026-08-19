@@ -19,6 +19,7 @@ import { TimedeltaDialog } from "../dialogs/samplers/timedelta-dialog";
 import { UniformDialog } from "../dialogs/samplers/uniform-dialog";
 import { UuidDialog } from "../dialogs/samplers/uuid-dialog";
 import { SeedDialog } from "../dialogs/seed/seed-dialog";
+import { ContentHashDialog } from "../dialogs/content-hash/content-hash-dialog";
 import { StringReplaceDialog } from "../dialogs/string-replace/string-replace-dialog";
 import { ToolProfileDialog } from "../dialogs/tool-profile/tool-profile-dialog";
 import { ValidatorDialog } from "../dialogs/validators/validator-dialog";
@@ -95,7 +96,8 @@ export function renderBlockDialog(
       return config.kind === "sampler" &&
         (config.sampler_type === "person" ||
           config.sampler_type === "person_from_faker" ||
-          config.sampler_type === "synthetic_persona") ? (
+          config.sampler_type === "synthetic_persona" ||
+          config.sampler_type === "identity") ? (
         <PersonDialog config={config} onUpdate={update} />
       ) : null;
     case "llm":
@@ -132,6 +134,10 @@ export function renderBlockDialog(
     case "string_replace":
       return config.kind === "expression" && config.expression_type === "string_replace" ? (
         <StringReplaceDialog config={config} onUpdate={update} />
+      ) : null;
+    case "content_hash":
+      return config.kind === "expression" && config.expression_type === "content_hash" ? (
+        <ContentHashDialog config={config} onUpdate={update} />
       ) : null;
     case "repair_workflow":
       return config.kind === "expression" ? (

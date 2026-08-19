@@ -116,6 +116,8 @@ type RecipeStudioState = {
     type:
       | "expression"
       | "string_replace"
+      | "content_hash"
+      | "repair_patch"
       | "conversation_pair"
       | "conversation_extend"
       | "repair_merge"
