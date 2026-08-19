@@ -11,6 +11,22 @@ export function readString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+export function readBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0") {
+      return false;
+    }
+  }
+  return null;
+}
+
 export function readNumberString(value: unknown): string {
   if (typeof value === "number" && Number.isFinite(value)) {
     return String(value);

@@ -359,6 +359,28 @@ export function makeExpressionConfig(
   };
 }
 
+export function makeStringReplaceConfig(
+  id: string,
+  existing: NodeConfig[],
+): ExpressionConfig {
+  return {
+    id,
+    kind: "expression",
+    name: nextName(existing, "string_replace"),
+    drop: false,
+    expr: "",
+    dtype: "str",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    expression_type: "string_replace",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    source_column: "",
+    find: "",
+    replace_with: "",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    use_regex: false,
+  };
+}
+
 export function makeConditionalRepairLlmConfig(
   id: string,
   type: "repair" | "guard",

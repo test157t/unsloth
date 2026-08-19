@@ -84,6 +84,7 @@ type BlockSheetProps = {
   onAddExpression: (
     type:
       | "expression"
+      | "string_replace"
       | "conversation_pair"
       | "conversation_extend"
       | "repair_merge"
@@ -403,6 +404,7 @@ export function BlockSheet({
       onAddExpression(
         type as
           | "expression"
+          | "string_replace"
           | "conversation_pair"
           | "conversation_extend"
           | "repair_merge"

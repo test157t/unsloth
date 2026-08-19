@@ -70,6 +70,7 @@ export type RecipeNodeData = {
     | "validator_sql"
     | "validator_oxc"
     | "expression"
+    | "string_replace"
     | "conditional_ai"
     | "conditional_guard"
     | "conversation_pair"
@@ -312,6 +313,7 @@ export type ExpressionConfig = {
   // biome-ignore lint/style/useNamingConvention: ui schema
   expression_type?:
     | "formula"
+    | "string_replace"
     | "conversation_pair"
     | "conversation_extend"
     | "repair_tasks"
@@ -333,6 +335,14 @@ export type ExpressionConfig = {
   human_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   assistant_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  source_column?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  find?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  replace_with?: string;
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  use_regex?: boolean;
   // biome-ignore lint/style/useNamingConvention: ui schema
   export_source_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema

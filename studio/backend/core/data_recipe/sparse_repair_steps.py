@@ -16,6 +16,7 @@ _REPAIR_COLUMN_TYPES = {
     "unsloth-repair-tasks",
     "unsloth-repair-check",
     "unsloth-repair-merge",
+    "unsloth-string-replace",
 }
 _INTERNAL_THOUGHT_OPEN = "<Mia_Internal-Thoughts>"
 _INTERNAL_THOUGHT_CLOSE = "</Mia_Internal-Thoughts>"
@@ -283,6 +284,31 @@ def merge_approved_repair(
     return merged
 
 
+def apply_string_replace(
+    row: dict[str, Any],
+    *,
+    source_column: str,
+    find: str,
+    replace_with: str,
+    use_regex: bool = False,
+) -> Any:
+    """Deterministically replace occurrences in one field, in place."""
+    value = row.get(source_column)
+    if not isinstance(value, str):
+        raise ValueError(f"String replace source {source_column!r} must be text.")
+    if not find:
+        raise ValueError("String replace requires a non-empty find pattern.")
+    if use_regex:
+        import re
+
+        try:
+            pattern = re.compile(find)
+        except re.error as exc:
+            raise ValueError(f"String replace has an invalid regex pattern: {exc}") from exc
+        return pattern.sub(replace_with, value)
+    return value.replace(find, replace_with)
+
+
 def split_sparse_repair_columns(
     recipe: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -348,6 +374,25 @@ def _make_workflow_column(spec: dict[str, Any]):
                 conversations_column = conversations_column,
                 human_column = human_column,
                 assistant_column = assistant_column,
+            )
+            return output
+
+    elif column_type == "unsloth-string-replace":
+        source_column = _required_column_name(spec, "source_column")
+        find = str(spec.get("find") or "")
+        replace_with = str(spec.get("replace_with") or "")
+        use_regex = bool(spec.get("use_regex", False))
+        required = [source_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = apply_string_replace(
+                row,
+                source_column = source_column,
+                find = find,
+                replace_with = replace_with,
+                use_regex = use_regex,
             )
             return output
 

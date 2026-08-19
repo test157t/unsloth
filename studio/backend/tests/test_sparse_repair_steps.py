@@ -13,6 +13,7 @@ assert _SPEC is not None and _SPEC.loader is not None
 _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
 build_conversation_pair = _MODULE.build_conversation_pair
+apply_string_replace = _MODULE.apply_string_replace
 extend_conversation_turns = _MODULE.extend_conversation_turns
 extract_repair_tasks = _MODULE.extract_repair_tasks
 merge_approved_repair = _MODULE.merge_approved_repair
@@ -385,6 +386,108 @@ def test_sparse_columns_are_removed_before_data_designer_parsing() -> None:
     )
     assert [column["name"] for column in recipe["columns"]] == ["judge"]
     assert [column["name"] for column in specs] == ["pair", "tasks"]
+
+
+def test_string_replace_with_literal_text() -> None:
+    result = apply_string_replace(
+        {"assistant_response": "hello  world"},
+        source_column = "assistant_response",
+        find = "  ",
+        replace_with = " ",
+        use_regex = False,
+    )
+    assert result == "hello world"
+
+
+def test_string_replace_with_empty_replacement_literal() -> None:
+    result = apply_string_replace(
+        {"text": "remove-this-token"},
+        source_column = "text",
+        find = "-this-",
+        replace_with = "",
+        use_regex = False,
+    )
+    assert result == "removetoken"
+
+
+def test_string_replace_with_regex_pattern() -> None:
+    result = apply_string_replace(
+        {"text": "abc123def456"},
+        source_column = "text",
+        find = r"\d+",
+        replace_with = "#",
+        use_regex = True,
+    )
+    assert result == "abc#def#"
+
+
+def test_string_replace_regex_backreference() -> None:
+    result = apply_string_replace(
+        {"text": "name_john"},
+        source_column = "text",
+        find = r"name_(\w+)",
+        replace_with = r"\1",
+        use_regex = True,
+    )
+    assert result == "john"
+
+
+def test_string_replace_rejects_non_text_source() -> None:
+    try:
+        apply_string_replace(
+            {"assistant_response": 42},
+            source_column = "assistant_response",
+            find = "x",
+            replace_with = "y",
+            use_regex = False,
+        )
+    except ValueError as exc:
+        assert "must be text" in str(exc)
+    else:
+        raise AssertionError("Expected a non-text source to be rejected.")
+
+
+def test_string_replace_rejects_empty_find() -> None:
+    try:
+        apply_string_replace(
+            {"assistant_response": "hello"},
+            source_column = "assistant_response",
+            find = "",
+            replace_with = "y",
+            use_regex = False,
+        )
+    except ValueError as exc:
+        assert "non-empty find" in str(exc)
+    else:
+        raise AssertionError("Expected an empty find pattern to be rejected.")
+
+
+def test_string_replace_rejects_invalid_regex_pattern() -> None:
+    try:
+        apply_string_replace(
+            {"assistant_response": "hello"},
+            source_column = "assistant_response",
+            find = "(",
+            replace_with = "y",
+            use_regex = True,
+        )
+    except ValueError as exc:
+        assert "invalid regex" in str(exc)
+    else:
+        raise AssertionError("Expected an invalid regex to be rejected.")
+
+
+def test_string_replace_column_is_split_out_before_parsing() -> None:
+    recipe, specs = split_sparse_repair_columns(
+        {
+            "columns": [
+                {"column_type": "llm-judge", "name": "judge"},
+                {"column_type": "unsloth-string-replace", "name": "clean"},
+            ]
+        }
+    )
+    assert [column["name"] for column in recipe["columns"]] == ["judge"]
+    assert [column["name"] for column in specs] == ["clean"]
 
 
 def test_merge_rejects_a_guard_decision_for_another_uuid() -> None:

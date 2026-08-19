@@ -2,7 +2,7 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import type { ExpressionConfig } from "../../../types";
-import { readString } from "../helpers";
+import { readBoolean, readString } from "../helpers";
 
 export function parseRepairWorkflow(
   column: Record<string, unknown>,
@@ -40,5 +40,28 @@ export function parseRepairWorkflow(
     candidate_column: readString(column.candidate_column) ?? "",
     // biome-ignore lint/style/useNamingConvention: ui schema
     approval_column: readString(column.approval_column) ?? "",
+  };
+}
+
+export function parseStringReplace(
+  column: Record<string, unknown>,
+  name: string,
+  id: string,
+): ExpressionConfig {
+  return {
+    id,
+    kind: "expression",
+    name,
+    drop: column.drop === true,
+    expr: "",
+    dtype: "str",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    expression_type: "string_replace",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    source_column: readString(column.source_column) ?? "",
+    find: readString(column.find) ?? "",
+    replace_with: readString(column.replace_with) ?? "",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    use_regex: readBoolean(column.use_regex) ?? false,
   };
 }

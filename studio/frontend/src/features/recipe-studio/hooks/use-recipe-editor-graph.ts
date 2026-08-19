@@ -102,6 +102,7 @@ type UseRecipeEditorGraphArgs = {
   addExpressionNode: (
     type:
       | "expression"
+      | "string_replace"
       | "conversation_pair"
       | "conversation_extend"
       | "repair_merge"
@@ -148,6 +149,7 @@ type UseRecipeEditorGraphResult = {
   handleAddExpressionFromSheet: (
     type:
       | "expression"
+      | "string_replace"
       | "conversation_pair"
       | "conversation_extend"
       | "repair_merge"
@@ -288,6 +290,7 @@ export function useRecipeEditorGraph({
         addExpressionNode(
           payload.type as
             | "expression"
+            | "string_replace"
             | "conversation_pair"
             | "conversation_extend"
             | "repair_merge"
@@ -390,6 +393,7 @@ export function useRecipeEditorGraph({
     (
       type:
         | "expression"
+        | "string_replace"
         | "conversation_pair"
         | "conversation_extend"
         | "repair_merge"

@@ -14,6 +14,20 @@ export function buildSparseRepairColumn(
   if (expressionType === "formula") {
     return null;
   }
+  if (expressionType === "string_replace") {
+    return {
+      name: config.name,
+      drop: config.drop ?? false,
+      // biome-ignore lint/style/useNamingConvention: api schema
+      column_type: "unsloth-string-replace",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      source_column: config.source_column?.trim(),
+      find: config.find ?? "",
+      replace_with: config.replace_with ?? "",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      use_regex: Boolean(config.use_regex),
+    };
+  }
   if (expressionType === "conversation_pair") {
     return {
       name: config.name,

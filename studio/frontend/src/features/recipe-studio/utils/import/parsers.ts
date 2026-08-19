@@ -6,7 +6,7 @@ import { readString } from "./helpers";
 import { parseExpression } from "./parsers/expression-parser";
 import { parseLlm } from "./parsers/llm-parser";
 export { parseModelConfig, parseModelProvider } from "./parsers/model-parser";
-import { parseRepairWorkflow } from "./parsers/repair-workflow-parser";
+import { parseRepairWorkflow, parseStringReplace } from "./parsers/repair-workflow-parser";
 import { parseSampler } from "./parsers/sampler-parser";
 import { parseValidator } from "./parsers/validator-parser";
 
@@ -34,6 +34,8 @@ const COLUMN_PARSERS: Record<string, ColumnParser> = {
     parseLlm(column, name, id),
   "unsloth-conversation-pair": (column, name, id) =>
     parseRepairWorkflow(column, name, id, "conversation_pair"),
+  "unsloth-string-replace": (column, name, id) =>
+    parseStringReplace(column, name, id),
   "unsloth-conversation-extend": (column, name, id) =>
     parseRepairWorkflow(column, name, id, "conversation_extend"),
   "unsloth-repair-tasks": (column, name, id) =>

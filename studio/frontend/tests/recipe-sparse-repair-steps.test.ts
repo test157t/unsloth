@@ -94,6 +94,48 @@ test("conversation extend serializes as a deterministic native step", () => {
   });
 });
 
+test("string replace serializes as a deterministic native step", () => {
+  const config: ExpressionConfig = {
+    id: "clean",
+    kind: "expression",
+    expression_type: "string_replace",
+    name: "cleaned",
+    expr: "",
+    dtype: "str",
+    source_column: "assistant_response",
+    find: "\\n\\n",
+    replace_with: "\\n",
+    use_regex: true,
+  };
+  const payload = buildSparseRepairColumn(config);
+  assert.deepEqual(payload, {
+    name: "cleaned",
+    drop: false,
+    column_type: "unsloth-string-replace",
+    source_column: "assistant_response",
+    find: "\\n\\n",
+    replace_with: "\\n",
+    use_regex: true,
+  });
+});
+
+test("string replace defaults regex to false", () => {
+  const config: ExpressionConfig = {
+    id: "fix",
+    kind: "expression",
+    expression_type: "string_replace",
+    name: "fixed",
+    expr: "",
+    dtype: "str",
+    source_column: "text",
+    find: "  ",
+    replace_with: " ",
+  };
+  const payload = buildSparseRepairColumn(config);
+  assert.ok(payload);
+  assert.equal(payload.use_regex, false);
+});
+
 test("default repair and guard contracts lock scope and internal thoughts", () => {
   const factoriesSource = readFileSync(
     new URL(

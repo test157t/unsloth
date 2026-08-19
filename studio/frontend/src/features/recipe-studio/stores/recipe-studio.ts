@@ -115,6 +115,7 @@ type RecipeStudioState = {
   addExpressionNode: (
     type:
       | "expression"
+      | "string_replace"
       | "conversation_pair"
       | "conversation_extend"
       | "repair_merge"

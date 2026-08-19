@@ -12,6 +12,7 @@ export {
   makeRepairWorkflowConfig,
   makeSamplerConfig,
   makeSeedConfig,
+  makeStringReplaceConfig,
   makeToolProfileConfig,
   makeValidatorConfig,
 } from "./config-factories";

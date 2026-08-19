@@ -233,6 +233,13 @@ export function getConfigErrors(config: NodeConfig | null): string[] {
       if (!config.expr.trim()) {
         errors.push("Expression is required.");
       }
+    } else if (expressionType === "string_replace") {
+      if (!config.source_column?.trim()) {
+        errors.push("Source field is required.");
+      }
+      if (config.find === undefined || config.find === null) {
+        errors.push("Find pattern is required.");
+      }
     } else if (expressionType === "conversation_pair") {
       if (!config.human_column?.trim()) {
         errors.push("Human message field is required.");

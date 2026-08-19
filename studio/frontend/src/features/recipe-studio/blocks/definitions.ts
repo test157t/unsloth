@@ -39,6 +39,7 @@ import {
   makeRepairWorkflowConfig,
   makeSamplerConfig,
   makeSeedConfig,
+  makeStringReplaceConfig,
   makeToolProfileConfig,
   makeValidatorConfig,
 } from "../utils";
@@ -57,6 +58,7 @@ export type BlockType =
   | "validator_sql"
   | "validator_oxc"
   | "expression"
+  | "string_replace"
   | "conditional_ai"
   | "conditional_guard"
   | "conversation_pair"
@@ -108,6 +110,7 @@ export type BlockDialogKey =
   | "model_config"
   | "tool_config"
   | "expression"
+  | "string_replace"
   | "repair_workflow"
   | "jsonl_export";
 
@@ -436,6 +439,16 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
   },
   {
     kind: "expression",
+    type: "string_replace",
+    title: "String replace",
+    description:
+      "Replace occurrences in a field with fixed text or a regex pattern.",
+    icon: FunctionIcon,
+    dialogKey: "string_replace",
+    createConfig: (id, existing) => makeStringReplaceConfig(id, existing),
+  },
+  {
+    kind: "expression",
     type: "conversation_pair",
     title: "Build conversation pair",
     description:
@@ -571,7 +584,8 @@ export function getBlockDefinitionForConfig(
     return getBlockDefinition(
       config.expression_type === "repair_merge" ||
         config.expression_type === "conversation_pair" ||
-        config.expression_type === "conversation_extend"
+        config.expression_type === "conversation_extend" ||
+        config.expression_type === "string_replace"
         ? "expression"
         : "validator",
       config.expression_type ?? "expression",
