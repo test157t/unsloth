@@ -104,6 +104,8 @@ function mapToViewData(
     lrHistory,
     gradNormHistory,
     evalLossHistory,
+    trainingEntries: [],
+    trainingEntriesError: null,
   };
 }
 

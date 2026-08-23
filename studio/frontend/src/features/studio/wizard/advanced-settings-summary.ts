@@ -23,6 +23,7 @@ const SCALAR_DEFAULTS = {
   randomSeed: DEFAULT_HYPERPARAMS.randomSeed,
   packing: DEFAULT_HYPERPARAMS.packing,
   trainOnCompletions: DEFAULT_HYPERPARAMS.trainOnCompletions,
+  preserveReasoning: DEFAULT_HYPERPARAMS.preserveReasoning,
   gradientCheckpointing: DEFAULT_HYPERPARAMS.gradientCheckpointing,
   visionImageSize: DEFAULT_HYPERPARAMS.visionImageSize,
   finetuneVisionLayers: DEFAULT_HYPERPARAMS.finetuneVisionLayers,

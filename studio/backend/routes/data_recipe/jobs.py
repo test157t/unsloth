@@ -252,16 +252,19 @@ def _inject_local_structured_response_format(
             clone["inference_parameters"] = params
         # BaseInferenceParams is extra="forbid", so response_format can't sit at
         # the top level. Its `extra_body` passthrough is spread into the request
-        # body top level by the OpenAI client, where llama-server reads
-        # response_format. Per tools/server/README.md the schema sits directly
-        # under response_format (not nested in a json_schema object as OpenAI
-        # expects) and is converted to a GBNF grammar for sampling.
+        # body top level by the OpenAI client. Current llama-server follows the
+        # OpenAI envelope: schema is nested under json_schema. The old flat
+        # {type, schema} shape was accepted but silently sampled unconstrained.
         extra_body = params.get("extra_body")
         if not isinstance(extra_body, dict):
             extra_body = {}
         extra_body["response_format"] = {
             "type": "json_schema",
-            "schema": output_format,
+            "json_schema": {
+                "name": str(column_name),
+                "strict": True,
+                "schema": output_format,
+            },
         }
         # The OpenAI chat endpoint now returns raw JSON by default for
         # response_format requests (spec compliance for public clients). This

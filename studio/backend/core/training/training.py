@@ -242,6 +242,7 @@ def _build_training_worker_config(values: dict[str, Any]) -> dict[str, Any]:
         "use_loftq": values.get("use_loftq", False),
         "use_dora": values.get("use_dora", False),
         "train_on_completions": values.get("train_on_completions", False),
+        "preserve_reasoning": values.get("preserve_reasoning", False),
         "finetune_vision_layers": values.get("finetune_vision_layers", True),
         "finetune_language_layers": values.get("finetune_language_layers", True),
         "finetune_attention_modules": values.get("finetune_attention_modules", True),
@@ -631,6 +632,9 @@ class TrainingProgress:
     # step loss, so the progress filter would drop it, and with it the only elapsed
     # time that includes the final evaluation, checkpoint save and best-model reload.
     is_run_summary: bool = False
+    # Live-only diagnostic payload; never persisted with run metrics.
+    training_entries: list[str] = field(default_factory = list)
+    training_entries_error: Optional[str] = None
 
 
 class _MLXTrainerAdapter:
@@ -1017,6 +1021,12 @@ class _MLXTrainerAdapter:
                 num_tokens = event.get("num_tokens", self.training_progress.num_tokens),
                 eval_loss = event.get("eval_loss", self.training_progress.eval_loss),
                 peak_memory_gb = event.get("peak_memory_gb", self.training_progress.peak_memory_gb),
+                training_entries = event.get(
+                    "training_entries", self.training_progress.training_entries
+                ),
+                training_entries_error = event.get(
+                    "training_entries_error", self.training_progress.training_entries_error
+                ),
             )
             return
         if etype == "complete":
@@ -2856,6 +2866,14 @@ class TrainingBackend:
                 self._progress.grad_norm = event.get("grad_norm")
                 self._progress.num_tokens = event.get("num_tokens")
                 self._progress.eval_loss = event.get("eval_loss")
+                entries = event.get("training_entries")
+                if isinstance(entries, list):
+                    self._progress.training_entries = [
+                        entry for entry in entries if isinstance(entry, str)
+                    ]
+                entry_error = event.get("training_entries_error")
+                if entry_error is None or isinstance(entry_error, str):
+                    self._progress.training_entries_error = entry_error
                 _peak = event.get("peak_memory_gb")
                 if _peak is not None:
                     try:

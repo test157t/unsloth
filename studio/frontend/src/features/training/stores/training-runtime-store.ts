@@ -7,6 +7,7 @@ import type {
   TrainingMetricsResponse,
   TrainingPhase,
   TrainingProgressPayload,
+  TrainingEntrySnapshot,
   TrainingRuntimeState,
   TrainingRuntimeStore,
   TrainingSeriesPoint,
@@ -21,6 +22,8 @@ const ACTIVE_TRAINING_PHASES = new Set<TrainingPhase>([
   "configuring",
   "training",
 ]);
+const MAX_TRAINING_ENTRY_STEPS = 256;
+const MAX_TRAINING_ENTRY_CHARACTERS = 8 * 1024 * 1024;
 
 export function isTrainingRunActive(
   state: Pick<TrainingRuntimeState, "phase" | "isTrainingRunning">,
@@ -81,6 +84,9 @@ const initialState: TrainingRuntimeState = {
   lrHistory: [],
   gradNormHistory: [],
   evalLossHistory: [],
+  trainingEntries: [],
+  trainingEntriesError: null,
+  trainingEntryHistory: [],
   resetGeneration: 0,
   stopRequested: false,
   selectedHistoryRunId: null,
@@ -195,6 +201,28 @@ function mergeSeries(
   return added ? merged : current;
 }
 
+function upsertTrainingEntrySnapshot(
+  history: TrainingEntrySnapshot[],
+  snapshot: TrainingEntrySnapshot,
+): TrainingEntrySnapshot[] {
+  const existing = history.findIndex((item) => item.step === snapshot.step);
+  const next = existing >= 0 ? history.slice() : [...history, snapshot];
+  if (existing >= 0) next[existing] = snapshot;
+  next.sort((a, b) => a.step - b.step);
+  let characters = next.reduce(
+    (total, item) => total + item.entries.reduce((sum, entry) => sum + entry.length, 0),
+    0,
+  );
+  while (
+    next.length > 1 &&
+    (next.length > MAX_TRAINING_ENTRY_STEPS || characters > MAX_TRAINING_ENTRY_CHARACTERS)
+  ) {
+    const removed = next.shift();
+    characters -= removed?.entries.reduce((sum, entry) => sum + entry.length, 0) ?? 0;
+  }
+  return next;
+}
+
 function applyMetricHistoryFromStatus(payload: TrainingStatusResponse): {
   lossHistory: TrainingSeriesPoint[] | null;
   lrHistory: TrainingSeriesPoint[] | null;
@@ -281,6 +309,9 @@ export const useTrainingRuntimeStore = create<TrainingRuntimeStore>()(
         lrHistory: [],
         gradNormHistory: [],
         evalLossHistory: [],
+        trainingEntries: [],
+        trainingEntriesError: null,
+        trainingEntryHistory: [],
         resetGeneration: state.resetGeneration + 1,
       })),
 
@@ -321,6 +352,9 @@ export const useTrainingRuntimeStore = create<TrainingRuntimeStore>()(
           lrHistory: [],
           gradNormHistory: [],
           evalLossHistory: [],
+          trainingEntries: [],
+          trainingEntriesError: null,
+          trainingEntryHistory: [],
           resetGeneration: state.resetGeneration + 1,
         };
       }),
@@ -400,6 +434,9 @@ export const useTrainingRuntimeStore = create<TrainingRuntimeStore>()(
               lrHistory: [],
               gradNormHistory: [],
               evalLossHistory: [],
+              trainingEntries: [],
+              trainingEntriesError: null,
+              trainingEntryHistory: [],
               resetGeneration: state.resetGeneration + 1,
               stopRequested: false,
             }
@@ -546,6 +583,11 @@ export const useTrainingRuntimeStore = create<TrainingRuntimeStore>()(
         const totalSteps = toFiniteNumber(payload.total_steps);
         const progressPercent = toFiniteNumber(payload.progress_percent);
         const currentEpoch = toFiniteNumber(payload.epoch);
+        const trainingEntries = payload.training_entries ?? [];
+        const trainingEntriesError = payload.training_entries_error ?? null;
+        const hasTrainingEntryDiagnostic =
+          step > 0 &&
+          (trainingEntries.length > 0 || trainingEntriesError !== null);
 
         return {
           ...state,
@@ -598,6 +640,20 @@ export const useTrainingRuntimeStore = create<TrainingRuntimeStore>()(
             step > 0 && evalLoss !== null
               ? upsertPoint(state.evalLossHistory, step, evalLoss)
               : state.evalLossHistory,
+          trainingEntries:
+            trainingEntries.length > 0
+              ? trainingEntries
+              : trainingEntriesError
+                ? []
+                : state.trainingEntries,
+          trainingEntriesError,
+          trainingEntryHistory: hasTrainingEntryDiagnostic
+            ? upsertTrainingEntrySnapshot(state.trainingEntryHistory, {
+                step,
+                entries: trainingEntries,
+                error: trainingEntriesError,
+              })
+            : state.trainingEntryHistory,
         };
       }),
   }),

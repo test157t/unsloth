@@ -52,6 +52,11 @@ function normalizeNullableFiniteNumber(value: unknown): number | null {
   return isFiniteNumber(value) ? value : null;
 }
 
+function normalizeTrainingEntries(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
 function parseTrainingProgressPayload(
   value: unknown,
 ): TrainingProgressPayload | null {
@@ -91,6 +96,11 @@ function parseTrainingProgressPayload(
     grad_norm: normalizeNullableFiniteNumber(payload.grad_norm),
     num_tokens: normalizeNullableFiniteNumber(payload.num_tokens),
     eval_loss: normalizeNullableFiniteNumber(payload.eval_loss),
+    training_entries: normalizeTrainingEntries(payload.training_entries),
+    training_entries_error:
+      typeof payload.training_entries_error === "string"
+        ? payload.training_entries_error
+        : null,
   };
 }
 

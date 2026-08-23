@@ -119,6 +119,32 @@ test("a completed stream releases its reader", async () => {
   assert.equal(body.locked, false);
 });
 
+test("training input diagnostics survive SSE parsing", async () => {
+  const payload = {
+    ...progressPayload("job-inputs", 4),
+    training_entries: ["first row", "second row"],
+    training_entries_error: null,
+  };
+  const body = new ReadableStream<Uint8Array>({
+    start(streamController) {
+      streamController.enqueue(
+        new TextEncoder().encode(rawEvent(JSON.stringify(payload), { id: 4 })),
+      );
+      streamController.close();
+    },
+  });
+  const received: TrainingProgressPayload[] = [];
+
+  await consumeTrainingProgressStream({
+    body,
+    signal: new AbortController().signal,
+    onEvent: ({ payload: parsed }) => received.push(parsed),
+  });
+
+  assert.deepEqual(received[0]?.training_entries, ["first row", "second row"]);
+  assert.equal(received[0]?.training_entries_error, null);
+});
+
 test("malformed frames are skipped without interrupting valid frames", async () => {
   const minimalWrongJob = {
     job_id: "job-other",

@@ -1468,6 +1468,7 @@ async def start_training(
             "use_loftq": request.use_loftq,
             "use_dora": request.use_dora,
             "train_on_completions": request.train_on_completions,
+            "preserve_reasoning": request.preserve_reasoning,
             "finetune_vision_layers": request.finetune_vision_layers,
             "finetune_language_layers": request.finetune_language_layers,
             "finetune_attention_modules": request.finetune_attention_modules,
@@ -2147,6 +2148,8 @@ async def stream_training_progress(
                 grad_norm = grad_norm,
                 num_tokens = num_tokens,
                 eval_loss = eval_loss,
+                training_entries = list(getattr(progress, "training_entries", []) or []),
+                training_entries_error = getattr(progress, "training_entries_error", None),
             )
 
         def format_sse(

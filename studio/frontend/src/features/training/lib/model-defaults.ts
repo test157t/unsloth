@@ -180,6 +180,10 @@ export function mapBackendModelConfigToTrainingPatch(
   if (trainOnCompletions !== undefined) {
     patch.trainOnCompletions = trainOnCompletions;
   }
+  const preserveReasoning = toBoolean(training?.preserve_reasoning);
+  if (preserveReasoning !== undefined) {
+    patch.preserveReasoning = preserveReasoning;
+  }
 
   const gradientCheckpointing = toGradientCheckpointing(
     training?.gradient_checkpointing,

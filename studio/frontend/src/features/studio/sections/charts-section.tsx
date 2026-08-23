@@ -25,6 +25,8 @@ interface ChartsSectionProps {
   lrHistory: TrainingSeriesPoint[];
   gradNormHistory: TrainingSeriesPoint[];
   evalLossHistory: TrainingSeriesPoint[];
+  onHoverStep?: (step: number | null) => void;
+  onSelectStep?: (step: number) => void;
 }
 
 export function ChartsSection({
@@ -36,6 +38,8 @@ export function ChartsSection({
   lrHistory,
   gradNormHistory,
   evalLossHistory,
+  onHoverStep,
+  onSelectStep,
 }: ChartsSectionProps): ReactElement | null {
   const series = useMemo(
     () => ({
@@ -82,7 +86,13 @@ export function ChartsSection({
         </div>
       }
     >
-      <ChartsContent metrics={series} isTraining={isTraining} evalEnabled={evalEnabled} />
+      <ChartsContent
+        metrics={series}
+        isTraining={isTraining}
+        evalEnabled={evalEnabled}
+        onHoverStep={onHoverStep}
+        onSelectStep={onSelectStep}
+      />
     </Suspense>
   );
 }

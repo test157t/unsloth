@@ -103,6 +103,7 @@ export interface TrainingConfigState {
   evalSteps: number;
   packing: boolean;
   trainOnCompletions: boolean;
+  preserveReasoning: boolean;
   gradientCheckpointing: GradientCheckpointing;
   randomSeed: number;
   enableWandb: boolean;
@@ -149,6 +150,7 @@ export type AdvancedSettingsBaseline = Partial<
     | "randomSeed"
     | "packing"
     | "trainOnCompletions"
+    | "preserveReasoning"
     | "gradientCheckpointing"
     | "visionImageSize"
     | "finetuneVisionLayers"
@@ -238,6 +240,7 @@ export interface TrainingConfigActions {
   setEvalSteps: (value: number) => void;
   setPacking: (value: boolean) => void;
   setTrainOnCompletions: (value: boolean) => void;
+  setPreserveReasoning: (value: boolean) => void;
   setGradientCheckpointing: (value: GradientCheckpointing) => void;
   setRandomSeed: (value: number) => void;
   setEnableWandb: (value: boolean) => void;

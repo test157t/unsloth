@@ -58,10 +58,14 @@ export function ChartsContent({
   metrics,
   isTraining,
   evalEnabled,
+  onHoverStep,
+  onSelectStep,
 }: {
   metrics: TrainingChartSeries;
   isTraining: boolean;
   evalEnabled: boolean;
+  onHoverStep?: (step: number | null) => void;
+  onSelectStep?: (step: number) => void;
 }): ReactElement {
   const {
     windowSize,
@@ -292,6 +296,8 @@ export function ChartsContent({
         showSmoothed={showSmoothed}
         showAvgLine={showAvgLine}
         scale={lossScale}
+        onHoverStep={onHoverStep}
+        onSelectStep={onSelectStep}
       />
       <GradNormChartCard
         data={displayGradData}
@@ -299,6 +305,8 @@ export function ChartsContent({
         visibleStepDomain={visibleStepDomain}
         xAxisTicks={xAxisTicks}
         scale={gradScale}
+        onHoverStep={onHoverStep}
+        onSelectStep={onSelectStep}
       />
       <LearningRateChartCard
         data={displayLrData}
@@ -306,6 +314,8 @@ export function ChartsContent({
         visibleStepDomain={visibleStepDomain}
         xAxisTicks={xAxisTicks}
         scale={lrScale}
+        onHoverStep={onHoverStep}
+        onSelectStep={onSelectStep}
       />
       <EvalLossChartCard
         data={reducedEvalLossData}
@@ -313,6 +323,8 @@ export function ChartsContent({
         ticks={evalLossStepTicks}
         isTraining={isTraining}
         evalEnabled={evalEnabled}
+        onHoverStep={onHoverStep}
+        onSelectStep={onSelectStep}
       />
     </div>
   );

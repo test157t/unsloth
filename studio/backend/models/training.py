@@ -529,6 +529,10 @@ class TrainingStartRequest(BaseModel):
     use_loftq: bool = Field(False, description = "Use LoftQ")
     use_dora: bool = Field(False, description = "Use DoRA")
     train_on_completions: bool = Field(False, description = "Train on completions only")
+    preserve_reasoning: bool = Field(
+        False,
+        description = "Preserve explicit reasoning channels in assistant training targets",
+    )
 
     # Vision-specific LoRA parameters
     finetune_vision_layers: bool = Field(False, description = "Finetune vision layers")
@@ -707,6 +711,13 @@ class TrainingProgress(BaseModel):
     num_tokens: Optional[int] = Field(None, description = "Total number of tokens processed so far")
     eval_loss: Optional[float] = Field(
         None, description = "Eval loss from the most recent evaluation step"
+    )
+    training_entries: List[str] = Field(
+        default_factory = list,
+        description = "Decoded model inputs for the current optimizer step; live only",
+    )
+    training_entries_error: Optional[str] = Field(
+        None, description = "Live diagnostic explaining why training inputs could not be captured"
     )
 
 

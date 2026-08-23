@@ -95,6 +95,7 @@ export function serializeConfigToYaml(
     random_seed: state.randomSeed,
     packing: state.packing,
     train_on_completions: state.trainOnCompletions,
+    preserve_reasoning: state.preserveReasoning,
     gradient_checkpointing: state.gradientCheckpointing,
     optim: state.optimizerType,
     lr_scheduler_type: state.lrSchedulerType,

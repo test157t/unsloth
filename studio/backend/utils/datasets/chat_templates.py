@@ -62,10 +62,9 @@ def get_tokenizer_chat_template(tokenizer, model_name):
 
     model_name_lower = model_name.lower()
 
-    matched_template = None
+    matched_template = resolve_model_chat_template(model_name_lower)
 
-    if model_name_lower in MODEL_TO_TEMPLATE_MAPPER:
-        matched_template = MODEL_TO_TEMPLATE_MAPPER[model_name_lower]
+    if matched_template is not None:
         logger.info(f"📝 Applying Unsloth chat template: {matched_template}")
         try:
             tokenizer = get_chat_template(
@@ -97,6 +96,24 @@ def get_tokenizer_chat_template(tokenizer, model_name):
                 logger.info(f"   Falling back to tokenizer as-is")
 
     return tokenizer
+
+
+def resolve_model_chat_template(model_name):
+    """Resolve exact models and quantized/repacked variants to one template."""
+    model_name_lower = (model_name or "").lower()
+    exact = MODEL_TO_TEMPLATE_MAPPER.get(model_name_lower)
+    if exact is not None:
+        return exact
+
+    # Repacked names append precision/quantization suffixes to a mapped base ID,
+    # e.g. gemma-4-26B-A4B-it-qat-q4_0-unquantized. Prefer the longest base.
+    candidates = [
+        (len(base_name), template)
+        for base_name, template in MODEL_TO_TEMPLATE_MAPPER.items()
+        if isinstance(base_name, str)
+        and model_name_lower.startswith(base_name.lower() + "-")
+    ]
+    return max(candidates, default = (0, None), key = lambda item: item[0])[1]
 
 
 def get_dataset_info_summary(dataset_info):
@@ -136,6 +153,7 @@ def apply_chat_template_to_dataset(
     batch_size = 1000,
     num_proc = None,
     progress_callback = None,
+    preserve_reasoning = False,
 ):
     """Apply the chat template to a dataset based on its format.
 
@@ -349,7 +367,11 @@ def apply_chat_template_to_dataset(
                     text = tokenizer.apply_chat_template(
                         convo,
                         tokenize = False,
-                        add_generation_prompt = False
+                        add_generation_prompt = False,
+                        # Reasoning preservation is opt-in: inference-style templates
+                        # otherwise strip old thought channels from assistant history.
+                        preserve_thinking = preserve_reasoning,
+                        enable_thinking = preserve_reasoning,
                     )
 
                     if remove_bos_prefix:

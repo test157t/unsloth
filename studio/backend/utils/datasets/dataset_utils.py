@@ -895,6 +895,7 @@ def format_and_template_dataset(
     batch_size = 1000,
     num_proc = None,
     progress_callback = None,
+    preserve_reasoning = False,
 ):
     """
     Combines format_dataset and apply_chat_template_to_dataset. Convenient for
@@ -1189,6 +1190,7 @@ def format_and_template_dataset(
             batch_size = batch_size,
             num_proc = num_proc,
             progress_callback = progress_callback,
+            preserve_reasoning = preserve_reasoning,
         )
 
         # Step 3: Generate summary

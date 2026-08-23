@@ -341,6 +341,30 @@ test("matching progress updates metrics without replacing the run identity", () 
   assert.deepEqual(current.lossHistory, [{ step: 4, value: 1.25 }]);
 });
 
+test("progress retains a bounded history of step-specific training inputs", () => {
+  useTrainingRuntimeStore.getState().resetRuntime();
+  useTrainingRuntimeStore.getState().setStartPending("job-current", "Starting");
+
+  for (let step = 1; step <= 257; step += 1) {
+    useTrainingRuntimeStore.getState().applyProgress({
+      ...progressPayload("job-current", step),
+      total_steps: 300,
+      progress_percent: step / 3,
+      training_entries: [`entry ${step}`],
+      training_entries_error: null,
+    }, step);
+  }
+
+  const history = useTrainingRuntimeStore.getState().trainingEntryHistory;
+  assert.equal(history.length, 256);
+  assert.deepEqual(history[0], { step: 2, entries: ["entry 2"], error: null });
+  assert.deepEqual(history.at(-1), {
+    step: 257,
+    entries: ["entry 257"],
+    error: null,
+  });
+});
+
 test("accepting a job already adopted from status preserves live progress", () => {
   useTrainingRuntimeStore.getState().resetRuntime();
   const runtime = useTrainingRuntimeStore.getState();

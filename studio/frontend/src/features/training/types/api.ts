@@ -66,6 +66,7 @@ export interface TrainingStartRequest {
   use_loftq: boolean;
   use_dora: boolean;
   train_on_completions: boolean;
+  preserve_reasoning: boolean;
   finetune_vision_layers: boolean;
   finetune_language_layers: boolean;
   finetune_attention_modules: boolean;

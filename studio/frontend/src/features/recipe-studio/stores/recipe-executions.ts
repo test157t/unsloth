@@ -27,7 +27,7 @@ const DEFAULT_RUN_SETTINGS: RecipeRunSettings = {
   nonInferenceWorkers: 4,
   maxConversationRestarts: 5,
   maxConversationCorrectionSteps: 0,
-  disableEarlyShutdown: true,
+  disableEarlyShutdown: false,
   shutdownErrorRate: 0.5,
   shutdownErrorWindow: 10,
 };

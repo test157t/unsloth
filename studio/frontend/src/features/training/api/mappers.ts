@@ -157,6 +157,8 @@ export function buildTrainingStartPayload(
     // CPT always trains on full sequences (no chat format masking)
     train_on_completions:
       isEmbedding || isCpt || isRawText ? false : config.trainOnCompletions,
+    preserve_reasoning:
+      isEmbedding || isCpt || isRawText ? false : config.preserveReasoning,
     finetune_vision_layers: config.finetuneVisionLayers,
     finetune_language_layers: config.finetuneLanguageLayers,
     finetune_attention_modules: config.finetuneAttentionModules,

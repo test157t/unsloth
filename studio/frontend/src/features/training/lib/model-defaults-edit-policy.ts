@@ -24,6 +24,7 @@ export const MODEL_DEFAULT_STATE_KEYS = [
   "evalSteps",
   "packing",
   "trainOnCompletions",
+  "preserveReasoning",
   "gradientCheckpointing",
   "randomSeed",
   "visionImageSize",

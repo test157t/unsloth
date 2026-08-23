@@ -122,6 +122,7 @@ export function TrainingMemoryParams(): ReactElement {
       datasetStreaming: state.datasetStreaming,
       packing: state.packing,
       trainOnCompletions: state.trainOnCompletions,
+      preserveReasoning: state.preserveReasoning,
       gradientCheckpointing: state.gradientCheckpointing,
       isVisionModel: state.isVisionModel,
       isEmbeddingModel: state.isEmbeddingModel,
@@ -130,6 +131,7 @@ export function TrainingMemoryParams(): ReactElement {
       setVisionImageSize: state.setVisionImageSize,
       setPacking: state.setPacking,
       setTrainOnCompletions: state.setTrainOnCompletions,
+      setPreserveReasoning: state.setPreserveReasoning,
       setGradientCheckpointing: state.setGradientCheckpointing,
     })),
   );
@@ -245,11 +247,27 @@ export function TrainingMemoryParams(): ReactElement {
         />
       )}
       {showTrainOnCompletions && (
-        <TrainOnCompletionsOption
-          checked={store.trainOnCompletions}
-          disabled={store.datasetStreaming}
-          onChange={store.setTrainOnCompletions}
-        />
+        <>
+          <TrainOnCompletionsOption
+            checked={store.trainOnCompletions}
+            disabled={store.datasetStreaming}
+            onChange={store.setTrainOnCompletions}
+          />
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="preserveReasoning"
+              checked={store.preserveReasoning}
+              onCheckedChange={(value) => store.setPreserveReasoning(!!value)}
+            />
+            <label
+              htmlFor="preserveReasoning"
+              className="cursor-pointer text-xs text-muted-foreground"
+              title="Keep explicit reasoning or thinking channels in assistant targets during chat-template formatting."
+            >
+              Preserve reasoning in training targets
+            </label>
+          </div>
+        </>
       )}
     </TabsContent>
   );

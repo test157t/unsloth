@@ -14,11 +14,14 @@ step, so a long evaluation would plot the same point once per status line.
 from __future__ import annotations
 
 import sys
+from collections import UserDict
 from pathlib import Path
 
 _BACKEND = Path(__file__).resolve().parent.parent
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
+
+from core.training.training_entries import training_batch_input_ids, training_batch_samples
 
 
 class _Progress:
@@ -115,3 +118,31 @@ def test_the_worker_publishes_only_changed_measurements():
     assert "and not is_repeat" in body
     # Wall-clock fields move on every call and would defeat the comparison.
     assert "progress.elapsed_seconds," not in body[: body.index("event_queue.put")]
+
+
+def test_training_input_diagnostics_follow_the_actual_accumulation_batches():
+    text = (_BACKEND / "core/training/trainer.py").read_text(encoding = "utf-8")
+    body = text[text.index("    def _install_training_entry_probe") :]
+    body = body[: body.index("    def _calculate_total_steps")]
+    assert "original_get_batch_samples = trainer.get_batch_samples" in body
+    assert "trainer.get_batch_samples = types.MethodType" in body
+    assert "training_batch_samples(result)" in body
+    assert "training_batch_input_ids(inputs)" in body
+    assert "original_compute_loss" not in body
+    assert "training_step" not in body
+
+
+def test_worker_carries_training_input_diagnostic_and_capture_error():
+    text = (_BACKEND / "core/training/worker.py").read_text(encoding = "utf-8")
+    body = text[text.index("def _create_trainer_progress_callback") :]
+    body = body[: body.index("def _create_embedding_progress_callback")]
+    assert '"training_entries"' in body
+    assert '"training_entries_error"' in body
+
+
+def test_batch_encoding_style_mappings_expose_token_ids():
+    batch = UserDict({"input_ids": [[11, 12, 13]], "labels": [[11, 12, 13]]})
+    result = ([batch], 3)
+    samples = list(training_batch_samples(result))
+    assert samples == [batch]
+    assert training_batch_input_ids(samples[0]) == [[11, 12, 13]]

@@ -1247,6 +1247,8 @@ export const useTrainingConfigStore = create<TrainingConfigStore>()(
             ...(trainOnCompletions ? { datasetStreaming: false } : {}),
           });
         },
+        setPreserveReasoning: (preserveReasoning) =>
+          setUserEdit({ preserveReasoning }),
         setGradientCheckpointing: (gradientCheckpointing) =>
           setUserEdit({ gradientCheckpointing }),
         setRandomSeed: (randomSeed) => setUserEdit({ randomSeed }),

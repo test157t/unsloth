@@ -36,6 +36,7 @@ import {
   buildExecutionPayload,
   sanitizeExecutionRows,
 } from "../executions/run-settings";
+import { collectUsedLlmModelAliases } from "../executions/local-model-columns";
 import {
   applyExecutionStatusSnapshot,
   createBaseExecutionRecord,
@@ -51,24 +52,6 @@ import type {
 } from "../utils/payload/types";
 
 const GGUF_MODEL_PATTERN = /gguf/i;
-
-function collectUsedLlmModelAliases(payload: RecipePayload): Set<string> {
-  const columns = Array.isArray(payload.recipe.columns)
-    ? payload.recipe.columns
-    : [];
-  const aliases = new Set<string>();
-  for (const column of columns) {
-    const columnType = column.column_type;
-    if (typeof columnType !== "string" || !columnType.startsWith("llm-")) {
-      continue;
-    }
-    const alias = column.model_alias;
-    if (typeof alias === "string" && alias.trim()) {
-      aliases.add(alias.trim());
-    }
-  }
-  return aliases;
-}
 
 type LocalModelSelection = {
   target: string;

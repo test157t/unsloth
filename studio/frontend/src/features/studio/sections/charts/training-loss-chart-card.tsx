@@ -51,6 +51,8 @@ export function TrainingLossChartCard({
   showSmoothed,
   showAvgLine,
   scale,
+  onHoverStep,
+  onSelectStep,
 }: {
   data: LossChartPoint[];
   domain: [number, number];
@@ -62,6 +64,8 @@ export function TrainingLossChartCard({
   showSmoothed: boolean;
   showAvgLine: boolean;
   scale: ScaleMode;
+  onHoverStep?: (step: number | null) => void;
+  onSelectStep?: (step: number) => void;
 }): ReactElement {
   const t = useT();
   const lossConfig = {
@@ -83,6 +87,15 @@ export function TrainingLossChartCard({
             syncMethod="value"
             accessibilityLayer={true}
             margin={DEFAULT_CHART_MARGIN}
+            onMouseMove={(state) => {
+              const step = Number((state as { activeLabel?: unknown })?.activeLabel);
+              if (Number.isFinite(step)) onHoverStep?.(step);
+            }}
+            onMouseLeave={() => onHoverStep?.(null)}
+            onClick={(state) => {
+              const step = Number((state as { activeLabel?: unknown })?.activeLabel);
+              if (Number.isFinite(step)) onSelectStep?.(step);
+            }}
           >
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis

@@ -111,6 +111,7 @@ export function ProgressSection({
       loraAlpha: state.loraAlpha,
       loraDropout: state.loraDropout,
       loraVariant: state.loraVariant,
+      preserveReasoning: state.preserveReasoning,
     })),
   );
 
@@ -188,6 +189,7 @@ export function ProgressSection({
   const cfgLoraAlpha = cfg?.loraAlpha;
   const cfgLoraDropout = cfg?.loraDropout;
   const cfgLoraVariant = cfg?.loraVariant;
+  const cfgPreserveReasoning = cfg?.preserveReasoning;
 
   // Mirror the training form: on Mac the MLX backend runs CUDA optimizers as AdamW.
   const effectiveOptimizer =
@@ -211,6 +213,10 @@ export function ProgressSection({
         configRow(t("studio.progress.maxSteps"), cfgMaxSteps),
         configRow(t("studio.progress.contextLength"), cfgContextLength),
         configRow(t("studio.progress.warmupSteps"), cfgWarmupSteps),
+        configRow(
+          "Preserve reasoning",
+          cfgPreserveReasoning == null ? undefined : cfgPreserveReasoning ? "On" : "Off",
+        ),
       ],
     },
     ...(data.trainingMethod !== "full"

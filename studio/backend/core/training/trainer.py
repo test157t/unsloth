@@ -91,6 +91,7 @@ from .training import (
 )
 
 from .dataset_bounds import bound_dataset_rows, world_size_env_report, world_size_from_env
+from .training_entries import training_batch_input_ids, training_batch_samples
 
 logger = get_logger(__name__)
 
@@ -635,6 +636,14 @@ class UnslothTrainer:
                     eval_loss = logs.get("eval_loss", None),
                     is_run_summary = is_run_summary,
                     status_message = "",
+                    training_entries = (
+                        trainer_ref._consume_training_entries()
+                        if loss_value is not None
+                        else trainer_ref.training_progress.training_entries
+                    ),
+                    training_entries_error = getattr(
+                        trainer_ref, "_training_entries_error", None
+                    ),
                 )
 
             def on_epoch_end(self, args, state, control, **kwargs):
@@ -647,6 +656,64 @@ class UnslothTrainer:
                     return control
 
         return _ProgressCallback()
+
+    def _consume_training_entries(self) -> list[str]:
+        entries = getattr(self, "_training_entries", [])
+        self._training_entries = []
+        return entries
+
+    def _install_training_entry_probe(self) -> None:
+        """Capture the accumulation batches selected for each optimizer step."""
+        trainer = self.trainer
+        self._training_entries = []
+        self._training_entries_error = None
+        tokenizer = getattr(self.tokenizer, "tokenizer", self.tokenizer)
+
+        if not hasattr(trainer, "get_batch_samples"):
+            self._training_entries_error = (
+                "This trainer does not expose per-step batches for diagnostics."
+            )
+            logger.warning(self._training_entries_error)
+            return
+
+        original_get_batch_samples = trainer.get_batch_samples
+
+        def get_batch_samples(trainer_self, *args, **kwargs):
+            result = original_get_batch_samples(*args, **kwargs)
+            found_input_ids = False
+            try:
+                for inputs in training_batch_samples(result):
+                    input_ids = training_batch_input_ids(inputs)
+                    if input_ids is None:
+                        continue
+                    found_input_ids = True
+                    rows = input_ids.detach().cpu().tolist()
+                    pad_token_id = getattr(tokenizer, "pad_token_id", None)
+                    if pad_token_id is not None:
+                        rows = [
+                            [token for token in row if token != pad_token_id] for row in rows
+                        ]
+                    previews = tokenizer.batch_decode(rows, skip_special_tokens = False)
+                    for preview in previews:
+                        preview = str(preview).strip()
+                        if preview and len(self._training_entries) < 32:
+                            if len(preview) > 16000:
+                                preview = preview[:16000] + "\n[training input preview truncated]"
+                            self._training_entries.append(preview)
+                if not found_input_ids:
+                    self._training_entries_error = (
+                        "The selected training batch did not contain token IDs to decode."
+                    )
+                elif self._training_entries:
+                    if self._training_entries_error is not None:
+                        logger.info("Training input diagnostics recovered")
+                    self._training_entries_error = None
+            except Exception as exc:  # diagnostics must never affect training
+                self._training_entries_error = f"Could not decode this training batch: {exc}"
+                logger.warning(self._training_entries_error)
+            return result
+
+        trainer.get_batch_samples = types.MethodType(get_batch_samples, trainer)
 
     def _calculate_total_steps(self, num_samples, batch_size, grad_accum, num_epochs, max_steps):
         """Calculate total training steps from dataset size and training params."""
@@ -2554,6 +2621,7 @@ class UnslothTrainer:
         eval_split: Optional[str] = None,
         dataset_streaming: bool = False,
         eval_steps: float = 0.00,
+        preserve_reasoning: bool = False,
         dataset_slice_start: Optional[int] = None,
         dataset_slice_end: Optional[int] = None,
         is_cpt: bool = False,
@@ -3166,6 +3234,7 @@ class UnslothTrainer:
                 dataset_name = dataset_source,
                 custom_format_mapping = custom_format_mapping,
                 progress_callback = self._update_progress,
+                preserve_reasoning = preserve_reasoning,
             )
 
             if self.should_stop:
@@ -3201,6 +3270,7 @@ class UnslothTrainer:
                     format_type = format_type,
                     dataset_name = dataset_source,
                     custom_format_mapping = custom_format_mapping,
+                    preserve_reasoning = preserve_reasoning,
                 )
                 eval_dataset = eval_info["dataset"]
                 logger.info("Eval dataset formatted successfully\n")
@@ -4361,6 +4431,7 @@ class UnslothTrainer:
                     logger.info("Training on full sequences (including prompts)\n")
 
             # ========== PROGRESS TRACKING ==========
+            self._install_training_entry_probe()
             self.trainer.add_callback(self._create_progress_callback())
             # Studio publishes progress itself, so HF's stdout callbacks are pure
             # duplication in a log that has no terminal. --verbose keeps them.

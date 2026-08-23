@@ -947,7 +947,7 @@ gemma4_template = \
     {{ '<|turn>' + role + '\n' }}
     {%- if message['content'] is string -%}
         {%- if role == "model" -%}
-            {{ strip_thinking(message['content']) }}
+            {{ message['content'] | trim if preserve_thinking is defined and preserve_thinking else strip_thinking(message['content']) }}
         {%- else -%}
             {{ message['content'] | trim }}
         {%- endif -%}
@@ -961,7 +961,7 @@ gemma4_template = \
                 {{ '<|video|>' }}
             {%- elif item['type'] == 'text' -%}
                 {%- if role == "model" -%}
-                    {{ strip_thinking(item['text']) }}
+                    {{ item['text'] | trim if preserve_thinking is defined and preserve_thinking else strip_thinking(item['text']) }}
                 {%- else -%}
                     {{ item['text'] | trim }}
                 {%- endif -%}
@@ -1026,7 +1026,7 @@ gemma4_thinking_template = \
     {{ '<|turn>' + role + '\n' }}
     {%- if message['content'] is string -%}
         {%- if role == "model" -%}
-            {{ strip_thinking(message['content']) }}
+            {{ message['content'] | trim if preserve_thinking is defined and preserve_thinking else strip_thinking(message['content']) }}
         {%- else -%}
             {{ message['content'] | trim }}
         {%- endif -%}
@@ -1040,7 +1040,7 @@ gemma4_thinking_template = \
                 {{ '<|video|>' }}
             {%- elif item['type'] == 'text' -%}
                 {%- if role == "model" -%}
-                    {{ strip_thinking(item['text']) }}
+                    {{ item['text'] | trim if preserve_thinking is defined and preserve_thinking else strip_thinking(item['text']) }}
                 {%- else -%}
                     {{ item['text'] | trim }}
                 {%- endif -%}

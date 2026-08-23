@@ -13,11 +13,13 @@ import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ChartsSection } from "./sections/charts-section";
 import { ProgressSection } from "./sections/progress-section";
+import { TrainingEntryLog } from "./sections/training-entry-log";
 import {
   type RunConfigOverride,
   mapRunConfigToOverride,
 } from "./sections/run-config-override";
 import { TrainingStartOverlay } from "./training-start-overlay";
+import { selectedTrainingEntryStep } from "./training-entry-selection";
 
 /** Retry budget for the run-config lookup. The row is inserted at start_training(), but a
 * lookup issued in the same instant can still miss it; a few short retries cover that. */
@@ -62,7 +64,10 @@ export function LiveTrainingView(): ReactElement {
       lossHistory: state.lossHistory,
       lrHistory: state.lrHistory,
       gradNormHistory: state.gradNormHistory,
-      evalLossHistory: state.evalLossHistory,
+        evalLossHistory: state.evalLossHistory,
+        trainingEntries: state.trainingEntries,
+      trainingEntriesError: state.trainingEntriesError,
+      trainingEntryHistory: state.trainingEntryHistory,
       firstStepReceived: state.firstStepReceived,
       isStarting: state.isStarting,
     })),
@@ -84,6 +89,12 @@ export function LiveTrainingView(): ReactElement {
     jobId: string;
     override: RunConfigOverride | undefined;
   } | null>(null);
+  const [hoveredStep, setHoveredStep] = useState<number | null>(null);
+  const [pinnedStep, setPinnedStep] = useState<number | null>(null);
+  useEffect(() => {
+    setHoveredStep(null);
+    setPinnedStep(null);
+  }, [runtime.jobId]);
   // Retry budget for the transient 404 below, keyed by job so a new run starts fresh.
   const [fetchAttempt, setFetchAttempt] = useState<{
     jobId: string;
@@ -159,6 +170,8 @@ export function LiveTrainingView(): ReactElement {
     lrHistory: runtime.lrHistory,
     gradNormHistory: runtime.gradNormHistory,
     evalLossHistory: runtime.evalLossHistory,
+    trainingEntries: runtime.trainingEntries,
+    trainingEntriesError: runtime.trainingEntriesError,
   };
 
   const isPreparingPhase =
@@ -173,6 +186,23 @@ export function LiveTrainingView(): ReactElement {
     runtime.isStarting ||
     isPreparingPhase ||
     (isWaitingForFirstStep && runtime.currentStep <= 0);
+  const displayedStep = selectedTrainingEntryStep(
+    hoveredStep,
+    pinnedStep,
+    runtime.currentStep,
+  );
+  const isInspectingStep = hoveredStep !== null || pinnedStep !== null;
+  const displayedEntrySnapshot = !isInspectingStep
+    ? {
+        step: runtime.currentStep,
+        entries: runtime.trainingEntries,
+        error: runtime.trainingEntriesError,
+      }
+    : runtime.trainingEntryHistory.find((item) => item.step === displayedStep) ?? {
+        step: displayedStep,
+        entries: [],
+        error: `Training inputs for step ${displayedStep} are not in the bounded browser cache.`,
+      };
 
   return (
     <div className={cn("relative", showOverlay && "min-h-[72dvh]")}>
@@ -189,16 +219,31 @@ export function LiveTrainingView(): ReactElement {
             configOverride={runConfigOverride}
           />
         </div>
-        <ChartsSection
-          currentStep={viewData.currentStep}
-          totalSteps={viewData.totalSteps}
-          isTraining={viewData.isTrainingRunning}
-          evalEnabled={viewData.evalEnabled}
-          lossHistory={viewData.lossHistory}
-          lrHistory={viewData.lrHistory}
-          gradNormHistory={viewData.gradNormHistory}
-          evalLossHistory={viewData.evalLossHistory}
-        />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <ChartsSection
+            currentStep={viewData.currentStep}
+            totalSteps={viewData.totalSteps}
+            isTraining={viewData.isTrainingRunning}
+            evalEnabled={viewData.evalEnabled}
+            lossHistory={viewData.lossHistory}
+            lrHistory={viewData.lrHistory}
+            gradNormHistory={viewData.gradNormHistory}
+            evalLossHistory={viewData.evalLossHistory}
+            onHoverStep={setHoveredStep}
+            onSelectStep={setPinnedStep}
+          />
+          <TrainingEntryLog
+            step={displayedEntrySnapshot.step}
+            entries={displayedEntrySnapshot.entries}
+            error={displayedEntrySnapshot.error}
+            isInspecting={isInspectingStep}
+            isPinned={pinnedStep !== null && hoveredStep === null}
+            onFollowLatest={() => {
+              setHoveredStep(null);
+              setPinnedStep(null);
+            }}
+          />
+        </div>
       </div>
       {showOverlay ? (
         <TrainingStartOverlay

@@ -2947,6 +2947,7 @@ def _run_mlx_training(event_queue, stop_queue, config):
                 dataset_name = hf_dataset or "local",
                 custom_format_mapping = custom_format_mapping,
                 progress_callback = _fmt_progress,
+                preserve_reasoning = config.get("preserve_reasoning", False),
             )
             if vlm_info.get("success"):
                 vision_image_layout = (
@@ -2970,6 +2971,7 @@ def _run_mlx_training(event_queue, stop_queue, config):
                     is_vlm = True,
                     dataset_name = hf_dataset or "local",
                     custom_format_mapping = custom_format_mapping,
+                    preserve_reasoning = config.get("preserve_reasoning", False),
                 )
                 if ev_info.get("success"):
                     vision_image_layout = (
@@ -2994,6 +2996,7 @@ def _run_mlx_training(event_queue, stop_queue, config):
                 dataset_name = hf_dataset or "local",
                 custom_format_mapping = custom_format_mapping,
                 progress_callback = _fmt_progress,
+                preserve_reasoning = config.get("preserve_reasoning", False),
             )
             if info.get("success", True):
                 dataset = info.get("dataset", dataset)
@@ -3007,6 +3010,7 @@ def _run_mlx_training(event_queue, stop_queue, config):
                     format_type = format_type,
                     dataset_name = hf_dataset or "local",
                     custom_format_mapping = custom_format_mapping,
+                    preserve_reasoning = config.get("preserve_reasoning", False),
                 )
                 if ev.get("success", True):
                     eval_dataset = ev.get("dataset", eval_dataset)
@@ -4185,6 +4189,7 @@ def run_training_process(*, event_queue: Any, stop_queue: Any, config: dict) -> 
                 eval_split = config.get("eval_split"),
                 dataset_streaming = config.get("dataset_streaming", False),
                 eval_steps = eval_steps,
+                preserve_reasoning = config.get("preserve_reasoning", False),
                 dataset_slice_start = config.get("dataset_slice_start"),
                 dataset_slice_end = config.get("dataset_slice_end"),
                 is_cpt = is_cpt_for_dataset,
@@ -4868,6 +4873,8 @@ def _create_trainer_progress_callback(event_queue: Any) -> Callable[[TrainingPro
                     "grad_norm": progress.grad_norm,
                     "num_tokens": progress.num_tokens,
                     "eval_loss": progress.eval_loss,
+                    "training_entries": list(getattr(progress, "training_entries", []) or []),
+                    "training_entries_error": getattr(progress, "training_entries_error", None),
                     "status_message": progress.status_message,
                     "ts": time.time(),
                 }
