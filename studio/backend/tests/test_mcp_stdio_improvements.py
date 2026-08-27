@@ -202,6 +202,15 @@ _STDIO_RECIPE = {
     ]
 }
 
+_STUDIO_BUILTIN_RECIPE = {
+    "mcp_providers": [
+        {
+            "provider_type": "studio_builtin",
+            "name": "studio",
+        }
+    ]
+}
+
 
 def test_data_recipe_skips_stdio_when_disabled(monkeypatch):
     pytest.importorskip("data_designer")
@@ -219,3 +228,25 @@ def test_data_recipe_builds_stdio_when_enabled(monkeypatch):
 
     built = build_mcp_providers(_STDIO_RECIPE)
     assert len(built) == 1  # constructed (not spawned) only when enabled
+
+
+def test_data_recipe_builds_studio_builtins_when_arbitrary_stdio_is_disabled(monkeypatch):
+    pytest.importorskip("data_designer")
+    _disable(monkeypatch)
+    from core.data_recipe.service import build_mcp_providers
+
+    built = build_mcp_providers(_STUDIO_BUILTIN_RECIPE)
+    assert len(built) == 1
+    assert built[0].name == "studio"
+    assert built[0].args[0].endswith("builtin_tools_mcp.py")
+
+
+def test_data_recipe_builds_fixed_studio_builtin_server(monkeypatch):
+    pytest.importorskip("data_designer")
+    _enable(monkeypatch)
+    from core.data_recipe.service import build_mcp_providers
+
+    built = build_mcp_providers(_STUDIO_BUILTIN_RECIPE)
+    assert len(built) == 1
+    assert built[0].name == "studio"
+    assert built[0].args[0].endswith("builtin_tools_mcp.py")

@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import io
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -203,6 +204,17 @@ def build_mcp_providers(recipe: dict[str, Any]) -> list:
         if not isinstance(provider, dict):
             continue
         provider_type = provider.get("provider_type")
+        if provider_type == "studio_builtin":
+            server_path = Path(__file__).with_name("builtin_tools_mcp.py").resolve()
+            providers.append(
+                LocalStdioMCPProvider(
+                    name = str(provider.get("name", "")),
+                    command = sys.executable,
+                    args = [str(server_path)],
+                    env = {},
+                )
+            )
+            continue
         if provider_type == "stdio":
             if not stdio_allowed:
                 continue

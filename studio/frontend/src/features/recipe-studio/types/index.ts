@@ -91,6 +91,9 @@ export type RecipeNodeData = {
     | "conditional_guard"
     | "conversation_pair"
     | "conversation_extend"
+    | "agent_conversation"
+    | "agent_conversation_extend"
+    | "agent_conversation_project"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge"
@@ -185,7 +188,7 @@ export type Score = {
   options: ScoreOption[];
 };
 
-export type McpProviderType = "stdio" | "streamable_http";
+export type McpProviderType = "studio_builtin" | "stdio" | "streamable_http";
 
 export type McpEnvVar = {
   key: string;
@@ -337,6 +340,9 @@ export type ExpressionConfig = {
     | "repair_patch"
     | "conversation_pair"
     | "conversation_extend"
+    | "agent_conversation"
+    | "agent_conversation_extend"
+    | "agent_conversation_project"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge"
@@ -359,6 +365,12 @@ export type ExpressionConfig = {
   human_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   assistant_column?: string;
+  // Full Data Designer trace used to preserve assistant/tool messages.
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  trace_column?: string;
+  // Canonical OpenAI-style agent history used by extension/projection steps.
+  // biome-ignore lint/style/useNamingConvention: ui schema
+  messages_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   source_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema

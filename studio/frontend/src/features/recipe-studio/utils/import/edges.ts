@@ -165,6 +165,38 @@ export function buildEdges(
           addEdgeByName(config.assistant_column, config.name);
         }
       }
+      if (config.expression_type === "agent_conversation") {
+        if (config.human_column?.trim()) {
+          addEdgeByName(config.human_column, config.name);
+        }
+        if (config.trace_column?.trim()) {
+          const traceColumn = config.trace_column.trim();
+          addEdgeByName(traceColumn, config.name);
+          if (traceColumn.endsWith("__trace")) {
+            addEdgeByName(traceColumn.slice(0, -"__trace".length), config.name);
+          }
+        }
+      }
+      if (
+        config.expression_type === "agent_conversation_extend" ||
+        config.expression_type === "agent_conversation_project"
+      ) {
+        if (config.messages_column?.trim()) {
+          addEdgeByName(config.messages_column, config.name);
+        }
+      }
+      if (config.expression_type === "agent_conversation_extend") {
+        if (config.human_column?.trim()) {
+          addEdgeByName(config.human_column, config.name);
+        }
+        if (config.trace_column?.trim()) {
+          const traceColumn = config.trace_column.trim();
+          addEdgeByName(traceColumn, config.name);
+          if (traceColumn.endsWith("__trace")) {
+            addEdgeByName(traceColumn.slice(0, -"__trace".length), config.name);
+          }
+        }
+      }
     }
     if (
       config.kind === "sampler" &&

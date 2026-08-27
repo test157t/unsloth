@@ -501,6 +501,9 @@ export function makeRepairWorkflowConfig(
   type:
     | "conversation_pair"
     | "conversation_extend"
+    | "agent_conversation"
+    | "agent_conversation_extend"
+    | "agent_conversation_project"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge",
@@ -518,9 +521,9 @@ export function makeRepairWorkflowConfig(
     expression_type: type,
     // biome-ignore lint/style/useNamingConvention: ui schema
     human_column:
-      type === "conversation_pair"
+      type === "conversation_pair" || type === "agent_conversation"
         ? "human_message"
-        : type === "conversation_extend"
+        : type === "conversation_extend" || type === "agent_conversation_extend"
           ? "human_followup"
           : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
@@ -531,12 +534,25 @@ export function makeRepairWorkflowConfig(
           ? "assistant_response"
           : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
+    trace_column:
+      type === "agent_conversation" || type === "agent_conversation_extend"
+        ? "assistant_response__trace"
+        : undefined,
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    messages_column:
+      type === "agent_conversation_extend" || type === "agent_conversation_project"
+        ? "messages"
+        : undefined,
+    // biome-ignore lint/style/useNamingConvention: ui schema
     internal_thought_tag:
       type === "repair_check" || type === "repair_merge"
         ? DEFAULT_INTERNAL_THOUGHT_TAG
         : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
-    uuid_column: type === "conversation_pair" ? undefined : "row_uuid",
+    uuid_column:
+      type === "repair_tasks" || type === "repair_check" || type === "repair_merge"
+        ? "row_uuid"
+        : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
     judge_column: type === "repair_tasks" ? "llm_judge_1" : undefined,
     threshold: type === "repair_tasks" ? "4" : undefined,

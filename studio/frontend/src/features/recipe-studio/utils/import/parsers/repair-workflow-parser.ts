@@ -11,6 +11,9 @@ export function parseRepairWorkflow(
   expressionType:
     | "conversation_pair"
     | "conversation_extend"
+    | "agent_conversation"
+    | "agent_conversation_extend"
+    | "agent_conversation_project"
     | "repair_tasks"
     | "repair_check"
     | "repair_merge",
@@ -28,6 +31,9 @@ export function parseRepairWorkflow(
     human_column: readString(column.human_column) ?? "",
     // biome-ignore lint/style/useNamingConvention: ui schema
     assistant_column: readString(column.assistant_column) ?? "",
+    // biome-ignore lint/style/useNamingConvention: ui schema
+    trace_column: readString(column.trace_column) ?? "",
+    messages_column: readString(column.messages_column) ?? "",
     // biome-ignore lint/style/useNamingConvention: ui schema
     uuid_column: readString(column.uuid_column) ?? "row_uuid",
     // biome-ignore lint/style/useNamingConvention: ui schema

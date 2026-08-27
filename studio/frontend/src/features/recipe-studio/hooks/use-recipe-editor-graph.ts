@@ -107,6 +107,9 @@ type UseRecipeEditorGraphArgs = {
       | "repair_patch"
       | "conversation_pair"
       | "conversation_extend"
+      | "agent_conversation"
+      | "agent_conversation_extend"
+      | "agent_conversation_project"
       | "repair_merge"
       | "jsonl_export",
     position?: XYPosition,
@@ -156,6 +159,9 @@ type UseRecipeEditorGraphResult = {
       | "repair_patch"
       | "conversation_pair"
       | "conversation_extend"
+      | "agent_conversation"
+      | "agent_conversation_extend"
+      | "agent_conversation_project"
       | "repair_merge"
       | "jsonl_export",
   ) => void;
@@ -299,6 +305,9 @@ export function useRecipeEditorGraph({
             | "repair_patch"
             | "conversation_pair"
             | "conversation_extend"
+            | "agent_conversation"
+            | "agent_conversation_extend"
+            | "agent_conversation_project"
             | "repair_merge"
             | "jsonl_export",
           position,
@@ -404,6 +413,9 @@ export function useRecipeEditorGraph({
         | "repair_patch"
         | "conversation_pair"
         | "conversation_extend"
+        | "agent_conversation"
+        | "agent_conversation_extend"
+        | "agent_conversation_project"
         | "repair_merge"
         | "jsonl_export",
     ) => {

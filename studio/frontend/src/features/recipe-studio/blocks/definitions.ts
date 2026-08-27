@@ -67,6 +67,9 @@ export type BlockType =
   | "conditional_guard"
   | "conversation_pair"
   | "conversation_extend"
+  | "agent_conversation"
+  | "agent_conversation_extend"
+  | "agent_conversation_project"
   | "repair_tasks"
   | "repair_check"
   | "repair_merge"
@@ -495,6 +498,39 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
   },
   {
     kind: "expression",
+    type: "agent_conversation",
+    title: "Build agent conversation",
+    description:
+      "Combine a natural user message with an AI trace while preserving tool calls and results.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(id, "agent_conversation", existing),
+  },
+  {
+    kind: "expression",
+    type: "agent_conversation_extend",
+    title: "Extend agent conversation",
+    description:
+      "Append a natural user turn and complete tool trace to an existing agent history.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(id, "agent_conversation_extend", existing),
+  },
+  {
+    kind: "expression",
+    type: "agent_conversation_project",
+    title: "Project agent conversation",
+    description:
+      "Project natural user and final assistant turns for ShareGPT-compatible judges.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(id, "agent_conversation_project", existing),
+  },
+  {
+    kind: "expression",
     type: "repair_merge",
     title: "Apply approved repairs",
     description:
@@ -610,6 +646,9 @@ export function getBlockDefinitionForConfig(
       config.expression_type === "repair_merge" ||
         config.expression_type === "conversation_pair" ||
         config.expression_type === "conversation_extend" ||
+        config.expression_type === "agent_conversation" ||
+        config.expression_type === "agent_conversation_extend" ||
+        config.expression_type === "agent_conversation_project" ||
         config.expression_type === "string_replace" ||
         config.expression_type === "content_hash" ||
         config.expression_type === "repair_patch"

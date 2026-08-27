@@ -94,6 +94,67 @@ test("conversation extend serializes as a deterministic native step", () => {
   });
 });
 
+test("agent conversation serializes a natural user turn plus the LLM trace", () => {
+  const config: ExpressionConfig = {
+    id: "agent",
+    kind: "expression",
+    expression_type: "agent_conversation",
+    name: "agent_messages",
+    expr: "",
+    dtype: "str",
+    human_column: "human_message",
+    trace_column: "mia_response__trace",
+  };
+  const payload = buildSparseRepairColumn(config);
+  assert.deepEqual(payload, {
+    name: "agent_messages",
+    drop: false,
+    column_type: "unsloth-agent-conversation",
+    human_column: "human_message",
+    trace_column: "mia_response__trace",
+  });
+});
+
+test("agent conversation extension serializes persistent history and a new trace", () => {
+  const config: ExpressionConfig = {
+    id: "agent-extend",
+    kind: "expression",
+    expression_type: "agent_conversation_extend",
+    name: "agent_messages",
+    expr: "",
+    dtype: "str",
+    messages_column: "messages",
+    human_column: "human_followup",
+    trace_column: "mia_response__trace",
+  };
+  assert.deepEqual(buildSparseRepairColumn(config), {
+    name: "agent_messages",
+    drop: false,
+    column_type: "unsloth-agent-conversation-extend",
+    messages_column: "messages",
+    human_column: "human_followup",
+    trace_column: "mia_response__trace",
+  });
+});
+
+test("agent conversation projection serializes a ShareGPT compatibility view", () => {
+  const config: ExpressionConfig = {
+    id: "agent-project",
+    kind: "expression",
+    expression_type: "agent_conversation_project",
+    name: "extended_conversations",
+    expr: "",
+    dtype: "str",
+    messages_column: "agent_messages",
+  };
+  assert.deepEqual(buildSparseRepairColumn(config), {
+    name: "extended_conversations",
+    drop: false,
+    column_type: "unsloth-agent-conversation-project",
+    messages_column: "agent_messages",
+  });
+});
+
 test("string replace serializes as a deterministic native step", () => {
   const config: ExpressionConfig = {
     id: "clean",

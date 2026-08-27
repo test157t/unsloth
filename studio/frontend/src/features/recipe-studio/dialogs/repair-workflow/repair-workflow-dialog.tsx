@@ -25,6 +25,8 @@ function TextField({
   field:
     | "human_column"
     | "assistant_column"
+    | "trace_column"
+    | "messages_column"
     | "uuid_column"
     | "judge_column"
     | "threshold"
@@ -68,8 +70,23 @@ export function RepairWorkflowDialog({
         onChange={(value) => onUpdate({ name: value })}
       />
       <AvailableVariables configId={config.id} />
-      {type === "conversation_pair" || type === "conversation_extend" ? (
+      {type === "conversation_pair" ||
+      type === "conversation_extend" ||
+      type === "agent_conversation" ||
+      type === "agent_conversation_extend" ||
+      type === "agent_conversation_project" ? (
         <>
+          {(type === "agent_conversation_extend" ||
+            type === "agent_conversation_project") && (
+            <TextField
+              config={config}
+              field="messages_column"
+              label="Agent messages field"
+              hint="Canonical OpenAI-style history containing user, assistant, and tool messages."
+              placeholder="messages"
+              onUpdate={onUpdate}
+            />
+          )}
           {type === "conversation_extend" && (
             <TextField
               config={config}
@@ -80,22 +97,35 @@ export function RepairWorkflowDialog({
               onUpdate={onUpdate}
             />
           )}
-          <TextField
-            config={config}
-            field="human_column"
-            label="New human message field"
-            hint="One generated raw human message. It becomes the appended human turn."
-            placeholder="human_followup"
-            onUpdate={onUpdate}
-          />
-          <TextField
-            config={config}
-            field="assistant_column"
-            label="New AI response field"
-            hint="One complete raw response, including any reasoning tags and visible answer."
-            placeholder="assistant_response"
-            onUpdate={onUpdate}
-          />
+          {type !== "agent_conversation_project" && (
+            <TextField
+              config={config}
+              field="human_column"
+              label="New human message field"
+              hint="One generated raw human message. It becomes the appended human turn."
+              placeholder="human_followup"
+              onUpdate={onUpdate}
+            />
+          )}
+          {type === "agent_conversation" || type === "agent_conversation_extend" ? (
+            <TextField
+              config={config}
+              field="trace_column"
+              label="AI trace field"
+              hint="An ALL_MESSAGES trace containing assistant tool calls, tool results, and the final response."
+              placeholder="assistant_response__trace"
+              onUpdate={onUpdate}
+            />
+          ) : type !== "agent_conversation_project" ? (
+            <TextField
+              config={config}
+              field="assistant_column"
+              label="New AI response field"
+              hint="One complete raw response, including any reasoning tags and visible answer."
+              placeholder="assistant_response"
+              onUpdate={onUpdate}
+            />
+          ) : null}
         </>
       ) : (
         <TextField
@@ -196,6 +226,12 @@ export function RepairWorkflowDialog({
           "Always outputs exactly two turns: one human followed by one gpt. The AI cannot add roles or split reasoning into another turn."}
         {type === "conversation_extend" &&
           "Appends exactly one human followed by one gpt turn onto the original array in code; the original turns are never re-emitted by a model."}
+        {type === "agent_conversation" &&
+          "Drops hidden orchestration prompts, keeps the natural user message, and preserves assistant tool calls, matching tool results, and the final assistant response in OpenAI message format."}
+        {type === "agent_conversation_extend" &&
+          "Appends one natural user message plus the complete assistant/tool/result/final trace. Existing tool messages remain intact and repeated provider call IDs are deterministically remapped."}
+        {type === "agent_conversation_project" &&
+          "Keeps natural user and final assistant turns for ShareGPT-compatible downstream judges while the canonical agent history retains every tool call and result."}
         {type === "repair_tasks" &&
           "Outputs { row_uuid, repairs[] }. Empty repairs let conditional AI skip the row without a model request."}
         {type === "repair_check" &&

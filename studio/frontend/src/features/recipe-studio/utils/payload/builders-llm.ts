@@ -143,6 +143,13 @@ export function buildLlmMcpProvider(
     errors.push("MCP provider: name is required.");
     return null;
   }
+  if (provider.provider_type === "studio_builtin") {
+    return {
+      // biome-ignore lint/style/useNamingConvention: api schema
+      provider_type: "studio_builtin",
+      name,
+    };
+  }
   if (provider.provider_type === "stdio") {
     const command = provider.command?.trim() ?? "";
     if (!command) {

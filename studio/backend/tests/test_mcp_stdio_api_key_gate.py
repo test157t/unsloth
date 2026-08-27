@@ -366,7 +366,7 @@ def test_default_is_ui_session_so_direct_calls_are_unaffected():
         assert param.default is False, name
 
 
-# ── data recipe: the same primitive, same gate ──────────────────────
+# ── data recipe: arbitrary commands stay gated; fixed built-ins do not ──
 
 
 _STDIO_PROVIDER = {
@@ -376,6 +376,7 @@ _STDIO_PROVIDER = {
     "args": ["-c", "id"],
 }
 _HTTP_PROVIDER = {"name": "remote", "provider_type": "http", "url": "https://example.com/mcp"}
+_STUDIO_BUILTIN_PROVIDER = {"name": "studio", "provider_type": "studio_builtin"}
 _STDIO_RECIPE = {"columns": [{"name": "a"}], "mcp_providers": [_STDIO_PROVIDER]}
 
 
@@ -383,6 +384,7 @@ def test_recipe_has_stdio_mcp():
     from core.data_recipe.service import recipe_has_stdio_mcp
 
     assert recipe_has_stdio_mcp({"mcp_providers": [_STDIO_PROVIDER]}) is True
+    assert recipe_has_stdio_mcp({"mcp_providers": [_STUDIO_BUILTIN_PROVIDER]}) is False
     assert recipe_has_stdio_mcp({"mcp_providers": [_HTTP_PROVIDER]}) is False
     assert recipe_has_stdio_mcp({}) is False
     assert recipe_has_stdio_mcp({"mcp_providers": "nonsense"}) is False

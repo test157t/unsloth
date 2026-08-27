@@ -120,6 +120,9 @@ type RecipeStudioState = {
       | "repair_patch"
       | "conversation_pair"
       | "conversation_extend"
+      | "agent_conversation"
+      | "agent_conversation_extend"
+      | "agent_conversation_project"
       | "repair_merge"
       | "jsonl_export",
     position?: XYPosition,

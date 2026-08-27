@@ -258,6 +258,27 @@ export function getConfigErrors(config: NodeConfig | null): string[] {
       if (!config.assistant_column?.trim()) {
         errors.push("AI response field is required.");
       }
+    } else if (expressionType === "agent_conversation") {
+      if (!config.human_column?.trim()) {
+        errors.push("Human message field is required.");
+      }
+      if (!config.trace_column?.trim()) {
+        errors.push("AI trace field is required.");
+      }
+    } else if (expressionType === "agent_conversation_extend") {
+      if (!config.messages_column?.trim()) {
+        errors.push("Agent messages field is required.");
+      }
+      if (!config.human_column?.trim()) {
+        errors.push("Human message field is required.");
+      }
+      if (!config.trace_column?.trim()) {
+        errors.push("AI trace field is required.");
+      }
+    } else if (expressionType === "agent_conversation_project") {
+      if (!config.messages_column?.trim()) {
+        errors.push("Agent messages field is required.");
+      }
     } else if (expressionType === "content_hash") {
       if (!config.source_column?.trim()) {
         errors.push("Source field is required.");

@@ -89,6 +89,9 @@ type BlockSheetProps = {
       | "repair_patch"
       | "conversation_pair"
       | "conversation_extend"
+      | "agent_conversation"
+      | "agent_conversation_extend"
+      | "agent_conversation_project"
       | "repair_merge"
       | "jsonl_export",
   ) => void;
@@ -411,6 +414,9 @@ export function BlockSheet({
           | "repair_patch"
           | "conversation_pair"
           | "conversation_extend"
+          | "agent_conversation"
+          | "agent_conversation_extend"
+          | "agent_conversation_project"
           | "repair_merge"
           | "jsonl_export",
       );

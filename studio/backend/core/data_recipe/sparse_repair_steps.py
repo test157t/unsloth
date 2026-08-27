@@ -14,6 +14,9 @@ _CONDITIONAL_PREFIX = "unsloth-conditional-"
 _REPAIR_COLUMN_TYPES = {
     "unsloth-conversation-pair",
     "unsloth-conversation-extend",
+    "unsloth-agent-conversation",
+    "unsloth-agent-conversation-extend",
+    "unsloth-agent-conversation-project",
     "unsloth-repair-tasks",
     "unsloth-repair-check",
     "unsloth-repair-merge",
@@ -117,6 +120,239 @@ def build_conversation_pair(
         {"from": "human", "value": human},
         {"from": "gpt", "value": assistant},
     ]
+
+
+def build_agent_conversation(
+    row: dict[str, Any],
+    *,
+    human_column: str,
+    trace_column: str,
+) -> list[dict[str, Any]]:
+    """Build an OpenAI-style user/tool/assistant training conversation.
+
+    Data Designer traces include the orchestration system and user prompts used
+    to generate a column.  Those are deliberately excluded: the training user
+    turn must be the natural message, while assistant tool calls, tool results,
+    and the final assistant response are preserved exactly.
+    """
+
+    human = row.get(human_column)
+    trace = _decoded_list(row.get(trace_column))
+    if not isinstance(human, str) or not human.strip():
+        raise ValueError(f"Human message field {human_column!r} must be non-empty text.")
+    if not isinstance(trace, list):
+        raise ValueError(f"Trace field {trace_column!r} must be a message list.")
+
+    messages: list[dict[str, Any]] = [{"role": "user", "content": human}]
+    call_ids: set[str] = set()
+    result_ids: set[str] = set()
+
+    for raw_message in trace:
+        message = _decoded(raw_message)
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role") or "").strip().lower()
+        if role == "assistant":
+            raw_calls = message.get("tool_calls")
+            tool_calls = raw_calls if isinstance(raw_calls, list) else []
+            content = message.get("content")
+            content_text = content if isinstance(content, str) else ""
+            if tool_calls:
+                normalized_calls: list[dict[str, Any]] = []
+                for raw_call in tool_calls:
+                    call = _decoded(raw_call)
+                    if not isinstance(call, dict):
+                        raise ValueError("Assistant trace contains a malformed tool call.")
+                    call_id = str(call.get("id") or "").strip()
+                    function = call.get("function")
+                    if not call_id or not isinstance(function, dict):
+                        raise ValueError("Assistant trace tool calls require id and function.")
+                    name = str(function.get("name") or "").strip()
+                    arguments = function.get("arguments")
+                    if not name or not isinstance(arguments, str):
+                        raise ValueError("Assistant trace tool functions require name and JSON arguments.")
+                    if call_id in call_ids:
+                        raise ValueError(f"Agent trace repeats tool call id {call_id!r}.")
+                    call_ids.add(call_id)
+                    normalized_calls.append(
+                        {
+                            "id": call_id,
+                            "type": "function",
+                            "function": {"name": name, "arguments": arguments},
+                        }
+                    )
+                assistant_message: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": content_text,
+                    "tool_calls": normalized_calls,
+                }
+                messages.append(assistant_message)
+            elif content_text.strip():
+                messages.append({"role": "assistant", "content": content_text})
+        elif role == "tool":
+            call_id = str(message.get("tool_call_id") or "").strip()
+            content = message.get("content")
+            if not call_id or not isinstance(content, str):
+                raise ValueError("Tool trace messages require tool_call_id and text content.")
+            if call_id in result_ids:
+                raise ValueError(f"Agent trace repeats tool result id {call_id!r}.")
+            result_ids.add(call_id)
+            messages.append(
+                {"role": "tool", "content": content, "tool_call_id": call_id}
+            )
+
+    if messages[-1].get("role") != "assistant" or messages[-1].get("tool_calls"):
+        raise ValueError("Agent trace must end with a non-empty assistant response.")
+    missing_results = call_ids.difference(result_ids)
+    orphan_results = result_ids.difference(call_ids)
+    if missing_results:
+        raise ValueError(f"Agent trace is missing tool results for {sorted(missing_results)!r}.")
+    if orphan_results:
+        raise ValueError(f"Agent trace has orphan tool results for {sorted(orphan_results)!r}.")
+    return messages
+
+
+def extend_agent_conversation(
+    row: dict[str, Any],
+    *,
+    messages_column: str,
+    human_column: str,
+    trace_column: str,
+) -> list[dict[str, Any]]:
+    """Append one natural user turn and its complete agent trace to a history.
+
+    The input is deliberately OpenAI-style only.  This keeps one canonical
+    recursive representation and prevents an apparently successful extension
+    from silently discarding older tool calls stored in a different schema.
+    """
+
+    original = _decoded_list(row.get(messages_column))
+    if not isinstance(original, list):
+        raise ValueError(f"Agent messages field {messages_column!r} must be a list.")
+    history: list[dict[str, Any]] = []
+    existing_call_ids: set[str] = set()
+    outstanding_call_ids: set[str] = set()
+    for index, raw_message in enumerate(original):
+        message = _decoded(raw_message)
+        if not isinstance(message, dict):
+            raise ValueError(f"Agent message {index} must be an object.")
+        role = str(message.get("role") or "").strip().lower()
+        if role not in {"system", "user", "assistant", "tool"}:
+            raise ValueError(f"Agent message {index} has unsupported role {role!r}.")
+        if "from" in message or "value" in message:
+            raise ValueError(
+                "Multi-turn agent history must use role/content messages, not ShareGPT turns."
+            )
+        copied = dict(message)
+        copied["role"] = role
+        raw_calls = copied.get("tool_calls")
+        if role == "assistant" and isinstance(raw_calls, list):
+            for raw_call in raw_calls:
+                call = _decoded(raw_call)
+                function = call.get("function") if isinstance(call, dict) else None
+                call_id = str(call.get("id") or "").strip() if isinstance(call, dict) else ""
+                if (
+                    not call_id
+                    or not isinstance(function, dict)
+                    or not str(function.get("name") or "").strip()
+                    or not isinstance(function.get("arguments"), str)
+                ):
+                    raise ValueError(f"Agent message {index} has a malformed tool call.")
+                if call_id in outstanding_call_ids:
+                    raise ValueError(f"Agent history repeats unresolved tool call id {call_id!r}.")
+                existing_call_ids.add(call_id)
+                outstanding_call_ids.add(call_id)
+        elif role == "tool":
+            call_id = str(copied.get("tool_call_id") or "").strip()
+            if not call_id or not isinstance(copied.get("content"), str):
+                raise ValueError(f"Agent tool message {index} is malformed.")
+            if call_id not in outstanding_call_ids:
+                raise ValueError(f"Agent history has orphan tool result {call_id!r}.")
+            outstanding_call_ids.remove(call_id)
+        history.append(copied)
+
+    if outstanding_call_ids:
+        raise ValueError(
+            f"Agent history is missing tool results for {sorted(outstanding_call_ids)!r}."
+        )
+    if (
+        not history
+        or history[-1].get("role") != "assistant"
+        or history[-1].get("tool_calls")
+        or not isinstance(history[-1].get("content"), str)
+        or not history[-1]["content"].strip()
+    ):
+        raise ValueError("Agent history must end with a non-empty assistant response.")
+
+    tail = build_agent_conversation(
+        row,
+        human_column = human_column,
+        trace_column = trace_column,
+    )
+
+    # Some providers restart call ids on each generation.  Keep the trace
+    # internally paired while making ids unique across the recursive history.
+    remapped_ids: dict[str, str] = {}
+    prefix = f"turn-{sum(1 for message in history if message.get('role') == 'user') + 1}-"
+    for message in tail:
+        calls = message.get("tool_calls")
+        if not isinstance(calls, list):
+            continue
+        for call in calls:
+            call_id = str(call.get("id") or "").strip()
+            candidate = call_id
+            suffix = 1
+            while candidate in existing_call_ids:
+                candidate = f"{prefix}{call_id}-{suffix}"
+                suffix += 1
+            existing_call_ids.add(candidate)
+            if candidate != call_id:
+                remapped_ids[call_id] = candidate
+                call["id"] = candidate
+    if remapped_ids:
+        for message in tail:
+            if message.get("role") == "tool":
+                call_id = str(message.get("tool_call_id") or "")
+                if call_id in remapped_ids:
+                    message["tool_call_id"] = remapped_ids[call_id]
+
+    return history + tail
+
+
+def project_agent_conversation(
+    row: dict[str, Any],
+    *,
+    messages_column: str,
+) -> list[dict[str, str]]:
+    """Project natural user and final assistant turns for legacy judges.
+
+    Tool-call carrier messages and tool results remain in the canonical agent
+    history.  The projection intentionally excludes them so stages 2-4 can
+    retain their existing ShareGPT contracts without learning fake tool prose.
+    """
+
+    original = _decoded_list(row.get(messages_column))
+    if not isinstance(original, list):
+        raise ValueError(f"Agent messages field {messages_column!r} must be a list.")
+    projected: list[dict[str, str]] = []
+    for index, raw_message in enumerate(original):
+        message = _decoded(raw_message)
+        if not isinstance(message, dict):
+            raise ValueError(f"Agent message {index} must be an object.")
+        role = str(message.get("role") or "").strip().lower()
+        content = message.get("content")
+        if role == "user" and isinstance(content, str) and content.strip():
+            projected.append({"from": "human", "value": content})
+        elif (
+            role == "assistant"
+            and not message.get("tool_calls")
+            and isinstance(content, str)
+            and content.strip()
+        ):
+            projected.append({"from": "gpt", "value": content})
+    if not projected or projected[-1].get("from") != "gpt":
+        raise ValueError("Projected agent history must end with a final assistant response.")
+    return projected
 
 
 def extend_conversation_turns(
@@ -543,6 +779,51 @@ def _make_workflow_column(spec: dict[str, Any]):
                 row,
                 human_column = human_column,
                 assistant_column = assistant_column,
+            )
+            return output
+
+    elif column_type == "unsloth-agent-conversation":
+        human_column = _required_column_name(spec, "human_column")
+        trace_column = _required_column_name(spec, "trace_column")
+        required = [human_column, trace_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = build_agent_conversation(
+                row,
+                human_column = human_column,
+                trace_column = trace_column,
+            )
+            return output
+
+    elif column_type == "unsloth-agent-conversation-extend":
+        messages_column = _required_column_name(spec, "messages_column")
+        human_column = _required_column_name(spec, "human_column")
+        trace_column = _required_column_name(spec, "trace_column")
+        required = [messages_column, human_column, trace_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = extend_agent_conversation(
+                row,
+                messages_column = messages_column,
+                human_column = human_column,
+                trace_column = trace_column,
+            )
+            return output
+
+    elif column_type == "unsloth-agent-conversation-project":
+        messages_column = _required_column_name(spec, "messages_column")
+        required = [messages_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = project_agent_conversation(
+                row,
+                messages_column = messages_column,
             )
             return output
 

@@ -57,6 +57,9 @@ function isProviderConfigured(provider: LlmMcpProviderConfig): boolean {
   if (!hasName) {
     return false;
   }
+  if (provider.provider_type === "studio_builtin") {
+    return true;
+  }
   if (provider.provider_type === "stdio") {
     return (provider.command?.trim().length ?? 0) > 0;
   }
@@ -108,12 +111,18 @@ function McpServerCard({
       : [{ key: "", value: "" }];
   const summaryTitle = provider.name.trim() || `Tool server ${index + 1}`;
   const transportLabel =
-    provider.provider_type === "stdio" ? "Local command" : "HTTP";
+    provider.provider_type === "studio_builtin"
+      ? "Studio built-ins"
+      : provider.provider_type === "stdio"
+        ? "Local command"
+        : "HTTP";
   const toolsLabel = typeof toolsCount === "number" ? `${toolsCount} tools` : null;
   const description =
-    provider.provider_type === "stdio"
-      ? "Runs a local tool server."
-      : "Calls a remote tool server.";
+    provider.provider_type === "studio_builtin"
+      ? "Uses Studio's web search and sandboxed Python tools."
+      : provider.provider_type === "stdio"
+        ? "Runs a local tool server."
+        : "Calls a remote tool server.";
 
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
@@ -182,17 +191,31 @@ function McpServerCard({
             onValueChange={(value) =>
               onUpdateProviderAt(index, {
                 // biome-ignore lint/style/useNamingConvention: ui schema
-                provider_type: value === "stdio" ? "stdio" : "streamable_http",
+                provider_type:
+                  value === "studio_builtin"
+                    ? "studio_builtin"
+                    : value === "stdio"
+                      ? "stdio"
+                      : "streamable_http",
               })
             }
           >
               <TabsList className="w-full">
+                <TabsTrigger value="studio_builtin">Studio built-ins</TabsTrigger>
                 <TabsTrigger value="stdio">Local command</TabsTrigger>
                 <TabsTrigger value="streamable_http">HTTP endpoint</TabsTrigger>
               </TabsList>
           </Tabs>
 
-          {provider.provider_type === "stdio" ? (
+          {provider.provider_type === "studio_builtin" ? (
+            <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3 text-xs text-muted-foreground">
+              Provides <span className="font-mono text-foreground">web_search</span>
+              {" "}and{" "}
+              <span className="font-mono text-foreground">python</span> through
+              Studio's existing network policy and code sandbox. No command,
+              endpoint, or API key is required.
+            </div>
+          ) : provider.provider_type === "stdio" ? (
             <div className="space-y-4">
               <div className="grid gap-1.5">
                 <FieldLabel label="Command" hint="Command used to start the tool server." />

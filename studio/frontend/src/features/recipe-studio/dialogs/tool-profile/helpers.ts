@@ -35,6 +35,9 @@ export function isProviderReadyForToolFetch(
   if (!hasName) {
     return false;
   }
+  if (provider.provider_type === "studio_builtin") {
+    return true;
+  }
   if (provider.provider_type === "stdio") {
     return (provider.command?.trim().length ?? 0) > 0;
   }
@@ -44,6 +47,13 @@ export function isProviderReadyForToolFetch(
 export function toApiProvider(
   provider: LlmMcpProviderConfig,
 ): Record<string, unknown> {
+  if (provider.provider_type === "studio_builtin") {
+    return {
+      // biome-ignore lint/style/useNamingConvention: api schema
+      provider_type: "studio_builtin",
+      name: provider.name.trim(),
+    };
+  }
   if (provider.provider_type === "stdio") {
     const env = Object.fromEntries(
       (provider.env ?? [])

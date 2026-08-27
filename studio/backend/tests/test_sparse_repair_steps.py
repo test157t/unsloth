@@ -13,6 +13,9 @@ assert _SPEC is not None and _SPEC.loader is not None
 _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
 build_conversation_pair = _MODULE.build_conversation_pair
+build_agent_conversation = _MODULE.build_agent_conversation
+extend_agent_conversation = _MODULE.extend_agent_conversation
+project_agent_conversation = _MODULE.project_agent_conversation
 apply_string_replace = _MODULE.apply_string_replace
 apply_repair_patch = _MODULE.apply_repair_patch
 compute_content_hash = _MODULE.compute_content_hash
@@ -61,6 +64,189 @@ def test_conversation_pair_rejects_missing_text() -> None:
         assert "assistant_response" in str(exc)
     else:
         raise AssertionError("Expected blank assistant text to be rejected.")
+
+
+def test_agent_conversation_keeps_calls_results_and_final_answer() -> None:
+    result = build_agent_conversation(
+        {
+            "human_message": "What is the current value?",
+            "mia_response__trace": [
+                {"role": "system", "content": "Hidden orchestration."},
+                {"role": "user", "content": "Wrapped generation prompt."},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {
+                                "name": "web_search",
+                                "arguments": '{"query":"current value"}',
+                            },
+                        }
+                    ],
+                },
+                {"role": "tool", "content": "Source result", "tool_call_id": "call-1"},
+                {"role": "assistant", "content": "Grounded final answer."},
+            ],
+        },
+        human_column = "human_message",
+        trace_column = "mia_response__trace",
+    )
+    assert result == [
+        {"role": "user", "content": "What is the current value?"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "call-1",
+                    "type": "function",
+                    "function": {
+                        "name": "web_search",
+                        "arguments": '{"query":"current value"}',
+                    },
+                }
+            ],
+        },
+        {"role": "tool", "content": "Source result", "tool_call_id": "call-1"},
+        {"role": "assistant", "content": "Grounded final answer."},
+    ]
+
+
+def test_agent_conversation_rejects_orphan_tool_results() -> None:
+    try:
+        build_agent_conversation(
+            {
+                "human_message": "Calculate this.",
+                "trace": [
+                    {"role": "tool", "content": "42", "tool_call_id": "missing-call"},
+                    {"role": "assistant", "content": "42"},
+                ],
+            },
+            human_column = "human_message",
+            trace_column = "trace",
+        )
+    except ValueError as exc:
+        assert "orphan" in str(exc)
+    else:
+        raise AssertionError("Expected orphan tool output to be rejected.")
+
+
+def test_agent_conversation_requires_final_answer_after_last_tool_result() -> None:
+    try:
+        build_agent_conversation(
+            {
+                "human_message": "Calculate this.",
+                "trace": [
+                    {
+                        "role": "assistant",
+                        "content": "",
+                        "tool_calls": [
+                            {
+                                "id": "call-1",
+                                "function": {
+                                    "name": "python",
+                                    "arguments": '{"code":"print(42)"}',
+                                },
+                            }
+                        ],
+                    },
+                    {"role": "tool", "content": "42", "tool_call_id": "call-1"},
+                ],
+            },
+            human_column = "human_message",
+            trace_column = "trace",
+        )
+    except ValueError as exc:
+        assert "must end" in str(exc)
+    else:
+        raise AssertionError("Expected a trace without a final answer to be rejected.")
+
+
+def test_agent_conversation_extension_preserves_prior_and_new_tool_turns() -> None:
+    result = extend_agent_conversation(
+        {
+            "messages": [
+                {"role": "user", "content": "First question"},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {
+                                "name": "web_search",
+                                "arguments": '{"query":"first"}',
+                            },
+                        }
+                    ],
+                },
+                {"role": "tool", "content": "first result", "tool_call_id": "call-1"},
+                {"role": "assistant", "content": "First answer"},
+            ],
+            "human_followup": "Now calculate it",
+            "mia_response__trace": [
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {
+                                "name": "python",
+                                "arguments": '{"code":"print(42)"}',
+                            },
+                        }
+                    ],
+                },
+                {"role": "tool", "content": "42", "tool_call_id": "call-1"},
+                {"role": "assistant", "content": "The result is 42."},
+            ],
+        },
+        messages_column = "messages",
+        human_column = "human_followup",
+        trace_column = "mia_response__trace",
+    )
+    assert [message["role"] for message in result] == [
+        "user",
+        "assistant",
+        "tool",
+        "assistant",
+        "user",
+        "assistant",
+        "tool",
+        "assistant",
+    ]
+    new_call_id = result[5]["tool_calls"][0]["id"]
+    assert new_call_id != "call-1"
+    assert result[6]["tool_call_id"] == new_call_id
+    assert result[-1]["content"] == "The result is 42."
+
+
+def test_agent_projection_keeps_users_and_final_answers_only() -> None:
+    result = project_agent_conversation(
+        {
+            "messages": [
+                {"role": "user", "content": "Question"},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{"id": "call-1", "function": {}}],
+                },
+                {"role": "tool", "content": "evidence", "tool_call_id": "call-1"},
+                {"role": "assistant", "content": "Answer"},
+            ]
+        },
+        messages_column = "messages",
+    )
+    assert result == [
+        {"from": "human", "value": "Question"},
+        {"from": "gpt", "value": "Answer"},
+    ]
 
 
 def test_extend_appends_one_human_and_one_gpt_turn_verbatim() -> None:
