@@ -348,7 +348,10 @@ export function getConfigErrors(config: NodeConfig | null): string[] {
         if (!provider.command?.trim()) {
           errors.push(`Tool server ${name}: add a command.`);
         }
-      } else if (!provider.endpoint?.trim()) {
+      } else if (
+        provider.provider_type === "streamable_http" &&
+        !provider.endpoint?.trim()
+      ) {
         errors.push(`Tool server ${name}: add an endpoint.`);
       }
     }

@@ -17,15 +17,27 @@ const builtins: LlmMcpProviderConfig = {
 };
 
 test("Studio built-ins serialize without a user command or endpoint", () => {
-  const source = readFileSync(
+  const builderSource = readFileSync(
     new URL(
       "../src/features/recipe-studio/utils/payload/builders-llm.ts",
       import.meta.url,
     ),
     "utf8",
   );
-  assert.match(source, /provider\.provider_type === "studio_builtin"/);
-  assert.match(source, /provider_type: "studio_builtin"/);
+  assert.match(builderSource, /provider\.provider_type === "studio_builtin"/);
+  assert.match(builderSource, /provider_type: "studio_builtin"/);
+
+  const validationSource = readFileSync(
+    new URL(
+      "../src/features/recipe-studio/utils/validation.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(
+    validationSource,
+    /provider\.provider_type === "streamable_http"\s*&&\s*!provider\.endpoint\?\.trim\(\)/,
+  );
 });
 
 test("Studio built-ins are ready for discovery with the same API shape", () => {
