@@ -665,7 +665,7 @@ export const it = {
         sectionTitle: "Cambio automatico del modello (API OpenAI)",
         enable: "Cambia modello in base alla richiesta",
         enableDescription:
-          "Carica un GGUF già scaricato indicato in una richiesta API prima di rispondere. Disattivato per impostazione predefinita.",
+          "Carica un modello già scaricato indicato in una richiesta API prima di rispondere. Disattivato per impostazione predefinita.",
         autoDownload: "Scarica i modelli mancanti",
         autoDownloadDescription:
           "Scarica un GGUF indicato in una richiesta API se non è ancora presente. Chiunque abbia una chiave API potrà così consumare spazio su disco e banda.",
@@ -1332,6 +1332,9 @@ export const it = {
         showAllQuantizations: "Mostra tutte le quantizzazioni",
         showAllQuantizationsDescription:
           "Attivata: elenca tutte le quantizzazioni in «On Device», incluse quelle non scaricate. Disattivata: mostra solo le quantizzazioni scaricate.",
+        showMemoryBar: "Mostra la barra di utilizzo della VRAM",
+        showMemoryBarDescription:
+          "Mostra sotto la riga di ogni modello scaricato il consumo stimato di VRAM: pesi, cache KV alla lunghezza di contesto con cui verrà caricato ed eventuale riserva per il draft speculativo.",
       },
       menu: {
         title: "Menu della chat",
@@ -1358,10 +1361,40 @@ export const it = {
       rememberParamsPerModel: "Ricorda le impostazioni per modello",
       rememberParamsPerModelDescription:
         "Cambiando modello vengono ripristinati temperatura, prompt e le altre impostazioni usate l'ultima volta con quel modello. Disattivato, resta un unico set di impostazioni per tutti i modelli.",
+      autoCompact: "Compatta automaticamente le chat lunghe",
+      autoCompactDescription:
+        "Quando una chat GGUF locale raggiunge la lunghezza di contesto impostata, elimina i turni precedenti invece di restituire un errore. Questa impostazione non dipende dalla VRAM libera.",
+      compactionStyle: "Quando il contesto è pieno",
+      compactionStyleDescription:
+        "Il valore predefinito del server mantiene UNSLOTH_CONTEXT_POLICY. Reimpostare la conversazione conserva l'ultimo turno e le istruzioni permanenti. Una finestra scorrevole elimina i turni più vecchi e può conservare più cronologia recente.",
+      compactionStyleInherit: "Usa il valore del server",
+      compactionStyleCheckpoint: "Reimposta la conversazione",
+      compactionStyleRollingDefault:
+        "Elimina i turni precedenti (~25% di spazio aggiuntivo)",
+      compactionStyleRolling10:
+        "Elimina i turni precedenti (~10% di spazio aggiuntivo)",
+      compactionStyleRolling5:
+        "Elimina i turni precedenti (~5% di spazio aggiuntivo)",
+      compactionStyleRollingNone:
+        "Elimina i turni precedenti (nessun taglio aggiuntivo)",
+      autoCompactKeywords:
+        "compattazione automatica contesto finestra troncare scorrevole checkpoint margine compaction rolling headroom",
       thinking: {
         collapseByDefault: "Comprimi il ragionamento per impostazione predefinita",
         collapseByDefaultDescription:
           "Mantieni il ragionamento compresso mentre il modello pensa, invece di aprirlo automaticamente. Espandi un blocco per leggerlo.",
+      },
+      currentDate: {
+        label: "Comunica al modello la data di oggi",
+        description:
+          "Aggiunge la data corrente al prompt in modo che la ricerca web e Deep Research cerchino fonti recenti invece di basarsi sulla data di fine addestramento del modello.",
+        loadError: "Impossibile caricare le impostazioni della data corrente",
+        saveError: "Impossibile aggiornare le impostazioni della data corrente",
+      },
+      tools: {
+        collapseByDefault: "Comprimi l’attività degli strumenti per impostazione predefinita",
+        collapseByDefaultDescription:
+          "Mantieni compressi input e output degli strumenti durante l’esecuzione. Espandi una riga per esaminarla.",
       },
       webSearch: {
         title: "Ricerca web",
@@ -1380,6 +1413,11 @@ export const it = {
         blockedBanner: "Bloccata {count} risorsa esterna da {hosts}.",
         blockedBannerPlural: "Bloccate {count} risorse esterne da {hosts}.",
         blockedBannerAction: "Consenti per questo Canvas",
+        blockedTitle: "L'accesso alla rete del Canvas è disattivato",
+        blockedHint:
+          "Attiva “{setting}” in Impostazioni → Chat per consentire ai Canvas di caricare risorse esterne, oppure consentilo solo per questo Canvas.",
+        blockedSettingsAction: "Apri impostazioni",
+        blockedDismiss: "Ignora",
       },
       data: "Dati",
       exportHistory: "Esporta la cronologia delle chat",
@@ -2419,5 +2457,14 @@ export const it = {
       datasetStreaming: "Dataset: in streaming (nessun download completo)",
       modelWeights: "Pesi del modello",
     },
+  },
+  modelMemory: {
+    readout:
+      "Pesi {model} + contesto {context} = {total} di {budget} di VRAM utilizzabile",
+    readoutWithSpec:
+      "Pesi {model} + KV {kv} + draft MTP {spec} = {total} di {budget} di VRAM utilizzabile",
+    kvRate: "KV riservato, ~{rate}/token",
+    oomLikely: "Con le impostazioni attuali è probabile un errore di memoria",
+    tooLarge: "Più grande della VRAM, verrà scaricato sulla CPU. Una quantizzazione più piccola è più veloce",
   },
 } as const;
