@@ -11,7 +11,10 @@ import {
   CheckmarkCircle02Icon,
   Download01Icon,
   Flag02Icon,
+  PauseIcon,
+  PlayIcon,
   Share08Icon,
+  StopIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -42,6 +45,8 @@ type ExecutionsViewProps = {
   selectedExecutionId: string | null;
   currentSignature: string;
   onSelectExecution: (id: string) => void;
+  onPauseExecution: (id: string) => void;
+  onResumeExecution: (id: string) => void;
   onCancelExecution: (id: string) => void;
   onLoadDatasetPage: (id: string, page: number) => void;
 };
@@ -51,6 +56,8 @@ export function ExecutionsView({
   selectedExecutionId,
   currentSignature,
   onSelectExecution,
+  onPauseExecution,
+  onResumeExecution,
   onCancelExecution,
   onLoadDatasetPage,
 }: ExecutionsViewProps): ReactElement {
@@ -189,6 +196,16 @@ export function ExecutionsView({
 
   const canCancel = Boolean(
     selectedExecution?.jobId && isExecutionInProgress(selectedExecution.status),
+  );
+  const canPause = Boolean(
+    selectedExecution?.jobId &&
+      selectedExecution.kind === "full" &&
+      ["pending", "running", "active"].includes(selectedExecution.status),
+  );
+  const canResume = Boolean(
+    selectedExecution?.jobId &&
+      selectedExecution.kind === "full" &&
+      ["pausing", "paused"].includes(selectedExecution.status),
   );
   const canPublish = Boolean(
     selectedExecution &&
@@ -526,6 +543,28 @@ export function ExecutionsView({
                       Publish to Hugging Face
                     </Button>
                   )}
+                  {canPause && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onPauseExecution(selectedExecution.id)}
+                    >
+                      <HugeiconsIcon icon={PauseIcon} className="mr-2 size-4" />
+                      Pause
+                    </Button>
+                  )}
+                  {canResume && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onResumeExecution(selectedExecution.id)}
+                    >
+                      <HugeiconsIcon icon={PlayIcon} className="mr-2 size-4" />
+                      Resume
+                    </Button>
+                  )}
                   {canCancel && (
                     <Button
                       type="button"
@@ -533,7 +572,8 @@ export function ExecutionsView({
                       variant="outline"
                       onClick={() => onCancelExecution(selectedExecution.id)}
                     >
-                      Cancel
+                      <HugeiconsIcon icon={StopIcon} className="mr-2 size-4" />
+                      Stop
                     </Button>
                   )}
                 </div>

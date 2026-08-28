@@ -73,17 +73,29 @@ export function RepairWorkflowDialog({
       {type === "conversation_pair" ||
       type === "conversation_extend" ||
       type === "agent_conversation" ||
+      type === "agent_conversation_strip_reasoning" ||
       type === "agent_conversation_extend" ||
       type === "agent_conversation_project" ? (
         <>
           {(type === "agent_conversation_extend" ||
-            type === "agent_conversation_project") && (
+            type === "agent_conversation_project" ||
+            type === "agent_conversation_strip_reasoning") && (
             <TextField
               config={config}
               field="messages_column"
               label="Agent messages field"
               hint="Canonical OpenAI-style history containing user, assistant, and tool messages."
               placeholder="messages"
+              onUpdate={onUpdate}
+            />
+          )}
+          {type === "agent_conversation_strip_reasoning" && (
+            <TextField
+              config={config}
+              field="conversations_column"
+              label="Fallback conversations field"
+              hint="Optional ShareGPT human/gpt history used only when the canonical messages field is absent."
+              placeholder="conversations"
               onUpdate={onUpdate}
             />
           )}
@@ -97,7 +109,8 @@ export function RepairWorkflowDialog({
               onUpdate={onUpdate}
             />
           )}
-          {type !== "agent_conversation_project" && (
+          {type !== "agent_conversation_project" &&
+            type !== "agent_conversation_strip_reasoning" && (
             <TextField
               config={config}
               field="human_column"
@@ -116,7 +129,8 @@ export function RepairWorkflowDialog({
               placeholder="assistant_response__trace"
               onUpdate={onUpdate}
             />
-          ) : type !== "agent_conversation_project" ? (
+          ) : type !== "agent_conversation_project" &&
+            type !== "agent_conversation_strip_reasoning" ? (
             <TextField
               config={config}
               field="assistant_column"
@@ -126,6 +140,23 @@ export function RepairWorkflowDialog({
               onUpdate={onUpdate}
             />
           ) : null}
+          {(type === "conversation_pair" ||
+            type === "agent_conversation" ||
+            type === "agent_conversation_extend" ||
+            type === "agent_conversation_strip_reasoning") && (
+            <TextField
+              config={config}
+              field="internal_thought_tag"
+              label="Reasoning tag"
+              hint={
+                type === "agent_conversation_strip_reasoning"
+                  ? "Reasoning block removed from every existing assistant message before continuation."
+                  : "When set, the final assistant response must begin with exactly one valid block using this tag."
+              }
+              placeholder="Mia_Internal-Thoughts"
+              onUpdate={onUpdate}
+            />
+          )}
         </>
       ) : (
         <TextField
@@ -228,6 +259,8 @@ export function RepairWorkflowDialog({
           "Appends exactly one human followed by one gpt turn onto the original array in code; the original turns are never re-emitted by a model."}
         {type === "agent_conversation" &&
           "Drops hidden orchestration prompts, keeps the natural user message, and preserves assistant tool calls, matching tool results, and the final assistant response in OpenAI message format."}
+        {type === "agent_conversation_strip_reasoning" &&
+          "Removes complete reasoning blocks from existing assistant content while preserving user turns, visible answers, tool calls, tool results, and message metadata."}
         {type === "agent_conversation_extend" &&
           "Appends one natural user message plus the complete assistant/tool/result/final trace. Existing tool messages remain intact and repeated provider call IDs are deterministically remapped."}
         {type === "agent_conversation_project" &&

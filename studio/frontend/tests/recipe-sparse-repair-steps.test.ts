@@ -71,6 +71,49 @@ test("conversation pair serializes as a deterministic native step", () => {
   });
 });
 
+test("conversation and agent assembly serialize an opted-in reasoning tag", () => {
+  const base = {
+    kind: "expression" as const,
+    expr: "",
+    dtype: "str" as const,
+    internal_thought_tag: "Mia_Internal-Thoughts",
+  };
+  assert.equal(
+    buildSparseRepairColumn({
+      ...base,
+      id: "pair-tagged",
+      expression_type: "conversation_pair",
+      name: "conversations",
+      human_column: "human_message",
+      assistant_column: "mia_response",
+    })?.internal_thought_tag,
+    "Mia_Internal-Thoughts",
+  );
+  assert.equal(
+    buildSparseRepairColumn({
+      ...base,
+      id: "agent-tagged",
+      expression_type: "agent_conversation",
+      name: "agent_messages",
+      human_column: "human_message",
+      trace_column: "mia_response__trace",
+    })?.internal_thought_tag,
+    "Mia_Internal-Thoughts",
+  );
+  assert.equal(
+    buildSparseRepairColumn({
+      ...base,
+      id: "agent-extend-tagged",
+      expression_type: "agent_conversation_extend",
+      name: "agent_messages",
+      messages_column: "messages_clean",
+      human_column: "human_followup",
+      trace_column: "mia_response__trace",
+    })?.internal_thought_tag,
+    "Mia_Internal-Thoughts",
+  );
+});
+
 test("conversation extend serializes as a deterministic native step", () => {
   const config: ExpressionConfig = {
     id: "extend",
@@ -134,6 +177,28 @@ test("agent conversation extension serializes persistent history and a new trace
     messages_column: "messages",
     human_column: "human_followup",
     trace_column: "mia_response__trace",
+  });
+});
+
+test("agent reasoning strip serializes an ordinary-conversation fallback", () => {
+  const config: ExpressionConfig = {
+    id: "strip-history",
+    kind: "expression",
+    expression_type: "agent_conversation_strip_reasoning",
+    name: "messages_clean",
+    expr: "",
+    dtype: "str",
+    messages_column: "messages",
+    conversations_column: "conversations",
+    internal_thought_tag: "Mia_Internal-Thoughts",
+  };
+  assert.deepEqual(buildSparseRepairColumn(config), {
+    name: "messages_clean",
+    drop: false,
+    column_type: "unsloth-agent-conversation-strip-reasoning",
+    messages_column: "messages",
+    conversations_column: "conversations",
+    internal_thought_tag: "Mia_Internal-Thoughts",
   });
 });
 

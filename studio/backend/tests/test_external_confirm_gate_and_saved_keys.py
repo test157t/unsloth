@@ -304,9 +304,27 @@ def test_a_data_recipe_key_cannot_spend_a_saved_cloud_credential(monkeypatch):
     seen: list[bool] = []
     inf = _install(monkeypatch, "openai", record_keys = seen)
     token = f"{API_KEY_PREFIX}deadbeefdeadbeef"
-    _mint_internal(monkeypatch, inf, "data-recipe workflow")
+    _mint_internal(monkeypatch, inf, inf.auth_storage.DATA_RECIPE_WORKFLOW_KEY_NAME)
     _run(inf, _payload(), request = _request(f"Bearer {token}"))
     assert seen == [False], "a recipe key must not unlock the saved connection"
+
+
+def test_only_a_data_recipe_internal_key_gets_recipe_model_switch_authority(monkeypatch):
+    from auth.authentication import API_KEY_PREFIX
+    from routes import inference as inf
+
+    token = f"{API_KEY_PREFIX}deadbeefdeadbeef"
+    request = _request(f"Bearer {token}")
+
+    _mint_internal(monkeypatch, inf, inf.auth_storage.DATA_RECIPE_WORKFLOW_KEY_NAME)
+    assert inf._request_is_data_recipe_workflow(request) is True
+
+    monkeypatch.setattr(
+        inf.auth_storage,
+        "internal_api_key_name",
+        lambda _raw: inf.auth_storage.DEEP_RESEARCH_WORKFLOW_KEY_NAME,
+    )
+    assert inf._request_is_data_recipe_workflow(request) is False
 
 
 def test_the_deep_research_key_keeps_its_saved_connection(monkeypatch):

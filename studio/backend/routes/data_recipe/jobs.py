@@ -135,21 +135,6 @@ def _used_local_model_selections(
     return selections
 
 
-def _single_used_local_model_selection(
-    recipe: dict[str, Any], local_provider_names: set[str]
-) -> tuple[str, str] | None:
-    selections = _used_local_model_selections(recipe, local_provider_names)
-    if not selections:
-        return None
-    if len(selections) > 1:
-        aliases = ", ".join(alias for values in selections.values() for alias in values)
-        raise ValueError(
-            "Recipes supports one active local model per run. "
-            f"Select the same local model and GGUF variant for: {aliases}."
-        )
-    return next(iter(selections))
-
-
 def _loaded_local_model_identity() -> tuple[bool, str, str]:
     from routes.inference import get_llama_cpp_backend
     from core.inference import get_inference_backend
@@ -174,20 +159,59 @@ def _ensure_selected_local_model_loaded(
     if not model_loaded:
         raise ValueError("No model loaded in Chat. Load a model first, then run the recipe.")
 
-    selection = _single_used_local_model_selection(recipe, local_provider_names)
-    if selection is None:
+    selections = _used_local_model_selections(recipe, local_provider_names)
+    if not selections:
         return
 
-    target, gguf_variant = selection
-    variant_matches = not gguf_variant or active_variant == gguf_variant
-    if active_model.lower() != target.lower() or not variant_matches:
-        selected = f"{target} ({gguf_variant})" if gguf_variant else target
+    active_selection = next(
+        (
+            (target, gguf_variant)
+            for target, gguf_variant in selections
+            if active_model.lower() == target.lower()
+            and (not gguf_variant or active_variant == gguf_variant)
+        ),
+        None,
+    )
+    if active_selection is None:
+        selected = ", ".join(
+            f"{target} ({variant})" if variant else target
+            for target, variant in selections
+        )
         active = f"{active_model} ({active_variant})" if active_variant else active_model
         raise ValueError(
-            "Selected local model is not loaded. "
+            "None of the recipe's selected local models is loaded. "
             f"Selected {selected}; active {active or 'none'}. "
-            "Load the selected model again, then run the recipe."
+            "Load one of the selected models again, then run the recipe."
         )
+
+
+def _bind_local_model_variants(
+    recipe: dict[str, Any], local_provider_names: set[str]
+) -> None:
+    """Carry Studio's GGUF selection into Data Designer's OpenAI model id.
+
+    ``gguf_variant`` is frontend metadata and Data Designer's ``ModelConfig``
+    deliberately rejects it. The local /v1 resolver accepts ``repo:QUANT``, so
+    encode the variant in the actual request model before the metadata is
+    stripped. This also makes a multi-model recipe switch to the exact selected
+    quant instead of whichever downloaded quant happens to be preferred.
+    """
+    used_aliases = _used_llm_model_aliases(recipe)
+    for mc in recipe.get("model_configs", []):
+        if not isinstance(mc, dict):
+            continue
+        if mc.get("provider") not in local_provider_names or mc.get("alias") not in used_aliases:
+            continue
+        model = mc.get("model")
+        variant = mc.get("gguf_variant")
+        if not isinstance(model, str) or not model.strip():
+            continue
+        if not isinstance(variant, str) or not variant.strip():
+            continue
+        target = model.strip()
+        quant = variant.strip()
+        if not target.lower().endswith(f":{quant.lower()}"):
+            mc["model"] = f"{target}:{quant}"
 
 
 def _inject_local_structured_response_format(
@@ -341,7 +365,7 @@ def _inject_local_providers(
         expires_at = (datetime.now(timezone.utc) + timedelta(hours = 24)).isoformat()
         token, row = storage.create_api_key(
             username = "unsloth",
-            name = "data-recipe workflow",
+            name = storage.DATA_RECIPE_WORKFLOW_KEY_NAME,
             expires_at = expires_at,
             internal = True,
             expect_gen = expect_gen,
@@ -358,6 +382,11 @@ def _inject_local_providers(
         providers[i].pop("api_key_env", None)
         providers[i].pop("extra_headers", None)
         providers[i].pop("extra_body", None)
+
+    # Data Designer has no gguf_variant field, but the local OpenAI endpoint can
+    # resolve an exact ``repo:QUANT`` model id and safely switch its single slot
+    # between columns in a multi-model recipe.
+    _bind_local_model_variants(recipe, local_names)
 
     # Force skip_health_check on local model_configs. llama-server's /v1/models
     # response can differ from the selected id (cache aliases, GGUF variants),
@@ -414,6 +443,7 @@ def create_job(
     via_api_key: ViaApiKey = False,
 ):
     recipe = payload.recipe
+    resume_recipe = copy.deepcopy(recipe)
     if not recipe.get("columns"):
         raise HTTPException(status_code = 400, detail = "Recipe must include columns.")
     if recipe_has_stdio_mcp(recipe):
@@ -467,6 +497,7 @@ def create_job(
         job_id = mgr.start(
             recipe = recipe,
             run = run,
+            resume_recipe = resume_recipe,
             internal_api_key_id = internal_api_key_id,
         )
     except RuntimeError as exc:
@@ -528,6 +559,65 @@ def current_job():
 def cancel_job(job_id: str):
     mgr = get_job_manager()
     ok = mgr.cancel(job_id)
+    if not ok:
+        raise HTTPException(status_code = 404, detail = "job not found")
+    return mgr.get_status(job_id)
+
+
+@router.post("/jobs/{job_id}/pause")
+def pause_job(job_id: str):
+    mgr = get_job_manager()
+    try:
+        ok = mgr.pause(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code = 409, detail = str(exc)) from exc
+    if not ok:
+        raise HTTPException(status_code = 404, detail = "job not found")
+    return mgr.get_status(job_id)
+
+
+@router.post("/jobs/{job_id}/resume")
+def resume_job(
+    job_id: str,
+    request: Request,
+    credential: tuple = Depends(get_current_credential),
+    via_api_key: ViaApiKey = False,
+):
+    mgr = get_job_manager()
+    internal_api_key_id: int | None = None
+    recipe: dict[str, Any] | None = None
+    if mgr.requires_restart_resume(job_id):
+        recipe = mgr.get_resume_recipe(job_id)
+        if recipe is None:
+            raise HTTPException(status_code = 409, detail = "Saved recipe configuration is unavailable.")
+        if recipe_has_stdio_mcp(recipe):
+            require_ui_session_for_local_commands(via_api_key)
+        try:
+            internal_api_key_id = _inject_local_providers(recipe, request, credential[1])
+        except CredentialRotated as exc:
+            raise HTTPException(status_code = 401, detail = "Invalid or expired token") from exc
+        except ValueError as exc:
+            raise log_and_http_error(
+                exc,
+                400,
+                safe_curated_detail(exc),
+                event = "data_recipe.jobs.resume_provider_failed",
+                log = logger,
+            ) from exc
+    try:
+        ok = mgr.resume(
+            job_id,
+            recipe = recipe,
+            internal_api_key_id = internal_api_key_id,
+        )
+    except ValueError as exc:
+        if internal_api_key_id is not None:
+            _revoke_internal_api_key_safe(internal_api_key_id)
+        raise HTTPException(status_code = 409, detail = str(exc)) from exc
+    except Exception:
+        if internal_api_key_id is not None:
+            _revoke_internal_api_key_safe(internal_api_key_id)
+        raise
     if not ok:
         raise HTTPException(status_code = 404, detail = "job not found")
     return mgr.get_status(job_id)

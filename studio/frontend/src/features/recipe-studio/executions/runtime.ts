@@ -61,6 +61,15 @@ export function toExecutionLogLine(event: JobEvent): string | null {
   if (eventType === "job.completed") {
     return `[${ts}] [INFO] Job completed`;
   }
+  if (eventType === "job.pausing") {
+    return `[${ts}] [INFO] Pause requested; finishing the current batch`;
+  }
+  if (eventType === "job.paused") {
+    return `[${ts}] [INFO] Job paused at a completed batch checkpoint`;
+  }
+  if (eventType === "job.resumed") {
+    return `[${ts}] [INFO] Job resumed`;
+  }
   if (eventType === "job.cancelling") {
     return `[${ts}] [WARN] Cancellation requested`;
   }

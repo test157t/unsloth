@@ -502,6 +502,7 @@ export function makeRepairWorkflowConfig(
     | "conversation_pair"
     | "conversation_extend"
     | "agent_conversation"
+    | "agent_conversation_strip_reasoning"
     | "agent_conversation_extend"
     | "agent_conversation_project"
     | "repair_tasks"
@@ -540,12 +541,16 @@ export function makeRepairWorkflowConfig(
         : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
     messages_column:
-      type === "agent_conversation_extend" || type === "agent_conversation_project"
+      type === "agent_conversation_extend" ||
+      type === "agent_conversation_project" ||
+      type === "agent_conversation_strip_reasoning"
         ? "messages"
         : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
     internal_thought_tag:
-      type === "repair_check" || type === "repair_merge"
+      type === "repair_check" ||
+      type === "repair_merge" ||
+      type === "agent_conversation_strip_reasoning"
         ? DEFAULT_INTERNAL_THOUGHT_TAG
         : undefined,
     // biome-ignore lint/style/useNamingConvention: ui schema
@@ -559,6 +564,7 @@ export function makeRepairWorkflowConfig(
     // biome-ignore lint/style/useNamingConvention: ui schema
     conversations_column:
       type === "conversation_extend" ||
+      type === "agent_conversation_strip_reasoning" ||
       type === "repair_check" ||
       type === "repair_merge"
         ? "conversations"

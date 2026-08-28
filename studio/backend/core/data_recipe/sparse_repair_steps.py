@@ -15,6 +15,7 @@ _REPAIR_COLUMN_TYPES = {
     "unsloth-conversation-pair",
     "unsloth-conversation-extend",
     "unsloth-agent-conversation",
+    "unsloth-agent-conversation-strip-reasoning",
     "unsloth-agent-conversation-extend",
     "unsloth-agent-conversation-project",
     "unsloth-repair-tasks",
@@ -106,6 +107,7 @@ def build_conversation_pair(
     *,
     human_column: str,
     assistant_column: str,
+    internal_thought_tag: str = "",
 ) -> list[dict[str, str]]:
     """Deterministically pair one human message with one assistant response."""
     human = row.get(human_column)
@@ -116,10 +118,42 @@ def build_conversation_pair(
         raise ValueError(
             f"Assistant response field {assistant_column!r} must be non-empty text."
         )
+    _require_single_internal_thought_block(
+        assistant,
+        internal_thought_tag,
+        context = f"Assistant response field {assistant_column!r}",
+    )
     return [
         {"from": "human", "value": human},
         {"from": "gpt", "value": assistant},
     ]
+
+
+def _message_text_content(content: Any, *, context: str) -> str:
+    """Normalize string or structured OpenAI text content without silent loss."""
+
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    raw_blocks = content if isinstance(content, list) else [content]
+    parts: list[str] = []
+    for raw_block in raw_blocks:
+        block = _decoded(raw_block)
+        if isinstance(block, str):
+            parts.append(block)
+            continue
+        if not isinstance(block, dict):
+            raise ValueError(f"{context} contains a malformed content block.")
+        block_type = str(block.get("type") or "").strip().lower()
+        text = block.get("text")
+        if isinstance(text, str) and block_type in {"", "text", "input_text", "output_text"}:
+            parts.append(text)
+            continue
+        raise ValueError(
+            f"{context} contains unsupported non-text content block type {block_type!r}."
+        )
+    return "".join(parts)
 
 
 def build_agent_conversation(
@@ -127,6 +161,7 @@ def build_agent_conversation(
     *,
     human_column: str,
     trace_column: str,
+    internal_thought_tag: str = "",
 ) -> list[dict[str, Any]]:
     """Build an OpenAI-style user/tool/assistant training conversation.
 
@@ -155,8 +190,10 @@ def build_agent_conversation(
         if role == "assistant":
             raw_calls = message.get("tool_calls")
             tool_calls = raw_calls if isinstance(raw_calls, list) else []
-            content = message.get("content")
-            content_text = content if isinstance(content, str) else ""
+            content_text = _message_text_content(
+                message.get("content"),
+                context = "Assistant trace",
+            )
             if tool_calls:
                 normalized_calls: list[dict[str, Any]] = []
                 for raw_call in tool_calls:
@@ -191,18 +228,26 @@ def build_agent_conversation(
                 messages.append({"role": "assistant", "content": content_text})
         elif role == "tool":
             call_id = str(message.get("tool_call_id") or "").strip()
-            content = message.get("content")
-            if not call_id or not isinstance(content, str):
+            content_text = _message_text_content(
+                message.get("content"),
+                context = "Tool trace",
+            )
+            if not call_id:
                 raise ValueError("Tool trace messages require tool_call_id and text content.")
             if call_id in result_ids:
                 raise ValueError(f"Agent trace repeats tool result id {call_id!r}.")
             result_ids.add(call_id)
             messages.append(
-                {"role": "tool", "content": content, "tool_call_id": call_id}
+                {"role": "tool", "content": content_text, "tool_call_id": call_id}
             )
 
     if messages[-1].get("role") != "assistant" or messages[-1].get("tool_calls"):
         raise ValueError("Agent trace must end with a non-empty assistant response.")
+    _require_single_internal_thought_block(
+        messages[-1].get("content"),
+        internal_thought_tag,
+        context = "Final assistant trace response",
+    )
     missing_results = call_ids.difference(result_ids)
     orphan_results = result_ids.difference(call_ids)
     if missing_results:
@@ -218,6 +263,7 @@ def extend_agent_conversation(
     messages_column: str,
     human_column: str,
     trace_column: str,
+    internal_thought_tag: str = "",
 ) -> list[dict[str, Any]]:
     """Append one natural user turn and its complete agent trace to a history.
 
@@ -288,6 +334,7 @@ def extend_agent_conversation(
         row,
         human_column = human_column,
         trace_column = trace_column,
+        internal_thought_tag = internal_thought_tag,
     )
 
     # Some providers restart call ids on each generation.  Keep the trace
@@ -353,6 +400,124 @@ def project_agent_conversation(
     if not projected or projected[-1].get("from") != "gpt":
         raise ValueError("Projected agent history must end with a final assistant response.")
     return projected
+
+
+def _strip_reasoning_blocks(value: str, internal_thought_tag: str) -> str:
+    """Remove complete reasoning blocks while rejecting malformed tag structure."""
+
+    open_tag, close_tag, open_prefix, close_prefix = _internal_thought_tokens(
+        internal_thought_tag
+    )
+    if open_prefix not in value and close_prefix not in value:
+        return value
+
+    visible: list[str] = []
+    cursor = 0
+    while cursor < len(value):
+        next_open = value.find(open_tag, cursor)
+        next_close = value.find(close_tag, cursor)
+        if next_close >= 0 and (next_open < 0 or next_close < next_open):
+            raise ValueError("Assistant history contains an unmatched reasoning close tag.")
+        if next_open < 0:
+            remainder = value[cursor:]
+            if open_prefix in remainder or close_prefix in remainder:
+                raise ValueError("Assistant history contains an incomplete reasoning tag.")
+            visible.append(remainder)
+            break
+
+        visible.append(value[cursor:next_open])
+        reasoning_start = next_open + len(open_tag)
+        next_nested_open = value.find(open_tag, reasoning_start)
+        block_end = value.find(close_tag, reasoning_start)
+        if block_end < 0:
+            raise ValueError("Assistant history contains an unclosed reasoning block.")
+        if next_nested_open >= 0 and next_nested_open < block_end:
+            raise ValueError("Assistant history contains a nested reasoning block.")
+        cursor = block_end + len(close_tag)
+
+    return "".join(visible).strip()
+
+
+def strip_agent_conversation_reasoning(
+    row: dict[str, Any],
+    *,
+    messages_column: str,
+    internal_thought_tag: str,
+    conversations_column: str = "",
+) -> list[dict[str, Any]]:
+    """Normalize history and remove reasoning blocks from assistant content.
+
+    Canonical OpenAI-style messages win whenever that field is present. A
+    ShareGPT conversation fallback lets ordinary 1A exports enter the same 1B
+    pipeline without fabricating tool traces or maintaining a second path.
+    """
+
+    if messages_column in row:
+        original = _decoded_list(row.get(messages_column))
+    elif conversations_column and conversations_column in row:
+        conversations = _decoded_list(row.get(conversations_column))
+        if not isinstance(conversations, list):
+            raise ValueError(
+                f"Conversations field {conversations_column!r} must be a list."
+            )
+        original = []
+        role_map = {
+            "human": "user",
+            "user": "user",
+            "gpt": "assistant",
+            "assistant": "assistant",
+        }
+        for index, raw_turn in enumerate(conversations):
+            turn = _decoded(raw_turn)
+            if not isinstance(turn, dict):
+                raise ValueError(f"Conversation turn {index} must be an object.")
+            source_role = str(turn.get("from") or "").strip().lower()
+            role = role_map.get(source_role)
+            if role is None:
+                raise ValueError(
+                    f"Conversation turn {index} has unsupported role {source_role!r}."
+                )
+            content = turn.get("value")
+            if not isinstance(content, str):
+                raise ValueError(f"Conversation turn {index} value must be text.")
+            original.append({"role": role, "content": content})
+    else:
+        accepted = repr(messages_column)
+        if conversations_column:
+            accepted += f" or {conversations_column!r}"
+        raise ValueError(f"History requires field {accepted}.")
+
+    if not isinstance(original, list):
+        raise ValueError(f"Agent messages field {messages_column!r} must be a list.")
+    cleaned: list[dict[str, Any]] = []
+    for index, raw_message in enumerate(original):
+        message = _decoded(raw_message)
+        if not isinstance(message, dict):
+            raise ValueError(f"Agent message {index} must be an object.")
+        copied = dict(message)
+        role = str(copied.get("role") or "").strip().lower()
+        copied["role"] = role
+        if role == "assistant":
+            content = copied.get("content")
+            if content is not None and not isinstance(content, str):
+                raise ValueError(f"Assistant message {index} content must be text.")
+            if isinstance(content, str):
+                copied["content"] = _strip_reasoning_blocks(
+                    content,
+                    internal_thought_tag,
+                )
+        cleaned.append(copied)
+
+    if (
+        not cleaned
+        or cleaned[-1].get("role") != "assistant"
+        or not isinstance(cleaned[-1].get("content"), str)
+        or not cleaned[-1]["content"].strip()
+    ):
+        raise ValueError(
+            "Cleaned agent history must end with a non-empty visible assistant response."
+        )
+    return cleaned
 
 
 def extend_conversation_turns(
@@ -438,6 +603,40 @@ def _invalid_assistant_content_reason(
     if not "".join(visible_parts).strip():
         return "has no non-empty visible answer outside its internal-thought block"
     return None
+
+
+def _require_single_internal_thought_block(
+    value: Any,
+    internal_thought_tag: str,
+    *,
+    context: str,
+) -> None:
+    """Require one exact reasoning block when a workflow opts into a tag."""
+    tag = internal_thought_tag.strip()
+    if not tag:
+        return
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{context} must be non-empty text.")
+
+    open_tag, close_tag, _, _ = _internal_thought_tokens(tag)
+    lowered = value.lower()
+    if (
+        lowered.count(open_tag.lower()) != 1
+        or lowered.count(close_tag.lower()) != 1
+    ):
+        raise ValueError(
+            f"{context} must contain exactly one <{tag}>...</{tag}> block."
+        )
+    if value.count(open_tag) != 1 or value.count(close_tag) != 1:
+        raise ValueError(
+            f"{context} must use the exact case-sensitive <{tag}>...</{tag}> tags."
+        )
+    if not value.lstrip().startswith(open_tag):
+        raise ValueError(f"{context} must begin with {open_tag}.")
+
+    invalid_reason = _invalid_assistant_content_reason(value, tag)
+    if invalid_reason is not None:
+        raise ValueError(f"{context} {invalid_reason}.")
 
 
 def _last_assistant_turn_index(conversations: list[Any]) -> int | None:
@@ -770,6 +969,7 @@ def _make_workflow_column(spec: dict[str, Any]):
     if column_type == "unsloth-conversation-pair":
         human_column = _required_column_name(spec, "human_column")
         assistant_column = _required_column_name(spec, "assistant_column")
+        internal_thought_tag = str(spec.get("internal_thought_tag") or "").strip()
         required = [human_column, assistant_column]
 
         @custom_column_generator(required_columns = required)
@@ -779,12 +979,14 @@ def _make_workflow_column(spec: dict[str, Any]):
                 row,
                 human_column = human_column,
                 assistant_column = assistant_column,
+                internal_thought_tag = internal_thought_tag,
             )
             return output
 
     elif column_type == "unsloth-agent-conversation":
         human_column = _required_column_name(spec, "human_column")
         trace_column = _required_column_name(spec, "trace_column")
+        internal_thought_tag = str(spec.get("internal_thought_tag") or "").strip()
         required = [human_column, trace_column]
 
         @custom_column_generator(required_columns = required)
@@ -794,6 +996,26 @@ def _make_workflow_column(spec: dict[str, Any]):
                 row,
                 human_column = human_column,
                 trace_column = trace_column,
+                internal_thought_tag = internal_thought_tag,
+            )
+            return output
+
+    elif column_type == "unsloth-agent-conversation-strip-reasoning":
+        messages_column = _required_column_name(spec, "messages_column")
+        conversations_column = str(spec.get("conversations_column") or "").strip()
+        internal_thought_tag = str(
+            spec.get("internal_thought_tag") or "Mia_Internal-Thoughts"
+        ).strip()
+        required = [] if conversations_column else [messages_column]
+
+        @custom_column_generator(required_columns = required)
+        def generate(row):
+            output = dict(row)
+            output[name] = strip_agent_conversation_reasoning(
+                row,
+                messages_column = messages_column,
+                internal_thought_tag = internal_thought_tag,
+                conversations_column = conversations_column,
             )
             return output
 
@@ -801,6 +1023,7 @@ def _make_workflow_column(spec: dict[str, Any]):
         messages_column = _required_column_name(spec, "messages_column")
         human_column = _required_column_name(spec, "human_column")
         trace_column = _required_column_name(spec, "trace_column")
+        internal_thought_tag = str(spec.get("internal_thought_tag") or "").strip()
         required = [messages_column, human_column, trace_column]
 
         @custom_column_generator(required_columns = required)
@@ -811,6 +1034,7 @@ def _make_workflow_column(spec: dict[str, Any]):
                 messages_column = messages_column,
                 human_column = human_column,
                 trace_column = trace_column,
+                internal_thought_tag = internal_thought_tag,
             )
             return output
 

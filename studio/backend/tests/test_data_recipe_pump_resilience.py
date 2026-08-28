@@ -14,12 +14,16 @@ import queue
 import sys
 import threading
 import time
+import json
 from pathlib import Path
+
+import pytest
 
 _BACKEND_DIR = str(Path(__file__).resolve().parent.parent)
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
+import core.data_recipe.jobs.manager as manager_module  # noqa: E402
 from core.data_recipe.jobs.manager import JobManager  # noqa: E402
 from core.data_recipe.jobs.types import Job  # noqa: E402
 
@@ -30,6 +34,20 @@ class _FakeProc:
 
     def is_alive(self):
         return self._alive
+
+
+class _FakePauseEvent:
+    def __init__(self):
+        self._set = False
+
+    def set(self):
+        self._set = True
+
+    def clear(self):
+        self._set = False
+
+    def is_set(self):
+        return self._set
 
 
 class _ScriptedQueue:
@@ -150,3 +168,122 @@ def test_pump_finalizes_when_read_keeps_raising_on_dead_worker(monkeypatch):
     assert not pump.is_alive(), "pump must finalize a dead worker even when reads keep raising"
     assert m._job.status == "error"
     assert retired and retired[0] is m._job
+
+
+def test_full_run_pause_and_resume_are_cooperative(monkeypatch):
+    m = _manager_with_active_job()
+    m._job.execution_type = "full"
+    m._pause_event = _FakePauseEvent()
+    emitted: list[dict] = []
+    monkeypatch.setattr(m, "_emit", lambda event: emitted.append(event))
+
+    assert m.pause("job-test") is True
+    assert m._pause_event.is_set() is True
+    assert m._job.status == "pausing"
+    assert emitted[-1]["type"] == "job.pausing"
+
+    assert m.resume("job-test") is True
+    assert m._pause_event.is_set() is False
+    assert m._job.status == "active"
+    assert emitted[-1]["type"] == "job.resumed"
+
+
+def test_preview_run_cannot_pause(monkeypatch):
+    m = _manager_with_active_job()
+    m._job.execution_type = "preview"
+    m._pause_event = _FakePauseEvent()
+    monkeypatch.setattr(m, "_emit", lambda event: None)
+
+    try:
+        m.pause("job-test")
+    except ValueError as exc:
+        assert "Only full recipe runs" in str(exc)
+    else:
+        raise AssertionError("preview runs do not have durable pause checkpoints")
+
+
+def test_durable_checkpoint_restores_paused_job_without_credentials(monkeypatch, tmp_path):
+    state_path = tmp_path / "checkpoints" / "current.json"
+    artifact_path = tmp_path / "recipe-run"
+    artifact_path.mkdir()
+    monkeypatch.setattr(manager_module, "_resume_state_path", lambda: state_path)
+
+    manager = JobManager()
+    manager._job = Job(
+        job_id = "durable-job",
+        status = "paused",
+        artifact_path = str(artifact_path),
+        execution_type = "full",
+    )
+    manager._resume_recipe = {
+        "model_providers": [{"name": "local", "api_key": "do-not-persist"}],
+        "columns": [{"name": "answer"}],
+    }
+    manager._resume_run = {"execution_type": "full", "rows": 2000}
+    manager._persist_resumable_locked()
+
+    persisted = json.loads(state_path.read_text(encoding = "utf-8"))
+    assert "api_key" not in persisted["recipe"]["model_providers"][0]
+
+    interrupted_write = state_path.with_suffix(".tmp")
+    state_path.replace(interrupted_write)
+
+    restored = JobManager()
+    assert restored._job is not None
+    assert restored._job.job_id == "durable-job"
+    assert restored._job.status == "paused"
+    assert restored.requires_restart_resume("durable-job") is True
+    assert state_path.is_file()
+    assert not interrupted_write.exists()
+
+
+def test_restart_resume_spawns_new_worker_against_existing_artifact(monkeypatch, tmp_path):
+    state_path = tmp_path / "checkpoints" / "current.json"
+    artifact_path = tmp_path / "recipe-run"
+    artifact_path.mkdir()
+    monkeypatch.setattr(manager_module, "_resume_state_path", lambda: state_path)
+    manager = JobManager()
+    manager._job = Job(
+        job_id = "durable-job",
+        status = "paused",
+        artifact_path = str(artifact_path),
+        execution_type = "full",
+    )
+    manager._resume_recipe = {"columns": [{"name": "answer"}]}
+    manager._resume_run = {"execution_type": "full", "rows": 2000}
+    manager._restart_resume_error = None
+    spawned: list[dict] = []
+
+    def fake_spawn(**kwargs):
+        spawned.append(kwargs)
+        manager._proc = _FakeProc(alive = True)
+        manager._pause_event = _FakePauseEvent()
+
+    monkeypatch.setattr(manager, "_spawn_worker_locked", fake_spawn)
+    monkeypatch.setattr(manager, "_emit", lambda event: None)
+
+    assert manager.resume("durable-job", recipe = manager._resume_recipe) is True
+    assert manager._job.status == "active"
+    assert spawned[0]["resume_artifact_path"] == str(artifact_path)
+
+
+def test_restart_resume_refuses_shuffled_seed_reader(monkeypatch, tmp_path):
+    state_path = tmp_path / "checkpoints" / "current.json"
+    artifact_path = tmp_path / "recipe-run"
+    artifact_path.mkdir()
+    monkeypatch.setattr(manager_module, "_resume_state_path", lambda: state_path)
+    manager = JobManager()
+    manager._job = Job(
+        job_id = "durable-job",
+        status = "paused",
+        artifact_path = str(artifact_path),
+        execution_type = "full",
+    )
+    manager._resume_recipe = {"seed_config": {"sampling_strategy": "shuffle"}}
+    manager._resume_run = {"execution_type": "full", "rows": 2000}
+    manager._restart_resume_error = manager_module._restart_resume_error(
+        manager._resume_recipe
+    )
+
+    with pytest.raises(ValueError, match = "shuffle state"):
+        manager.resume("durable-job", recipe = manager._resume_recipe)

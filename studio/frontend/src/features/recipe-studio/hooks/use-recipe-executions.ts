@@ -12,6 +12,8 @@ import {
   getRecipeJobDataset,
   getRecipeJobStatus,
   isDataRecipeApiError,
+  pauseRecipeJob,
+  resumeRecipeJob,
   validateRecipe,
 } from "../api";
 import { saveRecipeExecution } from "../data/executions-db";
@@ -170,16 +172,10 @@ function getLocalModelLoadPlan(
     return { selection: null, error: null, legacyAliases };
   }
 
-  if (selections.size > 1) {
-    const aliases = [...selections.values()]
-      .flatMap((selection) => selection.aliases)
-      .join(", ");
-    return {
-      selection: null,
-      error: `Recipes supports one active local model per run. Select the same local model and GGUF variant for: ${aliases}.`,
-    };
-  }
-
+  // The local inference server has one resident slot, but recipe requests carry
+  // their concrete model ids and the backend serializes swaps between columns.
+  // Load the first selected model as the run's starting point; subsequent local
+  // aliases switch through the internally authenticated recipe endpoint.
   const selection = [...selections.values()][0];
   return selection ? { selection, error: null } : null;
 }
@@ -460,6 +456,8 @@ type UseRecipeExecutionsResult = {
   } | null;
   runPreview: () => Promise<boolean>;
   runFull: () => Promise<boolean>;
+  pauseExecution: (id: string) => Promise<void>;
+  resumeExecution: (id: string) => Promise<void>;
   cancelExecution: (id: string) => Promise<void>;
   loadExecutionDatasetPage: (id: string, page: number) => Promise<void>;
 };
@@ -1008,6 +1006,40 @@ export function useRecipeExecutions({
     [executions, upsertAndPersist],
   );
 
+  const pauseExecution = useCallback(
+    async (id: string): Promise<void> => {
+      const execution = executions.find((entry) => entry.id === id);
+      if (!execution?.jobId) {
+        return;
+      }
+      try {
+        const status = await pauseRecipeJob(execution.jobId);
+        upsertAndPersist(applyExecutionStatusSnapshot(execution, status));
+      } catch (error) {
+        const message = toErrorMessage(error, "Could not pause execution.");
+        toastError("Pause failed", message);
+      }
+    },
+    [executions, upsertAndPersist],
+  );
+
+  const resumeExecution = useCallback(
+    async (id: string): Promise<void> => {
+      const execution = executions.find((entry) => entry.id === id);
+      if (!execution?.jobId) {
+        return;
+      }
+      try {
+        const status = await resumeRecipeJob(execution.jobId);
+        upsertAndPersist(applyExecutionStatusSnapshot(execution, status));
+      } catch (error) {
+        const message = toErrorMessage(error, "Could not resume execution.");
+        toastError("Resume failed", message);
+      }
+    },
+    [executions, upsertAndPersist],
+  );
+
   const loadExecutionDatasetPage = useCallback(
     async (id: string, page: number): Promise<void> => {
       const execution = executions.find((entry) => entry.id === id);
@@ -1079,6 +1111,8 @@ export function useRecipeExecutions({
     validateResult,
     runPreview,
     runFull,
+    pauseExecution,
+    resumeExecution,
     cancelExecution,
     loadExecutionDatasetPage,
   };

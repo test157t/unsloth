@@ -68,6 +68,7 @@ export type BlockType =
   | "conversation_pair"
   | "conversation_extend"
   | "agent_conversation"
+  | "agent_conversation_strip_reasoning"
   | "agent_conversation_extend"
   | "agent_conversation_project"
   | "repair_tasks"
@@ -520,6 +521,21 @@ const BLOCK_DEFINITIONS: BlockDefinition[] = [
   },
   {
     kind: "expression",
+    type: "agent_conversation_strip_reasoning",
+    title: "Strip agent reasoning",
+    description:
+      "Remove reasoning blocks from prior assistant turns while preserving tool history.",
+    icon: FunctionIcon,
+    dialogKey: "repair_workflow",
+    createConfig: (id, existing) =>
+      makeRepairWorkflowConfig(
+        id,
+        "agent_conversation_strip_reasoning",
+        existing,
+      ),
+  },
+  {
+    kind: "expression",
     type: "agent_conversation_project",
     title: "Project agent conversation",
     description:
@@ -647,6 +663,7 @@ export function getBlockDefinitionForConfig(
         config.expression_type === "conversation_pair" ||
         config.expression_type === "conversation_extend" ||
         config.expression_type === "agent_conversation" ||
+        config.expression_type === "agent_conversation_strip_reasoning" ||
         config.expression_type === "agent_conversation_extend" ||
         config.expression_type === "agent_conversation_project" ||
         config.expression_type === "string_replace" ||

@@ -27,6 +27,15 @@ from .identity import (
 )
 
 _IMAGE_CONTEXT_PATCHED = False
+_MODEL_RETRY_PATCHED = False
+
+# Data Designer's native HTTP transport retries 502/503/504, but not 500. Its
+# model error mapper nevertheless classifies every 5xx response as an internal
+# server error. In the synchronous recipe engine, an exhausted/unretried 500
+# drops the record immediately. Include 500 in the existing bounded transport
+# policy so a brief local inference-server hiccup does not punch holes in a
+# long dataset run.
+_STUDIO_RETRYABLE_MODEL_STATUS_CODES = frozenset({500})
 
 
 def _encode_bytes_to_base64(value: bytes | bytearray) -> str:
@@ -135,6 +144,50 @@ def _apply_data_designer_image_context_patch() -> None:
     ImageContext._auto_resolve_context_value = _patched_auto_resolve
     setattr(ImageContext, "_unsloth_image_context_patch_applied", True)
     _IMAGE_CONTEXT_PATCHED = True
+
+
+def _apply_data_designer_model_retry_patch() -> None:
+    """Extend Data Designer's bounded model retry policy to cover HTTP 500."""
+    global _MODEL_RETRY_PATCHED
+    if _MODEL_RETRY_PATCHED:
+        return
+
+    try:
+        from dataclasses import replace
+
+        from data_designer.engine.models.clients.retry import (  # pyright: ignore[reportMissingImports]
+            RetryConfig,
+        )
+        from data_designer.engine.resources import (  # pyright: ignore[reportMissingImports]
+            resource_provider,
+        )
+    except ImportError:
+        return
+
+    if getattr(resource_provider, "_unsloth_model_retry_patch_applied", False):
+        _MODEL_RETRY_PATCHED = True
+        return
+
+    original_create_model_registry = resource_provider.create_model_registry
+
+    def _patched_create_model_registry(*args: Any, **kwargs: Any) -> Any:
+        registry = original_create_model_registry(*args, **kwargs)
+        retry_config = registry.retry_config or RetryConfig()
+        retryable_status_codes = (
+            retry_config.retryable_status_codes | _STUDIO_RETRYABLE_MODEL_STATUS_CODES
+        )
+        if retryable_status_codes != retry_config.retryable_status_codes:
+            # Model facades are initialized lazily, so replacing the registry's
+            # policy here happens before any HTTP client consumes it.
+            registry._retry_config = replace(  # noqa: SLF001
+                retry_config,
+                retryable_status_codes = retryable_status_codes,
+            )
+        return registry
+
+    resource_provider.create_model_registry = _patched_create_model_registry
+    setattr(resource_provider, "_unsloth_model_retry_patch_applied", True)
+    _MODEL_RETRY_PATCHED = True
 
 
 def build_model_providers(recipe: dict[str, Any]):
@@ -322,6 +375,7 @@ def build_config_builder(recipe: dict[str, Any]):
 
 def create_data_designer(recipe: dict[str, Any], *, artifact_path: str | None = None):
     _apply_data_designer_image_context_patch()
+    _apply_data_designer_model_retry_patch()
     from data_designer.interface.data_designer import DataDesigner  # pyright: ignore[reportMissingImports]
 
     if artifact_path is None:

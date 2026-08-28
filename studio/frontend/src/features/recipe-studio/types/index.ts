@@ -92,6 +92,7 @@ export type RecipeNodeData = {
     | "conversation_pair"
     | "conversation_extend"
     | "agent_conversation"
+    | "agent_conversation_strip_reasoning"
     | "agent_conversation_extend"
     | "agent_conversation_project"
     | "repair_tasks"
@@ -341,6 +342,7 @@ export type ExpressionConfig = {
     | "conversation_pair"
     | "conversation_extend"
     | "agent_conversation"
+    | "agent_conversation_strip_reasoning"
     | "agent_conversation_extend"
     | "agent_conversation_project"
     | "repair_tasks"
@@ -358,7 +360,7 @@ export type ExpressionConfig = {
   candidate_column?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema
   approval_column?: string;
-  // Reasoning block tag checked on repaired assistant responses.
+  // Optional reasoning tag validated by assembly or repair helpers.
   // biome-ignore lint/style/useNamingConvention: ui schema
   internal_thought_tag?: string;
   // biome-ignore lint/style/useNamingConvention: ui schema

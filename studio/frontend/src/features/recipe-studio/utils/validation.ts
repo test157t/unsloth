@@ -275,6 +275,13 @@ export function getConfigErrors(config: NodeConfig | null): string[] {
       if (!config.trace_column?.trim()) {
         errors.push("AI trace field is required.");
       }
+    } else if (expressionType === "agent_conversation_strip_reasoning") {
+      if (!config.messages_column?.trim()) {
+        errors.push("Agent messages field is required.");
+      }
+      if (!config.internal_thought_tag?.trim()) {
+        errors.push("Reasoning tag is required.");
+      }
     } else if (expressionType === "agent_conversation_project") {
       if (!config.messages_column?.trim()) {
         errors.push("Agent messages field is required.");

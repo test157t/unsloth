@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import queue
 import threading
@@ -20,19 +21,124 @@ from ..jsonable import to_preview_jsonable
 from .constants import (
     EVENT_JOB_CANCELLING,
     EVENT_JOB_CANCELLED,
+    EVENT_JOB_CHECKPOINT,
     EVENT_JOB_COMPLETED,
     EVENT_JOB_ENQUEUED,
     EVENT_JOB_ERROR,
+    EVENT_JOB_PAUSED,
+    EVENT_JOB_PAUSING,
+    EVENT_JOB_RESUMED,
     EVENT_JOB_STARTED,
 )
 from .parse import apply_update, coerce_event, parse_log_message
-from .types import Job
+from .types import BatchProgress, Job, ModelUsage, Progress, SourceProgress
 from loggers import get_logger
+from utils.paths import ensure_dir, studio_root
 
 logger = get_logger(__name__)
 
 
 _CTX = mp.get_context("spawn")
+
+
+def _resume_state_path() -> Path:
+    return studio_root() / "state" / "data-recipe-current.json"
+
+
+def _strip_persisted_secrets(value: Any) -> Any:
+    """Keep replay configuration on disk without copying credentials into it."""
+    if isinstance(value, list):
+        return [_strip_persisted_secrets(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result: dict[str, Any] = {}
+    for key, item in value.items():
+        if key == "api_key":
+            continue
+        result[key] = _strip_persisted_secrets(item)
+    if result.get("provider_type") == "stdio" and isinstance(result.get("env"), dict):
+        result["env"] = {key: "" for key in result["env"]}
+    return result
+
+
+def _restart_resume_error(recipe: dict[str, Any]) -> str | None:
+    seed_config = recipe.get("seed_config")
+    if isinstance(seed_config, dict) and str(
+        seed_config.get("sampling_strategy") or ""
+    ).lower() == "shuffle":
+        return (
+            "Restart resume is unavailable for shuffled seed sampling because "
+            "Data Designer cannot restore the reader's shuffle state."
+        )
+    for provider in recipe.get("model_providers") or []:
+        if (
+            isinstance(provider, dict)
+            and not provider.get("is_local")
+            and isinstance(provider.get("api_key"), str)
+            and provider["api_key"].strip()
+        ):
+            return (
+                "Restart resume cannot retain a directly entered provider API key. "
+                "Use an API-key environment variable before starting the run."
+            )
+    for provider in recipe.get("mcp_providers") or []:
+        if not isinstance(provider, dict) or provider.get("provider_type") != "stdio":
+            continue
+        environment = provider.get("env")
+        if isinstance(environment, dict) and any(str(value) for value in environment.values()):
+            return (
+                "Restart resume cannot retain inline tool-server environment secrets. "
+                "Use inherited environment variables before starting the run."
+            )
+    return None
+
+
+def _restore_job(value: dict[str, Any]) -> Job:
+    job = Job(job_id = str(value.get("job_id") or ""))
+    for field_name in (
+        "stage",
+        "current_column",
+        "rows",
+        "cols",
+        "error",
+        "started_at",
+        "finished_at",
+        "analysis",
+        "artifact_path",
+        "execution_type",
+        "dataset",
+        "processor_artifacts",
+        "export_files",
+        "progress_columns_total",
+        "source_progress_estimated_total",
+        "completed_columns",
+        "internal_api_key_id",
+    ):
+        if field_name in value:
+            setattr(job, field_name, value[field_name])
+    progress = value.get("progress")
+    if isinstance(progress, dict):
+        job.progress = Progress(**progress)
+    column_progress = value.get("column_progress")
+    if isinstance(column_progress, dict):
+        job.column_progress = Progress(**column_progress)
+    batch = value.get("batch")
+    if isinstance(batch, dict):
+        job.batch = BatchProgress(**batch)
+    source_progress = value.get("source_progress")
+    if isinstance(source_progress, dict):
+        job.source_progress = SourceProgress(**source_progress)
+    model_usage = value.get("model_usage")
+    if isinstance(model_usage, dict):
+        job.model_usage = {
+            str(alias): ModelUsage(**usage)
+            for alias, usage in model_usage.items()
+            if isinstance(usage, dict)
+        }
+    job.status = "paused"
+    job.finished_at = None
+    job.error = None
+    return job
 
 
 def _github_source_estimated_total(recipe: dict) -> int | None:
@@ -120,16 +226,22 @@ class JobManager:
         self._job: Job | None = None
         self._proc: mp.Process | None = None
         self._mp_q: Any | None = None
+        self._pause_event: Any | None = None
         self._events: deque[dict] = deque(maxlen = 5000)
         self._subs: list[queue.Queue] = []
         self._pump_thread: threading.Thread | None = None
         self._seq: int = 0
+        self._resume_recipe: dict[str, Any] | None = None
+        self._resume_run: dict[str, Any] | None = None
+        self._restart_resume_error: str | None = None
+        self._load_resumable_job()
 
     def start(
         self,
         *,
         recipe: dict,
         run: dict,
+        resume_recipe: dict | None = None,
         internal_api_key_id: int | None = None,
     ) -> str:
         """Spawn the job subprocess (one at a time, no cap).
@@ -155,48 +267,230 @@ class JobManager:
         with self._lock:
             if self._proc is not None and self._proc.is_alive():
                 raise RuntimeError("job already running")
+            if self._job is not None and self._job.status == "paused":
+                raise RuntimeError("A paused recipe run must be resumed or stopped first.")
 
             job_id = uuid.uuid4().hex
             self._job = Job(job_id = job_id, status = "pending", started_at = time.time())
             self._job.progress_columns_total = llm_column_count
             self._job.source_progress_estimated_total = _github_source_estimated_total(recipe)
             self._job.internal_api_key_id = internal_api_key_id
+            self._job.execution_type = str(run.get("execution_type") or "full")
+            self._resume_recipe = _strip_persisted_secrets(resume_recipe or recipe)
+            self._resume_run = dict(run)
+            self._restart_resume_error = _restart_resume_error(resume_recipe or recipe)
             self._events.clear()
             self._seq = 0
-
-            run_payload = dict(run)
-            run_payload["_job_id"] = job_id
-            from utils.native_path_leases import (
-                native_path_secret_removed_for_child_start,
-                run_without_native_path_secret,
-            )
-            from utils.hf_cache_settings import child_environment_for_spawn, get_hf_cache_paths
-
-            cache_env = get_hf_cache_paths().child_env({})
-
-            with (
-                child_environment_for_spawn(cache_env),
-                native_path_secret_removed_for_child_start(),
-            ):
-                mp_q = _CTX.Queue()
-                proc = _CTX.Process(
-                    target = run_without_native_path_secret,
-                    args = ("core.data_recipe.jobs.worker", "run_job_process", cache_env),
-                    kwargs = {"event_queue": mp_q, "recipe": recipe, "run": run_payload},
-                    daemon = True,
-                )
-                proc.start()
-                from utils.process_lifetime import adopt_pid
-
-                adopt_pid(proc.pid)  # bind to parent lifetime (Windows job / sweep)
-
-            self._mp_q = mp_q
-            self._proc = proc
-            self._pump_thread = threading.Thread(target = self._pump_loop, daemon = True)
-            self._pump_thread.start()
+            self._spawn_worker_locked(recipe = recipe, run = run, job_id = job_id)
 
             self._emit({"type": EVENT_JOB_ENQUEUED, "ts": time.time(), "job_id": job_id})
             return job_id
+
+    def _spawn_worker_locked(
+        self,
+        *,
+        recipe: dict[str, Any],
+        run: dict[str, Any],
+        job_id: str,
+        resume_artifact_path: str | None = None,
+    ) -> None:
+        run_payload = dict(run)
+        run_payload["_job_id"] = job_id
+        if resume_artifact_path:
+            run_payload["_resume_artifact_path"] = resume_artifact_path
+
+        from utils.native_path_leases import (
+            native_path_secret_removed_for_child_start,
+            run_without_native_path_secret,
+        )
+        from utils.hf_cache_settings import child_environment_for_spawn, get_hf_cache_paths
+
+        cache_env = get_hf_cache_paths().child_env({})
+        with (
+            child_environment_for_spawn(cache_env),
+            native_path_secret_removed_for_child_start(),
+        ):
+            mp_q = _CTX.Queue()
+            pause_event = _CTX.Event()
+            proc = _CTX.Process(
+                target = run_without_native_path_secret,
+                args = ("core.data_recipe.jobs.worker", "run_job_process", cache_env),
+                kwargs = {
+                    "event_queue": mp_q,
+                    "recipe": recipe,
+                    "run": run_payload,
+                    "pause_event": pause_event,
+                },
+                daemon = True,
+            )
+            proc.start()
+            from utils.process_lifetime import adopt_pid
+
+            adopt_pid(proc.pid)
+
+        self._mp_q = mp_q
+        self._pause_event = pause_event
+        self._proc = proc
+        self._pump_thread = threading.Thread(target = self._pump_loop, daemon = True)
+        self._pump_thread.start()
+
+    def _persist_resumable_locked(self) -> None:
+        if (
+            self._job is None
+            or not self._job.artifact_path
+            or self._resume_recipe is None
+            or self._resume_run is None
+            or self._job.execution_type != "full"
+        ):
+            return
+        target = _resume_state_path()
+        try:
+            ensure_dir(target.parent)
+            persisted_recipe = _strip_persisted_secrets(self._resume_recipe)
+            self._resume_recipe = persisted_recipe
+            payload = {
+                "version": 1,
+                "job": dataclasses.asdict(self._job),
+                "recipe": persisted_recipe,
+                "run": self._resume_run,
+                "restart_resume_error": self._restart_resume_error,
+            }
+            temporary = target.with_suffix(".tmp")
+            temporary.write_text(
+                json.dumps(
+                    payload,
+                    ensure_ascii = False,
+                    default = lambda value: (
+                        sorted(value) if isinstance(value, set) else str(value)
+                    ),
+                ),
+                encoding = "utf-8",
+            )
+            temporary.replace(target)
+        except (OSError, TypeError, ValueError):
+            logger.warning("Could not persist the recipe checkpoint", exc_info = True)
+
+    def _delete_resume_state_locked(self) -> None:
+        target = _resume_state_path()
+        for candidate in (target, target.with_suffix(".tmp")):
+            try:
+                candidate.unlink(missing_ok = True)
+            except OSError:
+                logger.warning("Could not remove the completed recipe checkpoint", exc_info = True)
+
+    def _load_resumable_job(self) -> None:
+        canonical_target = _resume_state_path()
+        temporary_target = canonical_target.with_suffix(".tmp")
+        target = canonical_target if canonical_target.is_file() else temporary_target
+        if not target.is_file():
+            return
+        try:
+            payload = json.loads(target.read_text(encoding = "utf-8"))
+            job_raw = payload.get("job")
+            recipe = payload.get("recipe")
+            run = payload.get("run")
+            if not isinstance(job_raw, dict) or not isinstance(recipe, dict) or not isinstance(run, dict):
+                raise ValueError("invalid checkpoint payload")
+            job = _restore_job(job_raw)
+            if not job.job_id or not job.artifact_path or not Path(job.artifact_path).is_dir():
+                raise ValueError("checkpoint artifact is missing")
+            self._job = job
+            self._resume_recipe = recipe
+            self._resume_run = run
+            resume_error = payload.get("restart_resume_error")
+            self._restart_resume_error = resume_error if isinstance(resume_error, str) else None
+            self._events.append(
+                {
+                    "type": EVENT_JOB_PAUSED,
+                    "ts": time.time(),
+                    "job_id": job.job_id,
+                    "recovered": True,
+                    "seq": 1,
+                }
+            )
+            self._seq = 1
+            if target == temporary_target:
+                ensure_dir(canonical_target.parent)
+                temporary_target.replace(canonical_target)
+            if job.internal_api_key_id is not None:
+                self._retire_workflow_key(job)
+                self._persist_resumable_locked()
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            logger.warning("Ignoring an invalid recipe checkpoint", exc_info = True)
+            self._delete_resume_state_locked()
+
+    def requires_restart_resume(self, job_id: str) -> bool:
+        with self._lock:
+            return bool(
+                self._job is not None
+                and self._job.job_id == job_id
+                and self._job.status == "paused"
+                and (self._proc is None or not self._proc.is_alive())
+            )
+
+    def get_resume_recipe(self, job_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            if self._job is None or self._job.job_id != job_id:
+                return None
+            return None if self._resume_recipe is None else json.loads(json.dumps(self._resume_recipe))
+
+    def pause(self, job_id: str) -> bool:
+        """Request a cooperative pause after the current durable batch."""
+        with self._lock:
+            if self._job is None or self._job.job_id != job_id:
+                return False
+            if self._job.execution_type != "full":
+                raise ValueError("Only full recipe runs can be paused.")
+            if self._job.status not in {"pending", "active"}:
+                raise ValueError(f"Cannot pause a recipe run that is {self._job.status}.")
+            if self._proc is None or not self._proc.is_alive() or self._pause_event is None:
+                raise ValueError("The recipe worker is no longer running.")
+            self._pause_event.set()
+            self._job.status = "pausing"
+            self._persist_resumable_locked()
+            self._emit({"type": EVENT_JOB_PAUSING, "ts": time.time(), "job_id": job_id})
+            return True
+
+    def resume(
+        self,
+        job_id: str,
+        *,
+        recipe: dict[str, Any] | None = None,
+        internal_api_key_id: int | None = None,
+    ) -> bool:
+        """Release a worker paused at a completed batch checkpoint."""
+        with self._lock:
+            if self._job is None or self._job.job_id != job_id:
+                return False
+            if self._job.status not in {"pausing", "paused"}:
+                raise ValueError(f"Cannot resume a recipe run that is {self._job.status}.")
+            worker_alive = self._proc is not None and self._proc.is_alive()
+            if worker_alive:
+                if self._pause_event is None:
+                    raise ValueError("The recipe pause control is unavailable.")
+                self._pause_event.clear()
+            else:
+                if not self._job.artifact_path:
+                    raise ValueError("The durable recipe checkpoint is missing.")
+                if self._restart_resume_error:
+                    raise ValueError(self._restart_resume_error)
+                if recipe is None or self._resume_run is None:
+                    raise ValueError("The saved recipe configuration is unavailable.")
+                self._job.internal_api_key_id = internal_api_key_id
+                try:
+                    self._spawn_worker_locked(
+                        recipe = recipe,
+                        run = self._resume_run,
+                        job_id = job_id,
+                        resume_artifact_path = self._job.artifact_path,
+                    )
+                except Exception:
+                    self._job.internal_api_key_id = None
+                    raise
+            self._job.status = "active"
+            self._persist_resumable_locked()
+            self._emit({"type": EVENT_JOB_RESUMED, "ts": time.time(), "job_id": job_id})
+            return True
 
     def cancel(self, job_id: str) -> bool:
         """Hard stop. We terminate the subprocess. Quick + reliable."""
@@ -204,8 +498,13 @@ class JobManager:
             if self._job is None or self._job.job_id != job_id:
                 return False
             if self._proc is None or not self._proc.is_alive():
+                self._job.status = "cancelled"
+                self._job.finished_at = time.time()
+                self._delete_resume_state_locked()
+                self._emit({"type": EVENT_JOB_CANCELLED, "ts": time.time(), "job_id": job_id})
                 return True
             self._job.status = "cancelling"
+            self._delete_resume_state_locked()
             self._emit({"type": EVENT_JOB_CANCELLING, "ts": time.time(), "job_id": job_id})
             try:
                 self._proc.terminate()
@@ -511,17 +810,27 @@ class JobManager:
                     if self._job and self._job.status in {
                         "pending",
                         "active",
+                        "pausing",
+                        "paused",
                         "cancelling",
                     }:
                         if self._job.status == "cancelling":
                             self._job.status = "cancelled"
+                            self._delete_resume_state_locked()
+                        elif self._job.artifact_path and self._resume_recipe is not None:
+                            self._job.status = "paused"
+                            self._job.error = None
+                            self._persist_resumable_locked()
                         else:
                             self._job.status = "error"
                             self._job.error = self._job.error or "process exited"
+                            self._delete_resume_state_locked()
                         self._job.finished_at = time.time()
                         event_type = (
                             EVENT_JOB_CANCELLED
                             if self._job.status == "cancelled"
+                            else EVENT_JOB_PAUSED
+                            if self._job.status == "paused"
                             else EVENT_JOB_ERROR
                         )
                         self._emit(
@@ -547,8 +856,25 @@ class JobManager:
         with self._lock:
             if self._job is None or self._job.job_id != job.job_id:
                 return
-            if et == EVENT_JOB_STARTED:
+            if et == EVENT_JOB_STARTED and self._job.status != "pausing":
                 self._job.status = "active"
+            if et == EVENT_JOB_PAUSING:
+                self._job.status = "pausing"
+            if (
+                et == EVENT_JOB_PAUSED
+                and self._pause_event is not None
+                and self._pause_event.is_set()
+            ):
+                self._job.status = "paused"
+                self._persist_resumable_locked()
+            if et == EVENT_JOB_RESUMED:
+                self._job.status = "active"
+                self._persist_resumable_locked()
+            if et == EVENT_JOB_CHECKPOINT:
+                checkpoint_path = event.get("artifact_path")
+                if isinstance(checkpoint_path, str) and checkpoint_path:
+                    self._job.artifact_path = checkpoint_path
+                    self._persist_resumable_locked()
             if et == EVENT_JOB_COMPLETED:
                 self._job.status = "completed"
                 self._job.finished_at = time.time()
@@ -563,13 +889,16 @@ class JobManager:
                     self._job.progress.done = self._job.progress.total
                     self._job.progress.percent = 100.0
                 terminal = True
+                self._delete_resume_state_locked()
             if et == EVENT_JOB_ERROR:
                 self._job.status = "error"
                 self._job.finished_at = time.time()
                 self._job.error = event.get("error") or "error"
                 terminal = True
+                self._delete_resume_state_locked()
             if et == EVENT_JOB_CANCELLED:
                 terminal = True
+                self._delete_resume_state_locked()
 
             if msg:
                 upd = parse_log_message(msg)

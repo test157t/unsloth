@@ -122,6 +122,7 @@ type RecipeStudioState = {
       | "conversation_extend"
       | "agent_conversation"
       | "agent_conversation_extend"
+      | "agent_conversation_strip_reasoning"
       | "agent_conversation_project"
       | "repair_merge"
       | "jsonl_export",

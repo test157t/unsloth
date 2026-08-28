@@ -64,6 +64,12 @@ export function mapJobStatus(status: string): RecipeExecutionStatus {
   if (status === "pending") {
     return "pending";
   }
+  if (status === "pausing") {
+    return "pausing";
+  }
+  if (status === "paused") {
+    return "paused";
+  }
   if (status === "cancelling") {
     return "cancelling";
   }
@@ -84,6 +90,8 @@ export function isExecutionInProgress(status: RecipeExecutionStatus): boolean {
     status === "running" ||
     status === "active" ||
     status === "pending" ||
+    status === "pausing" ||
+    status === "paused" ||
     status === "cancelling"
   );
 }

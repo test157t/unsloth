@@ -2644,6 +2644,23 @@ def _request_is_internal_workflow(request: Any) -> bool:
         return False
 
 
+def _request_is_data_recipe_workflow(request: Any) -> bool:
+    """Whether this is the narrowly scoped key minted for a data-recipe run."""
+    if not _request_is_internal_workflow(request):
+        return False
+    token = _request_api_key_token(request)
+    if token is None:
+        return False
+    try:
+        return (
+            auth_storage.internal_api_key_name(token)
+            == auth_storage.DATA_RECIPE_WORKFLOW_KEY_NAME
+        )
+    except Exception:
+        logger.debug("data_recipe.workflow_key_name_probe_failed", exc_info = True)
+        return False
+
+
 def _request_is_saved_credential_workflow(request: Any) -> bool:
     """True only for the one workflow key allowed to spend a saved provider credential.
 
@@ -6909,7 +6926,10 @@ async def _reject_unservable_model(
             or recently_downloaded(base)
             or (variant is not None and resolve_local_gguf(base, allow_scan = False) is not None)
         )
-        switchable = downloaded and get_openai_auto_switch_enabled()
+        switchable = downloaded and (
+            get_openai_auto_switch_enabled()
+            or _request_is_data_recipe_workflow(fastapi_request)
+        )
     except HTTPException:
         # A refusal decided above is the answer, not a failure to decide: without this
         # the handler below logs it and falls through to the resident model.
@@ -7051,7 +7071,14 @@ async def _maybe_auto_switch_model(
     scope = getattr(fastapi_request, "scope", None)
     if isinstance(scope, dict) and scope.get(_DISABLE_OPENAI_AUTO_SWITCH_SCOPE_KEY):
         return
-    auto_switch_on = get_openai_auto_switch_enabled()
+    # A recipe key is minted by this server for this run and points only at the
+    # loopback /v1 endpoint. Let a model id in that recipe use the same serialized,
+    # wrong-weights-safe switch path as the opt-in public API without changing the
+    # user's global API setting. Other internal workflows do not inherit this.
+    auto_switch_on = (
+        get_openai_auto_switch_enabled()
+        or _request_is_data_recipe_workflow(fastapi_request)
+    )
     # The reload-stash path also runs when idle-unload is active on its own (a
     # standalone UNSLOTH_MODEL_IDLE_TTL with auto-switch off), so a model the idle
     # loop freed is restored on the next request. The resolver-based switch still

@@ -38,9 +38,16 @@ function formatEta(value: number | null | undefined): string {
 function statusLabel(input: {
   complete: boolean;
   inProgress: boolean;
+  status: RecipeExecutionRecord["status"];
 }): string {
   if (input.complete) {
     return "Run completed";
+  }
+  if (input.status === "pausing") {
+    return "Pausing after this batch";
+  }
+  if (input.status === "paused") {
+    return "Run paused";
   }
   if (input.inProgress) {
     return "Run in progress";
@@ -149,7 +156,7 @@ export function ExecutionProgressIsland({
             )}
           />
           <p className="truncate text-xs font-medium text-foreground">
-            {statusLabel({ complete, inProgress })}
+            {statusLabel({ complete, inProgress, status: execution.status })}
           </p>
         </div>
         <div className="flex items-center gap-2">

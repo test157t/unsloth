@@ -109,6 +109,7 @@ type UseRecipeEditorGraphArgs = {
       | "conversation_extend"
       | "agent_conversation"
       | "agent_conversation_extend"
+      | "agent_conversation_strip_reasoning"
       | "agent_conversation_project"
       | "repair_merge"
       | "jsonl_export",
@@ -161,6 +162,7 @@ type UseRecipeEditorGraphResult = {
       | "conversation_extend"
       | "agent_conversation"
       | "agent_conversation_extend"
+      | "agent_conversation_strip_reasoning"
       | "agent_conversation_project"
       | "repair_merge"
       | "jsonl_export",
@@ -307,6 +309,7 @@ export function useRecipeEditorGraph({
             | "conversation_extend"
             | "agent_conversation"
             | "agent_conversation_extend"
+            | "agent_conversation_strip_reasoning"
             | "agent_conversation_project"
             | "repair_merge"
             | "jsonl_export",
@@ -415,6 +418,7 @@ export function useRecipeEditorGraph({
         | "conversation_extend"
         | "agent_conversation"
         | "agent_conversation_extend"
+        | "agent_conversation_strip_reasoning"
         | "agent_conversation_project"
         | "repair_merge"
         | "jsonl_export",

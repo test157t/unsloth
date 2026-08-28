@@ -358,6 +358,8 @@ export function RecipeStudioPage({
     validateFromDialog,
     validateLoading,
     validateResult,
+    pauseExecution,
+    resumeExecution,
     cancelExecution,
     loadExecutionDatasetPage,
     runPreview,
@@ -859,6 +861,12 @@ export function RecipeStudioPage({
                 selectedExecutionId={selectedExecutionId}
                 currentSignature={currentSignature}
                 onSelectExecution={setSelectedExecutionId}
+                onPauseExecution={(executionId) => {
+                  void pauseExecution(executionId);
+                }}
+                onResumeExecution={(executionId) => {
+                  void resumeExecution(executionId);
+                }}
                 onCancelExecution={(executionId) => {
                   void cancelExecution(executionId);
                 }}

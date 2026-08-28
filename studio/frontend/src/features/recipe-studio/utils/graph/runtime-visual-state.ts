@@ -14,6 +14,8 @@ const ACTIVE_STATUSES: ReadonlySet<RecipeExecutionStatus> = new Set([
   "pending",
   "running",
   "active",
+  "pausing",
+  "paused",
   "cancelling",
 ]);
 const FRESH_PENDING_WINDOW_MS = 60_000;

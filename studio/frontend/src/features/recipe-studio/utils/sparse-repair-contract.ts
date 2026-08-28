@@ -66,6 +66,12 @@ export function buildSparseRepairColumn(
       human_column: config.human_column?.trim(),
       // biome-ignore lint/style/useNamingConvention: api schema
       assistant_column: config.assistant_column?.trim(),
+      ...(config.internal_thought_tag?.trim()
+        ? {
+            // biome-ignore lint/style/useNamingConvention: api schema
+            internal_thought_tag: config.internal_thought_tag.trim(),
+          }
+        : {}),
     };
   }
   if (expressionType === "agent_conversation") {
@@ -78,6 +84,30 @@ export function buildSparseRepairColumn(
       human_column: config.human_column?.trim(),
       // biome-ignore lint/style/useNamingConvention: api schema
       trace_column: config.trace_column?.trim(),
+      ...(config.internal_thought_tag?.trim()
+        ? {
+            // biome-ignore lint/style/useNamingConvention: api schema
+            internal_thought_tag: config.internal_thought_tag.trim(),
+          }
+        : {}),
+    };
+  }
+  if (expressionType === "agent_conversation_strip_reasoning") {
+    return {
+      name: config.name,
+      drop: config.drop ?? false,
+      // biome-ignore lint/style/useNamingConvention: api schema
+      column_type: "unsloth-agent-conversation-strip-reasoning",
+      // biome-ignore lint/style/useNamingConvention: api schema
+      messages_column: config.messages_column?.trim(),
+      ...(config.conversations_column?.trim()
+        ? {
+            // biome-ignore lint/style/useNamingConvention: api schema
+            conversations_column: config.conversations_column.trim(),
+          }
+        : {}),
+      // biome-ignore lint/style/useNamingConvention: api schema
+      internal_thought_tag: config.internal_thought_tag?.trim(),
     };
   }
   if (expressionType === "agent_conversation_extend") {
@@ -92,6 +122,12 @@ export function buildSparseRepairColumn(
       human_column: config.human_column?.trim(),
       // biome-ignore lint/style/useNamingConvention: api schema
       trace_column: config.trace_column?.trim(),
+      ...(config.internal_thought_tag?.trim()
+        ? {
+            // biome-ignore lint/style/useNamingConvention: api schema
+            internal_thought_tag: config.internal_thought_tag.trim(),
+          }
+        : {}),
     };
   }
   if (expressionType === "agent_conversation_project") {

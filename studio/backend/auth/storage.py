@@ -1045,6 +1045,7 @@ API_KEY_PREFIX = "sk-unsloth-"
 # created with. A data-recipe key is handed to a user-authored recipe subprocess
 # and needs nothing but this host's local /v1, so it must never gain that reach.
 DEEP_RESEARCH_WORKFLOW_KEY_NAME = "deep-research workflow"
+DATA_RECIPE_WORKFLOW_KEY_NAME = "data-recipe workflow"
 
 
 def create_api_key(

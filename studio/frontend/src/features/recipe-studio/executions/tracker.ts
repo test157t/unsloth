@@ -210,6 +210,39 @@ export async function trackRecipeExecution({
         return;
       }
 
+      if (eventType === "job.pausing") {
+        lastStatus = "pausing";
+        latestExecution = { ...latestExecution, status: "pausing" };
+        onUpsert(latestExecution);
+        return;
+      }
+
+      if (eventType === "job.paused") {
+        lastStatus = "paused";
+        latestExecution = { ...latestExecution, status: "paused" };
+        onUpsert(latestExecution);
+        return;
+      }
+
+      if (eventType === "job.resumed") {
+        lastStatus = "active";
+        latestExecution = { ...latestExecution, status: "active" };
+        onUpsert(latestExecution);
+        return;
+      }
+
+      if (eventType === "job.checkpoint") {
+        latestExecution = {
+          ...latestExecution,
+          artifact_path:
+            typeof event.payload.artifact_path === "string"
+              ? event.payload.artifact_path
+              : latestExecution.artifact_path,
+        };
+        onUpsert(latestExecution);
+        return;
+      }
+
       if (eventType === "job.cancelled") {
         lastStatus = "cancelled";
         done = true;

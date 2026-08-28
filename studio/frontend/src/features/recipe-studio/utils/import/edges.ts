@@ -179,10 +179,17 @@ export function buildEdges(
       }
       if (
         config.expression_type === "agent_conversation_extend" ||
-        config.expression_type === "agent_conversation_project"
+        config.expression_type === "agent_conversation_project" ||
+        config.expression_type === "agent_conversation_strip_reasoning"
       ) {
         if (config.messages_column?.trim()) {
           addEdgeByName(config.messages_column, config.name);
+        }
+        if (
+          config.expression_type === "agent_conversation_strip_reasoning" &&
+          config.conversations_column?.trim()
+        ) {
+          addEdgeByName(config.conversations_column, config.name);
         }
       }
       if (config.expression_type === "agent_conversation_extend") {

@@ -28,6 +28,10 @@ USAGE_RESET_STAGES = {
 # job event types emitted by worker/manager
 EVENT_JOB_ENQUEUED = "job.enqueued"
 EVENT_JOB_STARTED = "job.started"
+EVENT_JOB_PAUSING = "job.pausing"
+EVENT_JOB_PAUSED = "job.paused"
+EVENT_JOB_RESUMED = "job.resumed"
+EVENT_JOB_CHECKPOINT = "job.checkpoint"
 EVENT_JOB_CANCELLING = "job.cancelling"
 EVENT_JOB_CANCELLED = "job.cancelled"
 EVENT_JOB_COMPLETED = "job.completed"

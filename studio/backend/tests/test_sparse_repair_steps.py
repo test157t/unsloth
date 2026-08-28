@@ -16,6 +16,7 @@ build_conversation_pair = _MODULE.build_conversation_pair
 build_agent_conversation = _MODULE.build_agent_conversation
 extend_agent_conversation = _MODULE.extend_agent_conversation
 project_agent_conversation = _MODULE.project_agent_conversation
+strip_agent_conversation_reasoning = _MODULE.strip_agent_conversation_reasoning
 apply_string_replace = _MODULE.apply_string_replace
 apply_repair_patch = _MODULE.apply_repair_patch
 compute_content_hash = _MODULE.compute_content_hash
@@ -66,6 +67,55 @@ def test_conversation_pair_rejects_missing_text() -> None:
         raise AssertionError("Expected blank assistant text to be rejected.")
 
 
+def test_conversation_pair_requires_one_exact_configured_reasoning_block() -> None:
+    valid = (
+        "<Mia_Internal-Thoughts>Check the physics.</Mia_Internal-Thoughts>\n"
+        '"Thermal mass stores and releases heat."'
+    )
+    result = build_conversation_pair(
+        {"human_message": "Explain thermal mass.", "assistant_response": valid},
+        human_column = "human_message",
+        assistant_column = "assistant_response",
+        internal_thought_tag = "Mia_Internal-Thoughts",
+    )
+    assert result[-1]["value"] == valid
+
+    duplicate = (
+        "<Mia_Internal-Thoughts>First pass.</Mia_Internal-Thoughts>\n"
+        "<Mia_Internal-Thoughts>Second pass.</Mia_Internal-Thoughts>\n"
+        '"Visible answer."'
+    )
+    try:
+        build_conversation_pair(
+            {"human_message": "Question", "assistant_response": duplicate},
+            human_column = "human_message",
+            assistant_column = "assistant_response",
+            internal_thought_tag = "Mia_Internal-Thoughts",
+        )
+    except ValueError as exc:
+        assert "exactly one" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate reasoning blocks to be rejected.")
+
+
+def test_conversation_pair_rejects_case_mismatched_reasoning_close() -> None:
+    malformed = (
+        "<Mia_Internal-Thoughts>Check the physics.</Mia_internal-thoughts>\n"
+        '"Visible answer."'
+    )
+    try:
+        build_conversation_pair(
+            {"human_message": "Question", "assistant_response": malformed},
+            human_column = "human_message",
+            assistant_column = "assistant_response",
+            internal_thought_tag = "Mia_Internal-Thoughts",
+        )
+    except ValueError as exc:
+        assert "case-sensitive" in str(exc)
+    else:
+        raise AssertionError("Expected a case-mismatched reasoning tag to be rejected.")
+
+
 def test_agent_conversation_keeps_calls_results_and_final_answer() -> None:
     result = build_agent_conversation(
         {
@@ -113,6 +163,95 @@ def test_agent_conversation_keeps_calls_results_and_final_answer() -> None:
         {"role": "tool", "content": "Source result", "tool_call_id": "call-1"},
         {"role": "assistant", "content": "Grounded final answer."},
     ]
+
+
+def test_agent_conversation_rejects_duplicate_final_reasoning_blocks() -> None:
+    duplicate = (
+        "<Mia_Internal-Thoughts>First pass.</Mia_Internal-Thoughts>\n"
+        "<Mia_Internal-Thoughts>Second pass.</Mia_Internal-Thoughts>\n"
+        '"Grounded final answer."'
+    )
+    try:
+        build_agent_conversation(
+            {
+                "human_message": "Use the evidence.",
+                "trace": [{"role": "assistant", "content": duplicate}],
+            },
+            human_column = "human_message",
+            trace_column = "trace",
+            internal_thought_tag = "Mia_Internal-Thoughts",
+        )
+    except ValueError as exc:
+        assert "exactly one" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate final reasoning blocks to be rejected.")
+
+
+def test_agent_conversation_normalizes_structured_text_content() -> None:
+    result = build_agent_conversation(
+        {
+            "human_message": "Use the evidence.",
+            "trace": [
+                {
+                    "role": "assistant",
+                    "content": [],
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "function": {
+                                "name": "web_search",
+                                "arguments": '{"query":"evidence"}',
+                            },
+                        }
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "content": [{"type": "text", "text": "source result"}],
+                    "tool_call_id": "call-1",
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "output_text", "text": "Grounded "},
+                        {"type": "text", "text": "final answer."},
+                    ],
+                },
+            ],
+        },
+        human_column = "human_message",
+        trace_column = "trace",
+    )
+    assert result[-2] == {
+        "role": "tool",
+        "content": "source result",
+        "tool_call_id": "call-1",
+    }
+    assert result[-1] == {
+        "role": "assistant",
+        "content": "Grounded final answer.",
+    }
+
+
+def test_agent_conversation_rejects_unknown_content_blocks() -> None:
+    try:
+        build_agent_conversation(
+            {
+                "human_message": "Describe it.",
+                "trace": [
+                    {
+                        "role": "assistant",
+                        "content": [{"type": "image", "url": "example.invalid"}],
+                    }
+                ],
+            },
+            human_column = "human_message",
+            trace_column = "trace",
+        )
+    except ValueError as exc:
+        assert "unsupported non-text" in str(exc)
+    else:
+        raise AssertionError("Expected unknown content blocks to be rejected.")
 
 
 def test_agent_conversation_rejects_orphan_tool_results() -> None:
@@ -246,6 +385,149 @@ def test_agent_projection_keeps_users_and_final_answers_only() -> None:
     assert result == [
         {"from": "human", "value": "Question"},
         {"from": "gpt", "value": "Answer"},
+    ]
+
+
+def test_agent_history_strip_removes_only_assistant_reasoning() -> None:
+    messages = [
+        {"role": "user", "content": "Keep <Mia_Internal-Thoughts>literal</Mia_Internal-Thoughts>"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"id": "call-1", "function": {"name": "python", "arguments": "{}"}}],
+        },
+        {"role": "tool", "content": "result", "tool_call_id": "call-1"},
+        {
+            "role": "assistant",
+            "content": (
+                "<Mia_Internal-Thoughts>private reasoning</Mia_Internal-Thoughts>\n"
+                '"Visible answer"'
+            ),
+        },
+    ]
+    result = strip_agent_conversation_reasoning(
+        {"messages": messages},
+        messages_column = "messages",
+        internal_thought_tag = "Mia_Internal-Thoughts",
+    )
+    assert result[0] == messages[0]
+    assert result[1] == messages[1]
+    assert result[2] == messages[2]
+    assert result[3]["content"] == '"Visible answer"'
+    assert messages[3]["content"].startswith("<Mia_Internal-Thoughts>")
+
+
+def test_agent_history_strip_normalizes_sharegpt_fallback() -> None:
+    result = strip_agent_conversation_reasoning(
+        {
+            "conversations": [
+                {"from": "human", "value": "Question"},
+                {
+                    "from": "gpt",
+                    "value": (
+                        "<Mia_Internal-Thoughts>private</Mia_Internal-Thoughts>\n"
+                        '"Visible answer"'
+                    ),
+                },
+            ]
+        },
+        messages_column = "messages",
+        conversations_column = "conversations",
+        internal_thought_tag = "Mia_Internal-Thoughts",
+    )
+    assert result == [
+        {"role": "user", "content": "Question"},
+        {"role": "assistant", "content": '"Visible answer"'},
+    ]
+
+
+def test_agent_history_strip_does_not_hide_malformed_canonical_messages() -> None:
+    try:
+        strip_agent_conversation_reasoning(
+            {
+                "messages": "malformed",
+                "conversations": [
+                    {"from": "human", "value": "Question"},
+                    {"from": "gpt", "value": '"Answer"'},
+                ],
+            },
+            messages_column = "messages",
+            conversations_column = "conversations",
+            internal_thought_tag = "Mia_Internal-Thoughts",
+        )
+    except ValueError as exc:
+        assert "Agent messages" in str(exc)
+    else:
+        raise AssertionError("Expected malformed canonical messages to be rejected.")
+
+
+def test_agent_history_strip_rejects_unclosed_reasoning() -> None:
+    try:
+        strip_agent_conversation_reasoning(
+            {
+                "messages": [
+                    {"role": "user", "content": "Question"},
+                    {
+                        "role": "assistant",
+                        "content": "<Mia_Internal-Thoughts>unfinished",
+                    },
+                ]
+            },
+            messages_column = "messages",
+            internal_thought_tag = "Mia_Internal-Thoughts",
+        )
+    except ValueError as exc:
+        assert "unclosed" in str(exc) or "incomplete" in str(exc)
+    else:
+        raise AssertionError("Expected malformed reasoning history to be rejected.")
+
+
+def test_strip_then_extend_keeps_reasoning_only_on_new_final_turn() -> None:
+    cleaned = strip_agent_conversation_reasoning(
+        {
+            "messages": [
+                {"role": "user", "content": "First question"},
+                {
+                    "role": "assistant",
+                    "content": (
+                        "<Mia_Internal-Thoughts>old reasoning</Mia_Internal-Thoughts>\n"
+                        '"First answer"'
+                    ),
+                },
+            ]
+        },
+        messages_column = "messages",
+        internal_thought_tag = "Mia_Internal-Thoughts",
+    )
+    result = extend_agent_conversation(
+        {
+            "messages_clean": cleaned,
+            "human_followup": "Second question",
+            "mia_response__trace": [
+                {
+                    "role": "assistant",
+                    "content": (
+                        "<Mia_Internal-Thoughts>new reasoning</Mia_Internal-Thoughts>\n"
+                        '"Second answer"'
+                    ),
+                }
+            ],
+        },
+        messages_column = "messages_clean",
+        human_column = "human_followup",
+        trace_column = "mia_response__trace",
+    )
+    assistant_contents = [
+        message["content"]
+        for message in result
+        if message.get("role") == "assistant" and not message.get("tool_calls")
+    ]
+    assert assistant_contents == [
+        '"First answer"',
+        (
+            "<Mia_Internal-Thoughts>new reasoning</Mia_Internal-Thoughts>\n"
+            '"Second answer"'
+        ),
     ]
 
 

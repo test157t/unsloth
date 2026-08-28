@@ -362,6 +362,18 @@ export async function cancelRecipeJob(
   return postJson<JobStatusResponse>(`/jobs/${jobId}/cancel`, {});
 }
 
+export async function pauseRecipeJob(
+  jobId: string,
+): Promise<JobStatusResponse> {
+  return postJson<JobStatusResponse>(`/jobs/${jobId}/pause`, {});
+}
+
+export async function resumeRecipeJob(
+  jobId: string,
+): Promise<JobStatusResponse> {
+  return postJson<JobStatusResponse>(`/jobs/${jobId}/resume`, {});
+}
+
 export async function publishRecipeJob(
   jobId: string,
   payload: PublishRecipeJobRequest,

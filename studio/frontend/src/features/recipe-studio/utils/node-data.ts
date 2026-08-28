@@ -32,6 +32,10 @@ export function nodeDataFromConfig(
         conversation_pair: ["Conversation pair", "Fixed human then gpt"],
         conversation_extend: ["Conversation extend", "Append human/gpt"],
         agent_conversation: ["Agent conversation", "Preserve tool trace"],
+        agent_conversation_strip_reasoning: [
+          "Agent reasoning strip",
+          "Visible history only",
+        ],
         agent_conversation_extend: ["Agent extension", "Append tool trace"],
         agent_conversation_project: ["Agent projection", "User/final assistant"],
         repair_tasks: ["Repair tasks", "Failed criteria"],

@@ -146,6 +146,25 @@ def test_flag_off_never_loads(monkeypatch):
     assert rec.calls == []
 
 
+def test_data_recipe_internal_key_can_switch_without_global_api_opt_in(monkeypatch):
+    backend = _FakeBackend("unsloth/A-GGUF", "Q4_K_M")
+    rec = _LoadRecorder(backend)
+    _wire(
+        monkeypatch,
+        enabled = False,
+        resolves_to = ("unsloth/B-GGUF", "Q4_K_M", "unsloth/B-GGUF"),
+        backend = backend,
+        recorder = rec,
+    )
+    monkeypatch.setattr(inference_route, "_request_is_data_recipe_workflow", lambda _r: True)
+
+    _run_hook("unsloth/B-GGUF:Q4_K_M")
+
+    assert len(rec.calls) == 1
+    assert rec.calls[0].model_path == "unsloth/B-GGUF"
+    assert rec.calls[0].gguf_variant == "Q4_K_M"
+
+
 def test_unknown_model_falls_through(monkeypatch):
     backend = _FakeBackend("unsloth/A-GGUF")
     rec = _LoadRecorder(backend)

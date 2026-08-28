@@ -9,6 +9,8 @@ export type RecipeExecutionStatus =
   | "pending"
   | "running"
   | "active"
+  | "pausing"
+  | "paused"
   | "cancelling"
   | "cancelled"
   | "completed"
