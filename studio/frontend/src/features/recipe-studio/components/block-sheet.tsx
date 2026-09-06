@@ -13,8 +13,6 @@ import {
 } from "@/components/ui/sheet";
 import { Tick02Icon } from "@/lib/tick-icon";
 import {
-  ArrowLeft02Icon,
-  ArrowRight01Icon,
   CodeIcon,
   Copy02Icon,
   type Database02Icon,
@@ -24,6 +22,10 @@ import {
   Search01Icon,
   Upload01Icon,
 } from "@hugeicons/core-free-icons";
+import {
+  ArrowLeftIcon,
+  ChevronRightIcon,
+} from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   type DragEvent as ReactDragEvent,
@@ -234,8 +236,7 @@ function BlockSheetButton({
         </p>
       </div>
       {trailing === "chevron" ? (
-        <HugeiconsIcon
-          icon={ArrowRight01Icon}
+        <ChevronRightIcon
           className="size-3.5 text-muted-foreground"
         />
       ) : trailing === "drag" ? (
@@ -472,7 +473,7 @@ export function BlockSheet({
                   aria-label="Back to step groups"
                   title="Back to step groups"
                 >
-                  <HugeiconsIcon icon={ArrowLeft02Icon} className="size-4" />
+                  <ArrowLeftIcon className="size-4" />
                 </Button>
               )}
               <SheetTitle>{sheetTitle}</SheetTitle>

@@ -270,7 +270,7 @@ def run_job_process(
     """Subprocess entrypoint. Sends events to `event_queue`."""
     import os
 
-    os.environ["PYTHONWARNINGS"] = "ignore"  # suppress C-level warnings before imports
+    os.environ["PYTHONWARNINGS"] = "ignore"
 
     import warnings
     from loggers.config import LogConfig
@@ -314,8 +314,8 @@ def run_job_process(
         builder = build_config_builder(recipe)
         designer = create_data_designer(recipe, artifact_path = str(_ARTIFACT_ROOT))
 
-        # DataDesigner resets root logging in __init__; attach the queue handler
-        # to the named loggers directly so parser events survive.
+        # DataDesigner resets root logging in __init__; attach the queue handler to the named loggers so
+        # parser events survive.
         handler = _QueueLogHandler(event_queue)
         handler.setLevel(logging.INFO)
         for logger_name in (
@@ -463,8 +463,7 @@ def run_job_process(
 
 def _merge_batches_to_single_parquet(base_dataset_path: Path) -> None:
     parquet_dir = base_dataset_path / "parquet-files"
-    # Counted, so a companion makes a single-batch job take the merge path and rewrite a
-    # dataset that needed none.
+    # Counted, so a companion would make a single-batch job take the merge path and rewrite a dataset that needed none.
     parquet_files = drop_appledouble_metadata(sorted(parquet_dir.glob("*.parquet")))
     if len(parquet_files) <= 1:
         return

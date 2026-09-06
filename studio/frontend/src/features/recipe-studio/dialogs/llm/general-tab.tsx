@@ -24,8 +24,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactElement, type RefObject, useMemo, useRef } from "react";
 import { useRecipeStudioStore } from "../../stores/recipe-studio";
 import type { LlmConfig } from "../../types";
@@ -40,6 +38,9 @@ import { AvailableVariables } from "../shared/available-variables";
 import { CollapsibleSectionTriggerButton } from "../shared/collapsible-section-trigger";
 import { FieldLabel } from "../shared/field-label";
 import { NameField } from "../shared/name-field";
+import {
+  ChevronRightIcon,
+} from "lucide-react";
 
 const CODE_LANG_OPTIONS = [
   "python",
@@ -196,8 +197,7 @@ export function LlmGeneralTab({
           <div className="mt-2 space-y-1.5">
             {!hasModelProviders && (
               <p className="flex items-start gap-2">
-                <HugeiconsIcon
-                  icon={ArrowRight01Icon}
+                <ChevronRightIcon
                   className="mt-0.5 size-3.5 shrink-0 text-primary"
                 />
                 <span>
@@ -207,8 +207,7 @@ export function LlmGeneralTab({
             )}
             {!hasModelConfigs && (
               <p className="flex items-start gap-2">
-                <HugeiconsIcon
-                  icon={ArrowRight01Icon}
+                <ChevronRightIcon
                   className="mt-0.5 size-3.5 shrink-0 text-primary"
                 />
                 <span>
