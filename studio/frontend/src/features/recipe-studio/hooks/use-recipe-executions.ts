@@ -4,19 +4,21 @@
 import { getInferenceStatus, loadModel } from "@/features/chat";
 import { createLoadingToastIcon, toast } from "@/lib/toast";
 import { toastError } from "@/shared/toast";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   cancelRecipeJob,
   createRecipeJob,
+  deleteRecipeJob,
   getRecipeJobDataset,
   getRecipeJobStatus,
+  getRecipeResumeConfig,
   isDataRecipeApiError,
   pauseRecipeJob,
   resumeRecipeJob,
   validateRecipe,
 } from "../api";
-import { saveRecipeExecution } from "../data/executions-db";
+import { deleteRecipeExecution, saveRecipeExecution } from "../data/executions-db";
 import type {
   RecipeExecutionKind,
   RecipeExecutionRecord,
@@ -459,6 +461,7 @@ type UseRecipeExecutionsResult = {
   pauseExecution: (id: string) => Promise<void>;
   resumeExecution: (id: string) => Promise<void>;
   cancelExecution: (id: string) => Promise<void>;
+  deleteExecution: (id: string, deleteArtifacts: boolean) => Promise<boolean>;
   loadExecutionDatasetPage: (id: string, page: number) => Promise<void>;
 };
 
@@ -490,6 +493,7 @@ export function useRecipeExecutions({
   onExecutionStart,
   onPreviewSuccess,
 }: UseRecipeExecutionsParams): UseRecipeExecutionsResult {
+  const deletedExecutionIds = useRef(new Set<string>());
   const [validateLoading, setValidateLoading] = useState(false);
   const [validateResult, setValidateResult] = useState<{
     valid: boolean;
@@ -553,6 +557,7 @@ export function useRecipeExecutions({
 
   const upsertAndPersist = useCallback(
     (record: RecipeExecutionRecord): void => {
+      if (deletedExecutionIds.current.has(record.id)) return;
       const normalizedRecord = withExecutionDefaults(record);
       upsertExecution(normalizedRecord);
       saveRecipeExecution(normalizedRecord).catch((error) => {
@@ -989,6 +994,30 @@ export function useRecipeExecutions({
     ],
   );
 
+  const deleteExecution = useCallback(async (id: string, deleteArtifacts: boolean): Promise<boolean> => {
+    const execution = executions.find((entry) => entry.id === id);
+    if (!execution || !["completed", "error", "cancelled", "paused"].includes(execution.status)) return false;
+    try {
+      const result = execution.jobId
+        ? await deleteRecipeJob(execution.jobId, deleteArtifacts, execution.artifact_path)
+        : {};
+      deletedExecutionIds.current.add(id);
+      await deleteRecipeExecution(id);
+      const remaining = useRecipeExecutionsStore.getState().executions.filter((entry) => entry.id !== id);
+      setExecutions(remaining);
+      if (useRecipeExecutionsStore.getState().selectedExecutionId === id) {
+        selectExecution(remaining[0]?.id ?? null);
+      }
+      if (result.cleanup_pending) toast.warning("Run deleted; some output files could not be removed.");
+      else toast.success("Recipe run deleted");
+      return true;
+    } catch (error) {
+      deletedExecutionIds.current.delete(id);
+      toastError("Delete failed", toErrorMessage(error, "Could not delete recipe run."));
+      return false;
+    }
+  }, [executions, setExecutions, selectExecution]);
+
   const cancelExecution = useCallback(
     async (id: string): Promise<void> => {
       const execution = executions.find((entry) => entry.id === id);
@@ -1030,14 +1059,27 @@ export function useRecipeExecutions({
         return;
       }
       try {
+        const savedPayload = await getRecipeResumeConfig(execution.jobId);
+        const loadError = await ensureLocalModelLoaded(savedPayload);
+        if (loadError) throw new Error(loadError);
         const status = await resumeRecipeJob(execution.jobId);
-        upsertAndPersist(applyExecutionStatusSnapshot(execution, status));
+        const resumed = applyExecutionStatusSnapshot(execution, status);
+        upsertAndPersist(resumed);
+        // A failed/cancelled run's tracker has exited. Reattach it on recovery.
+        if (execution.status !== "paused") {
+          void trackRecipeExecution({
+            label: executionLabel(execution.kind), kind: execution.kind,
+            rows: execution.rows, jobId: execution.jobId, initialExecution: resumed,
+            notify: true, onUpsert: upsertAndPersist,
+            onSetPreviewErrors: setRunErrors, onPreviewSuccess,
+          });
+        }
       } catch (error) {
         const message = toErrorMessage(error, "Could not resume execution.");
         toastError("Resume failed", message);
       }
     },
-    [executions, upsertAndPersist],
+    [executions, upsertAndPersist, setRunErrors, onPreviewSuccess],
   );
 
   const loadExecutionDatasetPage = useCallback(
@@ -1114,6 +1156,7 @@ export function useRecipeExecutions({
     pauseExecution,
     resumeExecution,
     cancelExecution,
+    deleteExecution,
     loadExecutionDatasetPage,
   };
 }

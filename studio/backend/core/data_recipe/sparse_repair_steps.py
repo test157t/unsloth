@@ -72,6 +72,18 @@ def _decoded_list(value: Any) -> Any:
     return value
 
 
+def _message_tool_calls(message: dict[str, Any], *, context: str) -> list[Any]:
+    """Normalize Arrow/NumPy-backed tool-call arrays before truth checks."""
+
+    raw_calls = message.get("tool_calls")
+    if raw_calls is None:
+        return []
+    calls = _decoded_list(raw_calls)
+    if not isinstance(calls, list):
+        raise ValueError(f"{context} tool_calls must be a list.")
+    return calls
+
+
 def extract_repair_tasks(
     row: dict[str, Any],
     *,
@@ -188,8 +200,7 @@ def build_agent_conversation(
             continue
         role = str(message.get("role") or "").strip().lower()
         if role == "assistant":
-            raw_calls = message.get("tool_calls")
-            tool_calls = raw_calls if isinstance(raw_calls, list) else []
+            tool_calls = _message_tool_calls(message, context = "Assistant trace")
             content_text = _message_text_content(
                 message.get("content"),
                 context = "Assistant trace",
@@ -241,7 +252,10 @@ def build_agent_conversation(
                 {"role": "tool", "content": content_text, "tool_call_id": call_id}
             )
 
-    if messages[-1].get("role") != "assistant" or messages[-1].get("tool_calls"):
+    if (
+        messages[-1].get("role") != "assistant"
+        or _message_tool_calls(messages[-1], context = "Final assistant trace")
+    ):
         raise ValueError("Agent trace must end with a non-empty assistant response.")
     _require_single_internal_thought_block(
         messages[-1].get("content"),
@@ -291,9 +305,14 @@ def extend_agent_conversation(
             )
         copied = dict(message)
         copied["role"] = role
-        raw_calls = copied.get("tool_calls")
-        if role == "assistant" and isinstance(raw_calls, list):
-            for raw_call in raw_calls:
+        tool_calls = (
+            _message_tool_calls(copied, context = f"Agent message {index}")
+            if role == "assistant"
+            else []
+        )
+        if tool_calls:
+            copied["tool_calls"] = tool_calls
+            for raw_call in tool_calls:
                 call = _decoded(raw_call)
                 function = call.get("function") if isinstance(call, dict) else None
                 call_id = str(call.get("id") or "").strip() if isinstance(call, dict) else ""
@@ -324,7 +343,7 @@ def extend_agent_conversation(
     if (
         not history
         or history[-1].get("role") != "assistant"
-        or history[-1].get("tool_calls")
+        or _message_tool_calls(history[-1], context = "Final agent history message")
         or not isinstance(history[-1].get("content"), str)
         or not history[-1]["content"].strip()
     ):
@@ -342,8 +361,8 @@ def extend_agent_conversation(
     remapped_ids: dict[str, str] = {}
     prefix = f"turn-{sum(1 for message in history if message.get('role') == 'user') + 1}-"
     for message in tail:
-        calls = message.get("tool_calls")
-        if not isinstance(calls, list):
+        calls = _message_tool_calls(message, context = "Generated agent trace message")
+        if not calls:
             continue
         for call in calls:
             call_id = str(call.get("id") or "").strip()
@@ -392,7 +411,7 @@ def project_agent_conversation(
             projected.append({"from": "human", "value": content})
         elif (
             role == "assistant"
-            and not message.get("tool_calls")
+            and not _message_tool_calls(message, context = f"Agent message {index}")
             and isinstance(content, str)
             and content.strip()
         ):
@@ -497,6 +516,11 @@ def strip_agent_conversation_reasoning(
         copied = dict(message)
         role = str(copied.get("role") or "").strip().lower()
         copied["role"] = role
+        if "tool_calls" in copied:
+            copied["tool_calls"] = _message_tool_calls(
+                copied,
+                context = f"Agent message {index}",
+            )
         if role == "assistant":
             content = copied.get("content")
             if content is not None and not isinstance(content, str):

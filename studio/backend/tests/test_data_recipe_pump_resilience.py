@@ -85,6 +85,41 @@ def _manager_with_active_job():
     return m
 
 
+def test_error_retains_checkpoint_and_can_resume_after_restart(monkeypatch, tmp_path):
+    state = tmp_path / "current.json"
+    artifact = tmp_path / "recipe"
+    artifact.mkdir()
+    monkeypatch.setattr(manager_module, "_resume_state_path", lambda: state)
+    manager = JobManager()
+    manager._job = Job(job_id="failed", status="active", execution_type="full", artifact_path=str(artifact))
+    manager._resume_recipe = {"columns": [], "model_providers": [{"is_local": True}]}
+    manager._resume_run = {"rows": 5, "execution_type": "full"}
+    manager._handle_event(manager._job, {"type": "job.error", "error": "authentication expired"})
+    assert state.is_file()
+    assert (artifact / "recipe-recovery.json").is_file()
+    restored = JobManager()
+    assert restored._job.status == "error"
+    assert restored._job.error == "authentication expired"
+    assert restored.requires_restart_resume("failed")
+
+
+def test_worker_crash_keeps_error_and_completed_batches(monkeypatch, tmp_path):
+    state = tmp_path / "current.json"
+    artifact = tmp_path / "recipe"
+    artifact.mkdir()
+    monkeypatch.setattr(manager_module, "_resume_state_path", lambda: state)
+    manager = JobManager()
+    manager._job = Job(job_id="crashed", status="active", execution_type="full", artifact_path=str(artifact))
+    manager._resume_recipe = {"columns": []}
+    manager._resume_run = {"rows": 5, "execution_type": "full"}
+    manager._proc = _FakeProc(alive=False)
+    manager._mp_q = _ScriptedQueue([])
+    manager._pump_loop()
+    assert manager._job.status == "error"
+    assert state.is_file()
+    assert manager.requires_restart_resume("crashed")
+
+
 def test_pump_survives_handler_exception_and_still_finalizes(monkeypatch):
     m = _manager_with_active_job()
     handled: list = []
@@ -170,7 +205,7 @@ def test_pump_finalizes_when_read_keeps_raising_on_dead_worker(monkeypatch):
     assert retired and retired[0] is m._job
 
 
-def test_full_run_pause_and_resume_are_cooperative(monkeypatch):
+def test_stop_and_save_cannot_resume_a_still_running_worker(monkeypatch):
     m = _manager_with_active_job()
     m._job.execution_type = "full"
     m._pause_event = _FakePauseEvent()
@@ -182,10 +217,9 @@ def test_full_run_pause_and_resume_are_cooperative(monkeypatch):
     assert m._job.status == "pausing"
     assert emitted[-1]["type"] == "job.pausing"
 
-    assert m.resume("job-test") is True
-    assert m._pause_event.is_set() is False
-    assert m._job.status == "active"
-    assert emitted[-1]["type"] == "job.resumed"
+    with pytest.raises(ValueError, match="pausing"):
+        m.resume("job-test")
+    assert m._pause_event.is_set() is True
 
 
 def test_preview_run_cannot_pause(monkeypatch):
@@ -238,9 +272,16 @@ def test_durable_checkpoint_restores_paused_job_without_credentials(monkeypatch,
 
 
 def test_restart_resume_spawns_new_worker_against_existing_artifact(monkeypatch, tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    import utils.paths
+
+    monkeypatch.setattr(utils.paths, "recipe_datasets_root", lambda: tmp_path)
     state_path = tmp_path / "checkpoints" / "current.json"
     artifact_path = tmp_path / "recipe-run"
     artifact_path.mkdir()
+    (artifact_path / "parquet-files").mkdir()
+    pq.write_table(pa.table({"answer": ["saved"] * 1000}), artifact_path / "parquet-files" / "batch_00000.parquet")
     monkeypatch.setattr(manager_module, "_resume_state_path", lambda: state_path)
     manager = JobManager()
     manager._job = Job(

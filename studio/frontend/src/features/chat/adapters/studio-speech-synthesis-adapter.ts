@@ -9,6 +9,7 @@ import { encryptProviderApiKey } from "../api/providers-api";
 import { getExternalProviderApiKey } from "../external-providers";
 import { stripSearchImageTokens } from "../search-images/search-images";
 import { useExternalProvidersStore } from "../stores/external-providers-store";
+import { splitVoiceForgeSpeech } from "../voiceforge";
 
 /** Voice for a stored voiceURI. "default" resolves to the voice the platform
  * marks as its default, so the "System default" choice means what it says
@@ -370,6 +371,7 @@ function speakWithBackendAudio(
   let audio: HTMLAudioElement | null = null;
   let audioUrl: string | null = null;
   let cancelled = false;
+  let finishPlayback: (() => void) | null = null;
 
   // Release the element and its multi-MB WAV data URL as soon as playback ends.
   const cleanup = () => {
@@ -386,31 +388,37 @@ function speakWithBackendAudio(
 
   void (async () => {
     try {
-      const url = await generate(text, controller.signal);
-      if (cancelled) {
-        releaseTtsAudioUrl(url);
-        return;
-      }
-      audioUrl = url;
-      audio = new Audio(url);
-      audio.playbackRate = ttsRate;
-      audio.volume = ttsVolume;
-      // Some browsers reset playbackRate to 1 once the source loads; reapply
-      // it on loadedmetadata so the speed setting reliably takes effect.
-      audio.addEventListener("loadedmetadata", () => {
-        if (audio) audio.playbackRate = ttsRate;
-      });
-      audio.addEventListener("ended", () => {
-        cleanup();
-        handleEnd("finished");
-      });
-      audio.addEventListener("error", () => {
+      const settings = useVoiceSettingsStore.getState();
+      const connection = useExternalProvidersStore.getState().providers.find((provider) => provider.id === settings.ttsProviderId);
+      const segments = generate === generateCustomTtsAudio && connection?.providerType === "voiceforge"
+        ? splitVoiceForgeSpeech(text).filter((segment) => segment.trim())
+        : [text];
+      for (const segment of segments) {
         if (cancelled) return;
+        const url = await generate(segment, controller.signal);
+        if (cancelled) {
+          releaseTtsAudioUrl(url);
+          return;
+        }
+        audioUrl = url;
+        audio = new Audio(url);
+        audio.playbackRate = ttsRate;
+        audio.volume = ttsVolume;
+        // Reapply after metadata loads; some browsers reset playbackRate.
+        audio.addEventListener("loadedmetadata", () => {
+          if (audio) audio.playbackRate = ttsRate;
+        });
+        await new Promise<void>((resolve, reject) => {
+          finishPlayback = resolve;
+          audio!.addEventListener("ended", () => resolve(), { once: true });
+          audio!.addEventListener("error", () => reject(new Error("Audio playback failed.")), { once: true });
+          markRunning();
+          void audio!.play().catch(reject);
+        });
+        finishPlayback = null;
         cleanup();
-        handleEnd("error", new Error("Audio playback failed."));
-      });
-      markRunning();
-      await audio.play();
+      }
+      if (!cancelled) handleEnd("finished");
     } catch (error) {
       if (cancelled || controller.signal.aborted) return;
       cleanup();
@@ -422,6 +430,7 @@ function speakWithBackendAudio(
     cancel: () => {
       cancelled = true;
       controller.abort();
+      finishPlayback?.();
       cleanup();
       handleEnd("cancelled");
     },

@@ -564,6 +564,16 @@ def cancel_job(job_id: str):
     return mgr.get_status(job_id)
 
 
+@router.delete("/jobs/{job_id}")
+def delete_recipe_job(job_id: str, delete_artifacts: bool = Query(False), artifact_path: str | None = Query(None)):
+    from core.data_recipe.jobs.deletion import delete_saved_job
+
+    try:
+        return delete_saved_job(get_job_manager(), job_id, delete_artifacts=delete_artifacts, artifact_path=artifact_path)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.post("/jobs/{job_id}/pause")
 def pause_job(job_id: str):
     mgr = get_job_manager()
@@ -586,7 +596,11 @@ def resume_job(
     mgr = get_job_manager()
     internal_api_key_id: int | None = None
     recipe: dict[str, Any] | None = None
-    if mgr.requires_restart_resume(job_id):
+    try:
+        restart_required = mgr.requires_restart_resume(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code = 409, detail = str(exc)) from exc
+    if restart_required:
         recipe = mgr.get_resume_recipe(job_id)
         if recipe is None:
             raise HTTPException(status_code = 409, detail = "Saved recipe configuration is unavailable.")
@@ -621,6 +635,22 @@ def resume_job(
     if not ok:
         raise HTTPException(status_code = 404, detail = "job not found")
     return mgr.get_status(job_id)
+
+
+@router.get("/jobs/{job_id}/resume-config")
+def resume_config(job_id: str):
+    """Saved, credential-free recipe for restoring the original local model."""
+    manager = get_job_manager()
+    current = manager.get_current_status()
+    if current and current["status"] in {"pending", "active", "pausing", "cancelling"}:
+        raise HTTPException(status_code = 409, detail = "Wait for the active recipe worker to stop before restoring a model.")
+    status = manager.get_status(job_id)
+    if status and not status.get("can_resume"):
+        raise HTTPException(status_code = 409, detail = status.get("resume_error") or "This run is not ready to resume.")
+    recipe = manager.get_resume_recipe(job_id)
+    if recipe is None:
+        raise HTTPException(status_code = 404, detail = "Saved recipe configuration is unavailable.")
+    return {"recipe": recipe, "run": {}}
 
 
 @router.get("/jobs/{job_id}/analysis")

@@ -102,6 +102,8 @@ export type RecipeExecutionRecord = {
   lastEventId: number | null;
   // biome-ignore lint/style/useNamingConvention: backend schema
   artifact_path: string | null;
+  can_resume?: boolean;
+  resume_error?: string | null;
   // biome-ignore lint/style/useNamingConvention: backend schema
   export_files: RecipeExportFile[];
   // biome-ignore lint/style/useNamingConvention: backend schema

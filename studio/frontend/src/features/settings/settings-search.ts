@@ -96,6 +96,7 @@ export const SETTINGS_SEARCH_INDEX: Record<SettingsTab, TranslationKey[]> = {
   chat: [
     "settings.general.chatDefaults",
     "settings.chat.currentDate.label",
+    "settings.chat.tools.nudgeToolCalls",
     "settings.general.autoTitleNewChats",
     "settings.chat.projectAttachments",
     "settings.chat.rememberParamsPerModel",
@@ -150,6 +151,8 @@ export const SETTINGS_SEARCH_INDEX: Record<SettingsTab, TranslationKey[]> = {
   ],
   connections: [],
   voice: [
+    "settings.voice.voiceForge.title",
+    "settings.voice.voiceForge.label",
     "settings.voice.dictation.sectionTitle",
     "settings.voice.dictation.microphoneLabel",
     "settings.voice.dictation.languageLabel",

@@ -96,6 +96,11 @@ export function isExecutionInProgress(status: RecipeExecutionStatus): boolean {
   );
 }
 
+export function canResumeExecution(execution: RecipeExecutionRecord | null): boolean {
+  return Boolean(execution?.jobId && execution.kind === "full" && execution.can_resume &&
+    ["paused", "error", "cancelled"].includes(execution.status));
+}
+
 export function markExecutionUnavailable(
   record: RecipeExecutionRecord,
   finishedAt: number = Date.now(),

@@ -306,6 +306,12 @@ export function supportsProviderMaxOutputTokens(
 
 export const CUSTOM_PROVIDER_PRESETS = [
   {
+    providerType: "voiceforge",
+    displayName: "VoiceForge",
+    baseUrlPlaceholder: "http://127.0.0.1:8889/v1",
+    modelIdsPlaceholder: "omnivoice\nkokoro\npocket-tts\nwhisper-large-v3-turbo\nglm-asr-nano\nparakeet-tdt-0.6b-v3",
+  },
+  {
     providerType: "llama_cpp",
     displayName: "llama.cpp",
     baseUrlPlaceholder: "http://localhost:8080/v1",
@@ -444,6 +450,7 @@ export function toExternalBackendProviderType(
   if (providerType === "vllm") return "vllm";
   if (providerType === "ollama") return "ollama";
   if (providerType === "llama_cpp") return "llama_cpp";
+  if (providerType === "voiceforge") return "voiceforge";
   // Generic custom servers are OpenAI-compatible, but should still use the
   // chat-completions backend path instead of OpenAI's Responses API route.
   if (providerType === LEGACY_CUSTOM_PROVIDER_TYPE) {

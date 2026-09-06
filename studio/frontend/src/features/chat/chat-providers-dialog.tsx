@@ -810,7 +810,9 @@ export function ChatProvidersSettings({
         ]
       : [...selectedModelIds],
     );
-    if (manualOnly) {
+    if (providerType === "voiceforge") {
+      modelsToSave.length = 0;
+    } else if (manualOnly) {
       if (modelsToSave.length === 0) {
         toast.error("Add at least one model ID.");
         return;
@@ -955,7 +957,9 @@ export function ChatProvidersSettings({
         ]
       : [...selectedModelIds],
     );
-    if (manualOnly) {
+    if (providerType === "voiceforge") {
+      modelsToSave.length = 0;
+    } else if (manualOnly) {
       if (modelsToSave.length === 0) {
         toast.error("Add at least one model ID.");
         return;
@@ -1698,7 +1702,7 @@ export function ChatProvidersSettings({
                 }}
               >
                 <div
-                  className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${showModelsBody ? "border-border/60 border-b" : ""}`}
+                  className={providerType === "voiceforge" ? "hidden" : `flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${showModelsBody ? "border-border/60 border-b" : ""}`}
                 >
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <Label className="text-sm font-medium">Models</Label>
@@ -1731,7 +1735,11 @@ export function ChatProvidersSettings({
                     )}
                   </Button>
                 </div>
-                {isCustomProvider && !supportsRemoteModelCatalog(providerType) ? (
+                {providerType === "voiceforge" ? (
+                  <p className="px-4 py-4 text-sm text-muted-foreground">
+                    Choose speech and recognition models in Settings → Voice after saving this connection.
+                  </p>
+                ) : isCustomProvider && !supportsRemoteModelCatalog(providerType) ? (
                   <div className="space-y-3 px-4 py-4">
                     <div className="space-y-2">
                       <Label

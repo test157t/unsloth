@@ -303,6 +303,20 @@ export async function trackRecipeExecution({
     eventsAbortController.abort();
   }
 
+  if (lastStatus === "error" || lastStatus === "cancelled") {
+    // The terminal event precedes subprocess teardown. Fetch the durable
+    // recovery capability after the worker and its event pump have exited.
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      try {
+        const status = await getRecipeJobStatus(jobId);
+        latestExecution = applyExecutionStatusSnapshot(latestExecution, status);
+        onUpsert(latestExecution);
+        if (status.can_resume || status.resume_error || !status.artifact_path) break;
+      } catch { break; }
+      await delay(1000);
+    }
+  }
+
   if (lastStatus === "completed") {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {

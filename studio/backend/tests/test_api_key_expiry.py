@@ -50,6 +50,28 @@ def make_key(expires_at):
     return raw
 
 
+def test_recipe_lease_renews_without_reviving_revoked_or_user_keys():
+    seed_user()
+    raw, row = storage.create_api_key(
+        username=storage.DEFAULT_ADMIN_USERNAME,
+        name=storage.DATA_RECIPE_WORKFLOW_KEY_NAME,
+        expires_at=iso_from_now(seconds=1), internal=True,
+    )
+    assert storage.renew_recipe_api_key(row["id"])
+    assert storage.validate_api_key(raw) is not None
+    conn = storage.get_connection()
+    try:
+        expiry = conn.execute("SELECT expires_at FROM api_keys WHERE id = ?", (row["id"],)).fetchone()[0]
+    finally:
+        conn.close()
+    assert datetime.fromisoformat(expiry) > datetime.now(timezone.utc) + timedelta(hours=23)
+    storage.revoke_internal_api_key(row["id"])
+    assert not storage.renew_recipe_api_key(row["id"])
+    assert storage.validate_api_key(raw) is None
+    _, user = storage.create_api_key(username=storage.DEFAULT_ADMIN_USERNAME, name="user", expires_at=None)
+    assert not storage.renew_recipe_api_key(user["id"])
+
+
 def subject_of(token):
     """Run the real FastAPI auth dependency against a bearer token."""
     credentials = HTTPAuthorizationCredentials(scheme = "Bearer", credentials = token)

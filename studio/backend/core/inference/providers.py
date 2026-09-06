@@ -313,6 +313,19 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
         # Surfaced via the frontend's CUSTOM_PROVIDER_PRESETS, not the dropdown.
         "hidden": True,
     },
+    "voiceforge": {
+        "display_name": "VoiceForge",
+        "base_url": "",
+        "default_models": [],
+        "supports_streaming": False,
+        "supports_vision": False,
+        "supports_tool_calling": False,
+        "studio_tools": False,
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
+        "notes": "Speech synthesis and recognition server. No chat models.",
+        "hidden": True,
+    },
     "custom": {
         "display_name": "Custom",
         # User-supplied via provider_base_url.

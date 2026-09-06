@@ -44,10 +44,10 @@ function statusLabel(input: {
     return "Run completed";
   }
   if (input.status === "pausing") {
-    return "Pausing after this batch";
+    return "Stopping and saving after this batch";
   }
   if (input.status === "paused") {
-    return "Run paused";
+    return "Run stopped · checkpoint saved";
   }
   if (input.inProgress) {
     return "Run in progress";

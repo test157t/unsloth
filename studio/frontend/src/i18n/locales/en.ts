@@ -460,6 +460,14 @@ export const en = {
     },
     voice: {
       title: "Voice",
+      voiceForge: {
+        title: "VoiceForge",
+        label: "Use VoiceForge for speech and recognition",
+        description: "Add a VoiceForge connection in Settings → Connections, then select it here. This sets OmniVoice for speech and Whisper for recognition; you can change either model below.",
+        connection: "VoiceForge connection",
+        placeholder: "Choose VoiceForge connection",
+        selected: "VoiceForge selected for speech and recognition",
+      },
       description: "Microphone, dictation, speech-to-text and read-aloud",
       dictation: {
         sectionTitle: "Dictation",
@@ -1381,6 +1389,9 @@ export const en = {
         saveError: "Failed to update current date settings",
       },
       tools: {
+        nudgeToolCalls: "Nudge tool calls",
+        nudgeToolCallsDescription:
+          "Ask the model to try again when a tool call cannot be repaired. Turn off to disable these recovery nudges. This does not change the model's tool-use instructions.",
         collapseByDefault: "Collapse tool activity by default",
         collapseByDefaultDescription:
           "Keep tool inputs and outputs collapsed while tools run. Expand any tool row to inspect it.",

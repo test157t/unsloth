@@ -33,7 +33,7 @@ from .constants import (
 from .parse import apply_update, coerce_event, parse_log_message
 from .types import BatchProgress, Job, ModelUsage, Progress, SourceProgress
 from loggers import get_logger
-from utils.paths import ensure_dir, studio_root
+from utils.paths import ensure_dir, studio_root, recipe_datasets_root
 
 logger = get_logger(__name__)
 
@@ -135,9 +135,9 @@ def _restore_job(value: dict[str, Any]) -> Job:
             for alias, usage in model_usage.items()
             if isinstance(usage, dict)
         }
-    job.status = "paused"
-    job.finished_at = None
-    job.error = None
+    job.status = value.get("status") if value.get("status") in {"error", "paused", "cancelled", "completed"} else "error"
+    if job.status == "error" and not job.error:
+        job.error = "Recipe worker interrupted. Resume from the last completed batch."
     return job
 
 
@@ -264,11 +264,14 @@ class JobManager:
         if llm_column_count <= 0:
             llm_column_count = 1
 
+        from .checkpoints import seed_fingerprints
+
+        run = dict(run)
+        run["_seed_fingerprints"] = seed_fingerprints(resume_recipe or recipe)
+
         with self._lock:
             if self._proc is not None and self._proc.is_alive():
                 raise RuntimeError("job already running")
-            if self._job is not None and self._job.status == "paused":
-                raise RuntimeError("A paused recipe run must be resumed or stopped first.")
 
             job_id = uuid.uuid4().hex
             self._job = Job(job_id = job_id, status = "pending", started_at = time.time())
@@ -367,6 +370,10 @@ class JobManager:
                 encoding = "utf-8",
             )
             temporary.replace(target)
+            archive = Path(self._job.artifact_path) / "recipe-recovery.json"
+            archive_tmp = archive.with_suffix(".tmp")
+            archive_tmp.write_text(target.read_text(encoding = "utf-8"), encoding = "utf-8")
+            archive_tmp.replace(archive)
         except (OSError, TypeError, ValueError):
             logger.warning("Could not persist the recipe checkpoint", exc_info = True)
 
@@ -417,25 +424,50 @@ class JobManager:
                 self._persist_resumable_locked()
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             logger.warning("Ignoring an invalid recipe checkpoint", exc_info = True)
-            self._delete_resume_state_locked()
+            # Preserve invalid state for diagnosis instead of destroying recovery evidence.
 
     def requires_restart_resume(self, job_id: str) -> bool:
         with self._lock:
+            if self._job is None or self._job.job_id != job_id:
+                if self._proc is not None and self._proc.is_alive():
+                    raise ValueError("Stop the active recipe before resuming another run.")
+                payload = self._saved_run(job_id)
+                if payload is not None:
+                    self._job = _restore_job(payload["job"])
+                    self._resume_recipe = payload["recipe"]
+                    self._resume_run = payload["run"]
+                    self._restart_resume_error = payload.get("restart_resume_error")
+                    self._events.clear()
+                    self._seq = 0
             return bool(
                 self._job is not None
                 and self._job.job_id == job_id
-                and self._job.status == "paused"
+                and self._job.status in {"paused", "error", "cancelled"}
                 and (self._proc is None or not self._proc.is_alive())
             )
+
+    @staticmethod
+    def _saved_run(job_id: str) -> dict | None:
+        for path in recipe_datasets_root().glob("*/recipe-recovery.json"):
+            try:
+                payload = json.loads(path.read_text(encoding = "utf-8"))
+                if (payload["job"]["job_id"] == job_id
+                    and Path(payload["job"]["artifact_path"]).resolve() == path.parent.resolve()
+                    and isinstance(payload["recipe"], dict) and isinstance(payload["run"], dict)):
+                    return payload
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+        return None
 
     def get_resume_recipe(self, job_id: str) -> dict[str, Any] | None:
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
-                return None
+                payload = self._saved_run(job_id)
+                return payload["recipe"] if payload is not None else None
             return None if self._resume_recipe is None else json.loads(json.dumps(self._resume_recipe))
 
     def pause(self, job_id: str) -> bool:
-        """Request a cooperative pause after the current durable batch."""
+        """Request Stop and Save after the current durable batch."""
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
                 return False
@@ -458,17 +490,15 @@ class JobManager:
         recipe: dict[str, Any] | None = None,
         internal_api_key_id: int | None = None,
     ) -> bool:
-        """Release a worker paused at a completed batch checkpoint."""
+        """Resume a stopped run from its completed batch checkpoint."""
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
                 return False
-            if self._job.status not in {"pausing", "paused"}:
+            if self._job.status not in {"paused", "error", "cancelled"}:
                 raise ValueError(f"Cannot resume a recipe run that is {self._job.status}.")
             worker_alive = self._proc is not None and self._proc.is_alive()
-            if worker_alive:
-                if self._pause_event is None:
-                    raise ValueError("The recipe pause control is unavailable.")
-                self._pause_event.clear()
+            if worker_alive or (self._pump_thread is not None and self._pump_thread.is_alive()):
+                raise ValueError("The recipe run is still stopping at its batch checkpoint.")
             else:
                 if not self._job.artifact_path:
                     raise ValueError("The durable recipe checkpoint is missing.")
@@ -476,6 +506,11 @@ class JobManager:
                     raise ValueError(self._restart_resume_error)
                 if recipe is None or self._resume_run is None:
                     raise ValueError("The saved recipe configuration is unavailable.")
+                from .checkpoints import validate_checkpoint
+
+                validate_checkpoint(self._job.artifact_path, self._resume_run, recipe)
+                self._job.error = None
+                self._job.finished_at = None
                 self._job.internal_api_key_id = internal_api_key_id
                 try:
                     self._spawn_worker_locked(
@@ -500,11 +535,11 @@ class JobManager:
             if self._proc is None or not self._proc.is_alive():
                 self._job.status = "cancelled"
                 self._job.finished_at = time.time()
-                self._delete_resume_state_locked()
+                self._persist_resumable_locked()
                 self._emit({"type": EVENT_JOB_CANCELLED, "ts": time.time(), "job_id": job_id})
                 return True
             self._job.status = "cancelling"
-            self._delete_resume_state_locked()
+            self._persist_resumable_locked()
             self._emit({"type": EVENT_JOB_CANCELLING, "ts": time.time(), "job_id": job_id})
             try:
                 self._proc.terminate()
@@ -516,8 +551,32 @@ class JobManager:
         """UI-friendly structured snapshot; an alternative to SSE."""
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
-                return None
+                payload = self._saved_run(job_id)
+                if payload is None:
+                    return None
+                saved = dataclasses.asdict(_restore_job(payload["job"]))
+                saved["can_resume"] = saved["status"] in {"error", "paused", "cancelled"} and not payload.get("restart_resume_error")
+                saved["resume_error"] = payload.get("restart_resume_error")
+                return saved
             job = self._job
+            resume_error = self._restart_resume_error
+            if job.status in {"paused", "error", "cancelled"} and not resume_error:
+                from .checkpoints import validate_checkpoint
+
+                # Validation is repeated on actual resume. Cache this display-only
+                # result so terminal status polling does not reread a large dataset.
+                cache_key = (job.job_id, job.artifact_path, job.finished_at)
+                cached = getattr(self, "_checkpoint_validation", None)
+                if cached is None or cached[0] != cache_key:
+                    try:
+                        if not job.artifact_path or self._resume_run is None:
+                            raise ValueError("No saved recipe checkpoint is available.")
+                        validate_checkpoint(job.artifact_path, self._resume_run, self._resume_recipe)
+                    except Exception as exc:
+                        resume_error = str(exc)
+                    self._checkpoint_validation = (cache_key, resume_error)
+                else:
+                    resume_error = cached[1]
             return {
                 "job_id": job.job_id,
                 "status": job.status,
@@ -568,6 +627,14 @@ class JobManager:
                 "has_analysis": job.analysis is not None,
                 "dataset_rows": None if job.dataset is None else len(job.dataset),
                 "artifact_path": job.artifact_path,
+                "can_resume": bool(
+                    job.status in {"paused", "error", "cancelled"}
+                    and job.artifact_path and self._resume_recipe is not None
+                    and not resume_error
+                    and (self._proc is None or not self._proc.is_alive())
+                    and (self._pump_thread is None or not self._pump_thread.is_alive())
+                ),
+                "resume_error": resume_error,
                 "export_files": job.export_files,
                 "execution_type": job.execution_type,
                 "started_at": job.started_at,
@@ -590,7 +657,8 @@ class JobManager:
         """Final profiling output (only after job completes)."""
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
-                return None
+                payload = self._saved_run(job_id)
+                return payload["job"].get("analysis") if payload is not None else None
             return self._job.analysis
 
     def get_dataset(
@@ -603,10 +671,16 @@ class JobManager:
         """Load dataset page (offset + limit) and include total rows."""
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
-                return None
-            in_memory_dataset = self._job.dataset
-            artifact_path = self._job.artifact_path
-            job_status = self._job.status
+                payload = self._saved_run(job_id)
+                if payload is None:
+                    return None
+                in_memory_dataset = None
+                artifact_path = payload["job"]["artifact_path"]
+                job_status = payload["job"]["status"]
+            else:
+                in_memory_dataset = self._job.dataset
+                artifact_path = self._job.artifact_path
+                job_status = self._job.status
 
         if in_memory_dataset is not None:
             total = len(in_memory_dataset)
@@ -776,11 +850,20 @@ class JobManager:
         Guarded so no single event can end the loop; it is the sole writer of the
         snapshot the UI polls, so its death would freeze status/SSE.
         """
+        snap = self._snapshot()
+        if snap is None:
+            return
+        job, proc, mp_q = snap
+        next_key_renewal = 0.0
         while True:
-            snap = self._snapshot()
-            if snap is None:
-                return
-            job, proc, mp_q = snap
+            if proc.is_alive() and time.monotonic() >= next_key_renewal:
+                next_key_renewal = time.monotonic() + 60
+                if job.internal_api_key_id is not None:
+                    try:
+                        from auth import storage
+                        storage.renew_recipe_api_key(job.internal_api_key_id)
+                    except Exception:
+                        logger.exception("Could not renew the running recipe credential")
 
             try:
                 event = self._read_queue_with_timeout(mp_q, timeout_sec = 0.25)
@@ -807,7 +890,7 @@ class JobManager:
 
                 retired_job: Job | None = None
                 with self._lock:
-                    if self._job and self._job.status in {
+                    if self._job is job and self._job.status in {
                         "pending",
                         "active",
                         "pausing",
@@ -816,10 +899,11 @@ class JobManager:
                     }:
                         if self._job.status == "cancelling":
                             self._job.status = "cancelled"
-                            self._delete_resume_state_locked()
+                            self._persist_resumable_locked()
                         elif self._job.artifact_path and self._resume_recipe is not None:
-                            self._job.status = "paused"
-                            self._job.error = None
+                            self._job.status = "paused" if self._job.status in {"pausing", "paused"} else "error"
+                            if self._job.status == "error":
+                                self._job.error = self._job.error or "Recipe worker exited unexpectedly. Completed batches are saved."
                             self._persist_resumable_locked()
                         else:
                             self._job.status = "error"
@@ -843,6 +927,9 @@ class JobManager:
                         retired_job = self._job
                 if retired_job is not None:
                     self._retire_workflow_key(retired_job)
+                    with self._lock:
+                        if self._job is retired_job:
+                            self._persist_resumable_locked()
             except Exception:
                 logger.exception("Data-recipe job pump: finalization after worker exit failed")
             return
@@ -865,7 +952,7 @@ class JobManager:
                 and self._pause_event is not None
                 and self._pause_event.is_set()
             ):
-                self._job.status = "paused"
+                self._job.status = "pausing"
                 self._persist_resumable_locked()
             if et == EVENT_JOB_RESUMED:
                 self._job.status = "active"
@@ -889,16 +976,16 @@ class JobManager:
                     self._job.progress.done = self._job.progress.total
                     self._job.progress.percent = 100.0
                 terminal = True
-                self._delete_resume_state_locked()
+                self._persist_resumable_locked()
             if et == EVENT_JOB_ERROR:
                 self._job.status = "error"
                 self._job.finished_at = time.time()
                 self._job.error = event.get("error") or "error"
                 terminal = True
-                self._delete_resume_state_locked()
+                self._persist_resumable_locked()
             if et == EVENT_JOB_CANCELLED:
                 terminal = True
-                self._delete_resume_state_locked()
+                self._persist_resumable_locked()
 
             if msg:
                 upd = parse_log_message(msg)
@@ -913,8 +1000,8 @@ class JobManager:
     def _retire_workflow_key(self, job: Job) -> None:
         """Revoke the workflow-scoped sk-unsloth-* key, if one was minted.
 
-        Best-effort: failures are swallowed. The key expires after 24h, so a
-        missed revoke is a latency, not correctness, concern.
+        Active workers renew their lease. A stopped worker cannot renew, so a
+        missed revoke remains bounded by the last lease expiry.
         """
         key_id = getattr(job, "internal_api_key_id", None)
         if not key_id:

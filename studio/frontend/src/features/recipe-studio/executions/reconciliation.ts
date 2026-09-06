@@ -19,7 +19,8 @@ export async function reconcileHydratedExecutions(
 ): Promise<RecipeExecutionRecord[]> {
   const reconciled = await reconcilePersistedJobs(records, {
     jobId: (record) => record.jobId,
-    shouldReconcile: (record) => isExecutionInProgress(record.status),
+    shouldReconcile: (record) => isExecutionInProgress(record.status) ||
+      (record.kind === "full" && ["error", "cancelled"].includes(record.status)),
     getStatus,
     applyStatus: applyExecutionStatusSnapshot,
     isMissing,

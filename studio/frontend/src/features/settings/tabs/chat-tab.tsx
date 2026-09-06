@@ -160,6 +160,8 @@ export function ChatTab() {
   const setRememberParamsPerModel = useChatRuntimeStore(
     (state) => state.setRememberParamsPerModel,
   );
+  const nudgeToolCalls = useChatRuntimeStore((state) => state.nudgeToolCalls);
+  const setNudgeToolCalls = useChatRuntimeStore((state) => state.setNudgeToolCalls);
   const autoCompactEnabled = useChatRuntimeStore(
     (state) => state.autoCompactEnabled,
   );
@@ -395,6 +397,16 @@ export function ChatTab() {
       </SettingsSection>
 
       <SettingsSection title={t("settings.general.chatDefaults")}>
+        <SettingsRow
+          label={t("settings.chat.tools.nudgeToolCalls")}
+          description={t("settings.chat.tools.nudgeToolCallsDescription")}
+        >
+          <Switch
+            aria-label={t("settings.chat.tools.nudgeToolCalls")}
+            checked={nudgeToolCalls}
+            onCheckedChange={setNudgeToolCalls}
+          />
+        </SettingsRow>
         <SettingsRow
           label={t("settings.chat.currentDate.label")}
           description={t("settings.chat.currentDate.description")}

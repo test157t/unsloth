@@ -3,6 +3,11 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/lib/toast";
@@ -11,7 +16,6 @@ import {
   CheckmarkCircle02Icon,
   Download01Icon,
   Flag02Icon,
-  PauseIcon,
   PlayIcon,
   Share08Icon,
   StopIcon,
@@ -21,7 +25,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { downloadRecipeJsonl, publishRecipeJob } from "../../api";
 import type { RecipeExecutionRecord } from "../../execution-types";
-import { isExecutionInProgress } from "../../executions/execution-helpers";
+import { canResumeExecution, isExecutionInProgress } from "../../executions/execution-helpers";
 import { resolveImagePreview } from "../../utils/image-preview";
 import { ExecutionColumnsTab } from "./execution-columns-tab";
 import { ExecutionDataTab } from "./execution-data-tab";
@@ -48,6 +52,7 @@ type ExecutionsViewProps = {
   onPauseExecution: (id: string) => void;
   onResumeExecution: (id: string) => void;
   onCancelExecution: (id: string) => void;
+  onDeleteExecution: (id: string, deleteArtifacts: boolean) => Promise<boolean>;
   onLoadDatasetPage: (id: string, page: number) => void;
 };
 
@@ -59,6 +64,7 @@ export function ExecutionsView({
   onPauseExecution,
   onResumeExecution,
   onCancelExecution,
+  onDeleteExecution,
   onLoadDatasetPage,
 }: ExecutionsViewProps): ReactElement {
   const formatEta = (value: number | null | undefined): string =>
@@ -71,6 +77,10 @@ export function ExecutionsView({
   const [previewDatasetPageByExecution, setPreviewDatasetPageByExecution] =
     useState<Record<string, number>>({});
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [stopDialogOpen, setStopDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<RecipeExecutionRecord | null>(null);
+  const [deleteArtifacts, setDeleteArtifacts] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const shouldStickTerminalToBottomRef = useRef(true);
   const selectedExecution = useMemo(
@@ -202,11 +212,8 @@ export function ExecutionsView({
       selectedExecution.kind === "full" &&
       ["pending", "running", "active"].includes(selectedExecution.status),
   );
-  const canResume = Boolean(
-    selectedExecution?.jobId &&
-      selectedExecution.kind === "full" &&
-      ["pausing", "paused"].includes(selectedExecution.status),
-  );
+  const canResume = canResumeExecution(selectedExecution);
+  const canDelete = Boolean(selectedExecution && ["completed", "error", "cancelled", "paused"].includes(selectedExecution.status));
   const canPublish = Boolean(
     selectedExecution &&
       selectedExecution.kind === "full" &&
@@ -543,15 +550,12 @@ export function ExecutionsView({
                       Publish to Hugging Face
                     </Button>
                   )}
-                  {canPause && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onPauseExecution(selectedExecution.id)}
-                    >
-                      <HugeiconsIcon icon={PauseIcon} className="mr-2 size-4" />
-                      Pause
+                  {canDelete && (
+                    <Button type="button" size="sm" variant="outline" onClick={() => {
+                      setDeleteArtifacts(false);
+                      setDeleteTarget(selectedExecution);
+                    }}>
+                      Delete Run
                     </Button>
                   )}
                   {canResume && (
@@ -570,12 +574,32 @@ export function ExecutionsView({
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => onCancelExecution(selectedExecution.id)}
+                      onClick={() => setStopDialogOpen(true)}
                     >
                       <HugeiconsIcon icon={StopIcon} className="mr-2 size-4" />
                       Stop
                     </Button>
                   )}
+                  <AlertDialog open={stopDialogOpen} onOpenChange={setStopDialogOpen}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Stop this recipe run?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Stop and Save finishes the current batch and saves a checkpoint for resume.
+                          Cancel Run stops immediately; only previously completed batches can be recovered.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Continue</AlertDialogCancel>
+                        <AlertDialogAction variant="destructive" onClick={() => onCancelExecution(selectedExecution.id)}>
+                          Cancel Run
+                        </AlertDialogAction>
+                        <AlertDialogAction disabled={!canPause} onClick={() => onPauseExecution(selectedExecution.id)}>
+                          Stop and Save
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
               <TabsContent value="overview">
@@ -674,6 +698,34 @@ export function ExecutionsView({
           </div>
         )}
       </section>
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this recipe run?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove {deleteTarget?.run_name || "this run"} from history. You will no longer be able to resume it from history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteTarget?.artifact_path && deleteTarget.jobId && (
+            <label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
+              <Checkbox checked={deleteArtifacts} disabled={deleting} onCheckedChange={(checked) => setDeleteArtifacts(checked === true)} />
+              <span>Also delete output files
+                <span className="block text-xs text-muted-foreground">Permanently remove generated datasets, exports, and recovery backups. Leave unchecked to keep files on disk.</span>
+              </span>
+            </label>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" disabled={deleting} onClick={async () => {
+              if (!deleteTarget) return;
+              setDeleting(true);
+              try {
+                if (await onDeleteExecution(deleteTarget.id, deleteArtifacts)) setDeleteTarget(null);
+              } finally { setDeleting(false); }
+            }}>{deleting ? "Deleting…" : "Delete Run"}</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <PublishExecutionDialog
         open={publishDialogOpen}
         onOpenChange={setPublishDialogOpen}

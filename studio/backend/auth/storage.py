@@ -1201,6 +1201,24 @@ def is_internal_api_key(raw_key: str) -> bool:
     return internal
 
 
+def renew_recipe_api_key(key_id: int) -> bool:
+    """Extend only an active recipe worker's lease; never revive a revoked key."""
+    from datetime import timedelta
+
+    conn = get_connection()
+    try:
+        result = conn.execute(
+            "UPDATE api_keys SET expires_at = ? WHERE id = ? AND is_internal = 1 "
+            "AND is_active = 1 AND name = ?",
+            ((datetime.now(timezone.utc) + timedelta(hours = 24)).isoformat(),
+             key_id, DATA_RECIPE_WORKFLOW_KEY_NAME),
+        )
+        conn.commit()
+        return result.rowcount == 1
+    finally:
+        conn.close()
+
+
 def internal_api_key_name(raw_key: str) -> Optional[str]:
     """The workflow name *raw_key* was minted under, or ``None`` if it is not internal.
 

@@ -361,6 +361,7 @@ export function RecipeStudioPage({
     pauseExecution,
     resumeExecution,
     cancelExecution,
+    deleteExecution,
     loadExecutionDatasetPage,
     runPreview,
     runFull,
@@ -867,6 +868,7 @@ export function RecipeStudioPage({
                 onResumeExecution={(executionId) => {
                   void resumeExecution(executionId);
                 }}
+                onDeleteExecution={deleteExecution}
                 onCancelExecution={(executionId) => {
                   void cancelExecution(executionId);
                 }}

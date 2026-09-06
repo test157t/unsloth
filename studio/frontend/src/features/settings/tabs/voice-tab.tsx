@@ -41,6 +41,7 @@ import {
 } from "@/features/hub";
 import { useDebouncedValue, useWheelScrollRef } from "@/hooks";
 import { useT } from "@/i18n";
+import { voiceForgeSettings } from "@/features/chat/voiceforge";
 import { isTauri } from "@/lib/api-base";
 import { ChevronDownStandardIcon } from "@/lib/chevron-icons";
 import { MicIcon } from "@/lib/mic-icon";
@@ -898,6 +899,31 @@ export function VoiceTab() {
           {t("settings.voice.description")}
         </p>
       </header>
+
+      <SettingsSection title={t("settings.voice.voiceForge.title")}>
+        <SettingsRow
+          label={t("settings.voice.voiceForge.label")}
+          description={t("settings.voice.voiceForge.description")}
+        >
+          <Select
+            value={ttsProviderId === sttProviderId && ttsConnections.some((connection) => connection.id === ttsProviderId && connection.providerType === "voiceforge") ? ttsProviderId : ""}
+            disabled={!connectionsEnabled}
+            onValueChange={(connectionId) => {
+              useVoiceSettingsStore.setState(voiceForgeSettings(connectionId));
+              toast.success(t("settings.voice.voiceForge.selected"));
+            }}
+          >
+            <SelectTrigger className="min-w-56 max-w-72" size="sm" aria-label={t("settings.voice.voiceForge.connection")}>
+              <SelectValue placeholder={t("settings.voice.voiceForge.placeholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {ttsConnections.filter((connection) => connection.providerType === "voiceforge").map((connection) => (
+                <SelectItem key={connection.id} value={connection.id}>{connection.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+      </SettingsSection>
 
       <SettingsSection title={t("settings.voice.dictation.sectionTitle")}>
         <SettingsRow

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
+import type { RecipePayload } from "../utils/payload/types";
+
 import { authFetch } from "@/features/auth";
 import {
   formatFastApiDetail,
@@ -97,6 +99,8 @@ export type JobStatusResponse = {
   error?: string | null;
   // biome-ignore lint/style/useNamingConvention: api schema
   has_analysis?: boolean;
+  can_resume?: boolean;
+  resume_error?: string | null;
   // biome-ignore lint/style/useNamingConvention: api schema
   dataset_rows?: number | null;
   // biome-ignore lint/style/useNamingConvention: api schema
@@ -372,6 +376,23 @@ export async function resumeRecipeJob(
   jobId: string,
 ): Promise<JobStatusResponse> {
   return postJson<JobStatusResponse>(`/jobs/${jobId}/resume`, {});
+}
+
+export async function getRecipeResumeConfig(jobId: string): Promise<RecipePayload> {
+  return getJson<RecipePayload>(`/jobs/${jobId}/resume-config`);
+}
+
+export async function deleteRecipeJob(jobId: string, deleteArtifacts: boolean, artifactPath: string | null): Promise<{ cleanup_pending?: boolean }> {
+  const query = new URLSearchParams({ delete_artifacts: String(deleteArtifacts) });
+  if (artifactPath && deleteArtifacts) query.set("artifact_path", artifactPath);
+  const response = await authFetch(`${DATA_DESIGNER_API_BASE}/jobs/${encodeURIComponent(jobId)}?${query}`, { method: "DELETE" });
+  if (!response.ok) {
+    if (response.status === 404 || response.status === 405) {
+      throw new Error("Recipe deletion requires the updated Studio backend. Restart Studio after the active run finishes.");
+    }
+    throw new DataRecipeApiError(response.status, await parseErrorResponse(response));
+  }
+  return response.json();
 }
 
 export async function publishRecipeJob(

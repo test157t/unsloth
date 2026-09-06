@@ -130,6 +130,8 @@ export function applyExecutionStatusSnapshot(
     source_progress: normalizeSourceProgress(status.source_progress),
     model_usage: normalizeObject(status.model_usage),
     artifact_path: status.artifact_path ?? execution.artifact_path,
+    can_resume: status.can_resume ?? false,
+    resume_error: status.resume_error ?? null,
     export_files: Array.isArray(status.export_files)
       ? status.export_files.flatMap((item) => {
           const name =

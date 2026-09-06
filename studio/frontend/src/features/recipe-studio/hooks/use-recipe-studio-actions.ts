@@ -80,6 +80,7 @@ type UseRecipeStudioActionsResult = {
   pauseExecution: (id: string) => Promise<void>;
   resumeExecution: (id: string) => Promise<void>;
   cancelExecution: (id: string) => Promise<void>;
+  deleteExecution: (id: string, deleteArtifacts: boolean) => Promise<boolean>;
   loadExecutionDatasetPage: (id: string, page: number) => Promise<void>;
   copyRecipe: () => Promise<void>;
   importRecipe: (value: string) => string | null;
@@ -162,6 +163,7 @@ export function useRecipeStudioActions({
     pauseExecution: executions.pauseExecution,
     resumeExecution: executions.resumeExecution,
     cancelExecution: executions.cancelExecution,
+    deleteExecution: executions.deleteExecution,
     loadExecutionDatasetPage: executions.loadExecutionDatasetPage,
     copyRecipe: persistence.copyRecipe,
     importRecipe: persistence.importRecipe,

@@ -8,7 +8,6 @@ import structlog
 import loggers
 import logging
 import re
-import shutil
 import time
 import traceback
 import unicodedata
@@ -38,6 +37,10 @@ _RE_GITHUB_CURSOR = re.compile(r"\bcursor=[^\s,]+")
 _RE_SECRET_TOKEN = re.compile(
     r"\b(?:(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]+|sk-unsloth-[A-Za-z0-9]+)"
 )
+
+
+class _StopAndSaveRequested(BaseException):
+    """End a full run immediately after its latest durable batch commit."""
 
 
 def _sanitize_log_message(message: str) -> str:
@@ -107,14 +110,24 @@ def _parquet_row_count(paths: list[Path]) -> int:
 
 
 def _recover_interrupted_merge(base_dataset_path: Path) -> None:
+    import uuid
+    import pyarrow.parquet as pq
+
     staged_merge = base_dataset_path / ".merge-in-progress.parquet"
     if not staged_merge.is_file():
         return
     parquet_dir = base_dataset_path / "parquet-files"
-    existing = list(parquet_dir.glob("*.parquet")) if parquet_dir.is_dir() else []
-    if existing:
-        staged_merge.unlink()
+    archive = base_dataset_path / "interrupted-batches"
+    archive.mkdir(exist_ok = True)
+    try:
+        pq.read_table(staged_merge)
+    except Exception:
+        # The process can die while writing the staging file. Keep the original
+        # batches, and retain the damaged staging file as evidence.
+        staged_merge.replace(archive / f"invalid-merge-{uuid.uuid4().hex}.parquet")
         return
+    if parquet_dir.exists():
+        parquet_dir.replace(archive / f"pre-merge-{uuid.uuid4().hex}")
     parquet_dir.mkdir(parents = True, exist_ok = True)
     merged_file = parquet_dir / "batch_00000.parquet"
     staged_merge.replace(merged_file)
@@ -124,14 +137,35 @@ def _recover_interrupted_merge(base_dataset_path: Path) -> None:
     )
 
 
-def _build_resumed_dataset(
+def _archive_interrupted_batches(base_dataset_path: Path) -> None:
+    """Preserve interrupted column snapshots; they are NOT completed batches.
+
+    Data Designer writes this directory after every column, including seed-only
+    data. A readable Parquet footer is not proof that the judge/rewrite ran.
+    """
+
+    partial_dir = base_dataset_path / "tmp-partial-parquet-files"
+    if not partial_dir.is_dir():
+        return
+
+    import uuid
+
+    if any(partial_dir.iterdir()):
+        archive = base_dataset_path / "interrupted-batches"
+        archive.mkdir(exist_ok = True)
+        partial_dir.replace(archive / uuid.uuid4().hex)
+    else:
+        partial_dir.rmdir()
+
+
+def _build_checkpointed_dataset(
     dataset_builder,
     *,
     num_records: int,
     on_batch_complete,
     save_multimedia_to_disk: bool = True,
 ) -> Path:
-    """Continue missing durable batches in an existing Data Designer artifact."""
+    """Build or resume through the same durable batch execution path."""
     import uuid
 
     from data_designer.engine.storage.media_storage import StorageMode
@@ -179,8 +213,8 @@ def _build_resumed_dataset(
             if scratch_generator is not None:
                 scratch_generator.generate_from_scratch(batch_manager.num_records_batch)
             continue
-        loggers.get_logger(__name__).info(
-            "⏳ Resuming batch %s of %s",
+        logging.getLogger("data_designer.engine.dataset_builders.column_wise_builder").info(
+            "⏳ Processing batch %s of %s",
             batch_idx + 1,
             batch_manager.num_batches,
         )
@@ -274,9 +308,7 @@ def run_job_process(
         ensure_dir(_ARTIFACT_ROOT)
         if resume_artifact is not None:
             _recover_interrupted_merge(resume_artifact)
-            partial_path = resume_artifact / "tmp-partial-parquet-files"
-            if partial_path.is_dir():
-                shutil.rmtree(partial_path)
+            _archive_interrupted_batches(resume_artifact)
         run_config_raw = run.get("run_config") or {}
 
         builder = build_config_builder(recipe)
@@ -340,7 +372,25 @@ def run_job_process(
             from data_designer.engine.storage.artifact_storage import ArtifactStorage
 
             original_build = ColumnWiseDatasetBuilder.build
+            original_worker_error = ColumnWiseDatasetBuilder._worker_error_callback
+            original_finalize = ColumnWiseDatasetBuilder._finalize_fan_out
             original_resolved_dataset_name = ArtifactStorage.resolved_dataset_name
+
+            def fail_batch(dataset_builder, exc, *, context=None):
+                # A failed inference must not turn into an omitted source row in
+                # a committed checkpoint. Replay this batch from its seed on resume.
+                # Future callbacks run in executor threads; exceptions raised
+                # there are logged and swallowed by concurrent.futures. Carry
+                # the failure back to the builder thread before any batch commit.
+                dataset_builder._recipe_failure = exc
+
+            def finalize_batch(dataset_builder, tracker):
+                failure = getattr(dataset_builder, "_recipe_failure", None)
+                if failure is not None:
+                    raise RuntimeError(
+                        f"Recipe generation failed; completed batches are saved. {failure}"
+                    ) from failure
+                return original_finalize(dataset_builder, tracker)
 
             def build_with_pause_checkpoint(dataset_builder, *args, **kwargs):
                 caller_callback = kwargs.get("on_batch_complete")
@@ -359,15 +409,14 @@ def run_job_process(
                     if pause_event is None or not pause_event.is_set():
                         return
                     event_queue.put({"type": EVENT_JOB_PAUSED, "ts": time.time()})
-                    while pause_event.is_set():
-                        time.sleep(0.1)
+                    raise _StopAndSaveRequested
 
                 kwargs["on_batch_complete"] = on_batch_complete
-                if resume_artifact is not None:
-                    return _build_resumed_dataset(dataset_builder, *args, **kwargs)
-                return original_build(dataset_builder, *args, **kwargs)
+                return _build_checkpointed_dataset(dataset_builder, *args, **kwargs)
 
             ColumnWiseDatasetBuilder.build = build_with_pause_checkpoint
+            ColumnWiseDatasetBuilder._worker_error_callback = fail_batch
+            ColumnWiseDatasetBuilder._finalize_fan_out = finalize_batch
             if resume_artifact is not None:
                 ArtifactStorage.resolved_dataset_name = property(
                     lambda artifact_storage: artifact_storage.dataset_name
@@ -378,6 +427,8 @@ def run_job_process(
                     results.artifact_storage.__dict__["resolved_dataset_name"] = dataset_name
             finally:
                 ColumnWiseDatasetBuilder.build = original_build
+                ColumnWiseDatasetBuilder._worker_error_callback = original_worker_error
+                ColumnWiseDatasetBuilder._finalize_fan_out = original_finalize
                 ArtifactStorage.resolved_dataset_name = original_resolved_dataset_name
             analysis = to_jsonable(results.load_analysis().model_dump(mode = "json"))
             if merge_batches:
@@ -397,6 +448,8 @@ def run_job_process(
                     "execution_type": execution_type,
                 }
             )
+    except _StopAndSaveRequested:
+        return
     except Exception as exc:
         event_queue.put(
             {
@@ -424,14 +477,7 @@ def _merge_batches_to_single_parquet(base_dataset_path: Path) -> None:
     dataframe = read_parquet_dataset(parquet_dir)
     staged_merge = base_dataset_path / ".merge-in-progress.parquet"
     dataframe.to_parquet(staged_merge, index = False)
-    shutil.rmtree(parquet_dir)
-    parquet_dir.mkdir(parents = True, exist_ok = True)
-    merged_file = parquet_dir / "batch_00000.parquet"
-    staged_merge.replace(merged_file)
-    _rewrite_merged_metadata(
-        base_dataset_path = base_dataset_path,
-        parquet_file = merged_file,
-    )
+    _recover_interrupted_merge(base_dataset_path)
 
 
 def _rewrite_merged_metadata(*, base_dataset_path: Path, parquet_file: Path) -> None:
