@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 
 from utils.paths import recipe_datasets_root
+from core.training.account_jobs import job_control
 from .manager import _resume_state_path
 
 
@@ -25,6 +26,7 @@ def _artifact_path(value: str) -> Path:
     return resolved
 
 
+@job_control
 def delete_saved_job(manager, job_id: str, *, delete_artifacts: bool = False,
                      artifact_path: str | None = None) -> dict:
     staged = None

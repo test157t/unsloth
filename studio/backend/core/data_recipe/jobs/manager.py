@@ -3,6 +3,18 @@
 
 from __future__ import annotations
 
+from core.training.account_jobs import (
+    account_process_spec,
+    init_job_owner,
+    job_busy,
+    job_control,
+    job_pump,
+    job_read,
+    owned_job,
+    validate_recipe_access,
+    worker_alive,
+)
+from utils.account_context import account_thread, current_account
 import asyncio
 import dataclasses
 import json
@@ -33,7 +45,8 @@ from .constants import (
 from .parse import apply_update, coerce_event, parse_log_message
 from .types import BatchProgress, Job, ModelUsage, Progress, SourceProgress
 from loggers import get_logger
-from utils.paths import ensure_dir, studio_root, recipe_datasets_root
+from utils.paths import ensure_dir, recipe_datasets_root
+from utils.paths.storage_roots import account_path
 
 logger = get_logger(__name__)
 
@@ -42,7 +55,7 @@ _CTX = mp.get_context("spawn")
 
 
 def _resume_state_path() -> Path:
-    return studio_root() / "state" / "data-recipe-current.json"
+    return account_path("state/data-recipe-current.json")
 
 
 def _strip_persisted_secrets(value: Any) -> Any:
@@ -222,6 +235,12 @@ class Subscription:
 class JobManager:
     def __init__(self) -> None:
         """Single-job runner (in-mem). Simple on purpose, not a whole platform."""
+        init_job_owner(
+            self,
+            lambda: worker_alive(self),
+            lambda: self.cancel(self._job.job_id) if self._job else None,
+            self._clear_account_result,
+        )
         self._lock = threading.Lock()
         self._job: Job | None = None
         self._proc: mp.Process | None = None
@@ -236,6 +255,16 @@ class JobManager:
         self._restart_resume_error: str | None = None
         self._load_resumable_job()
 
+    def _clear_account_result(self):
+        self._job = None
+        self._resume_recipe = None
+        self._resume_run = None
+        self._restart_resume_error = None
+        self._events.clear()
+        # Old subscribers retain their private queues but never receive a successor's events.
+        self._subs.clear()
+
+    @owned_job()
     def start(
         self,
         *,
@@ -250,6 +279,7 @@ class JobManager:
         minted by the route layer; revoked on terminal state so the key's
         live window is no longer than the run.
         """
+        validate_recipe_access(recipe)
         llm_columns = recipe.get("columns") or []
         llm_column_count = 0
         if isinstance(llm_columns, list):
@@ -315,15 +345,19 @@ class JobManager:
         ):
             mp_q = _CTX.Queue()
             pause_event = _CTX.Event()
-            proc = _CTX.Process(
-                target = run_without_native_path_secret,
-                args = ("core.data_recipe.jobs.worker", "run_job_process", cache_env),
-                kwargs = {
+            process_args, process_kwargs = account_process_spec(
+                "core.data_recipe.jobs.worker", "run_job_process", cache_env,
+                {
                     "event_queue": mp_q,
                     "recipe": recipe,
                     "run": run_payload,
                     "pause_event": pause_event,
                 },
+            )
+            proc = _CTX.Process(
+                target = run_without_native_path_secret,
+                args = process_args,
+                kwargs = process_kwargs,
                 daemon = True,
             )
             proc.start()
@@ -334,7 +368,7 @@ class JobManager:
         self._mp_q = mp_q
         self._pause_event = pause_event
         self._proc = proc
-        self._pump_thread = threading.Thread(target = self._pump_loop, daemon = True)
+        self._pump_thread = account_thread(target = self._pump_loop, daemon = True)
         self._pump_thread.start()
 
     def _persist_resumable_locked(self) -> None:
@@ -402,6 +436,7 @@ class JobManager:
             if not job.job_id or not job.artifact_path or not Path(job.artifact_path).is_dir():
                 raise ValueError("checkpoint artifact is missing")
             self._job = job
+            self._result_account = current_account()
             self._resume_recipe = recipe
             self._resume_run = run
             resume_error = payload.get("restart_resume_error")
@@ -426,6 +461,7 @@ class JobManager:
             logger.warning("Ignoring an invalid recipe checkpoint", exc_info = True)
             # Preserve invalid state for diagnosis instead of destroying recovery evidence.
 
+    @owned_job()
     def requires_restart_resume(self, job_id: str) -> bool:
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
@@ -459,6 +495,7 @@ class JobManager:
                 continue
         return None
 
+    @job_read(lambda self, job_id: (self._saved_run(job_id) or {}).get("recipe"))
     def get_resume_recipe(self, job_id: str) -> dict[str, Any] | None:
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
@@ -466,6 +503,7 @@ class JobManager:
                 return payload["recipe"] if payload is not None else None
             return None if self._resume_recipe is None else json.loads(json.dumps(self._resume_recipe))
 
+    @job_control
     def pause(self, job_id: str) -> bool:
         """Request Stop and Save after the current durable batch."""
         with self._lock:
@@ -483,6 +521,7 @@ class JobManager:
             self._emit({"type": EVENT_JOB_PAUSING, "ts": time.time(), "job_id": job_id})
             return True
 
+    @owned_job(continuation = True)
     def resume(
         self,
         job_id: str,
@@ -491,6 +530,8 @@ class JobManager:
         internal_api_key_id: int | None = None,
     ) -> bool:
         """Resume a stopped run from its completed batch checkpoint."""
+        if recipe is not None:
+            validate_recipe_access(recipe)
         with self._lock:
             if self._job is None or self._job.job_id != job_id:
                 return False
@@ -527,6 +568,7 @@ class JobManager:
             self._emit({"type": EVENT_JOB_RESUMED, "ts": time.time(), "job_id": job_id})
             return True
 
+    @job_control
     def cancel(self, job_id: str) -> bool:
         """Hard stop. We terminate the subprocess. Quick + reliable."""
         with self._lock:
@@ -547,6 +589,7 @@ class JobManager:
                 pass
             return True
 
+    @job_read(lambda self, *args, **kwargs: None)
     def get_status(self, job_id: str) -> dict | None:
         """UI-friendly structured snapshot; an alternative to SSE."""
         with self._lock:
@@ -641,6 +684,7 @@ class JobManager:
                 "finished_at": job.finished_at,
             }
 
+    @job_read(lambda self: {"status": "busy" if job_busy(self) else "idle"})
     def get_current_status(self) -> dict | None:
         """Single-job convenience (last/current)."""
         job_id = self.get_current_job_id()
@@ -648,11 +692,12 @@ class JobManager:
             return None
         return self.get_status(job_id)
 
+    @job_read(lambda self, *args, **kwargs: None)
     def get_current_job_id(self) -> str | None:
-        """Return current job_id (or None)."""
         with self._lock:
             return None if self._job is None else self._job.job_id
 
+    @job_read(lambda self, *args, **kwargs: None)
     def get_analysis(self, job_id: str) -> dict | None:
         """Final profiling output (only after job completes)."""
         with self._lock:
@@ -661,6 +706,7 @@ class JobManager:
                 return payload["job"].get("analysis") if payload is not None else None
             return self._job.analysis
 
+    @job_read(lambda self, *args, **kwargs: None)
     def get_dataset(
         self,
         job_id: str,
@@ -766,6 +812,7 @@ class JobManager:
         rows = dataframe.iloc[offset : offset + limit].to_dict(orient = "records")
         return {"dataset": to_preview_jsonable(rows), "total": total}
 
+    @job_read(lambda self, *args, **kwargs: None)
     def subscribe(
         self,
         job_id: str,
@@ -845,6 +892,7 @@ class JobManager:
             etype = event.get("type") if isinstance(event, dict) else type(event).__name__
             logger.exception("Data-recipe job pump: failed to handle %s event; skipping", etype)
 
+    @job_pump
     def _pump_loop(self) -> None:
         """Background thread: consume worker events and update the job snapshot.
 

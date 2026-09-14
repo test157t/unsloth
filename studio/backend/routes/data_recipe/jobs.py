@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from utils.account_context import current_account
+from core.training.account_jobs import account_event_stream
 import copy
 import time
 from datetime import datetime, timedelta, timezone
@@ -37,6 +39,7 @@ from models.data_recipe import (
     PublishDatasetResponse,
     RecipePayload,
 )
+from utils.host_policy import dial_host, self_request_host
 from utils.utils import safe_error_detail, safe_curated_detail, log_and_http_error
 from utils.paths import recipe_datasets_root
 
@@ -46,22 +49,17 @@ router = APIRouter()
 # Keepalive cadence, well inside the ~100s a quick tunnel allows between body bytes.
 _KEEPALIVE_EVERY_S = 15.0
 
-# A stdio provider is a command this host would run, so only a UI session may
-# supply one. Annotated, not a Depends default, so a direct call gets False.
+# A stdio provider is a command this host would run, so only a UI session may supply one. Annotated, not a
+# Depends default, so a direct call gets False.
 ViaApiKey = Annotated[bool, Depends(authenticated_via_api_key)]
 
 
 def _resolve_local_v1_endpoint(request: Request) -> str:
-    """Return the loopback /v1 URL for the actual backend listen port.
-
-    Resolution order:
-      1. ``app.state.server_port`` (run.py, post-bind) - survives proxies/tunnels.
-      2. ``request.scope["server"]`` - when Unsloth starts outside ``run_server``.
-      3. parsed ``request.base_url`` - last resort for test fixtures.
-    """
+    """The /v1 URL of this process's own backend, at the address it is bound to. Port order:
+    ``server_port`` (survives proxies/tunnels), the request scope, ``base_url``."""
+    server = request.scope.get("server")
     port: Any = getattr(request.app.state, "server_port", None)
     if not isinstance(port, int) or port <= 0:
-        server = request.scope.get("server")
         if (
             isinstance(server, tuple)
             and len(server) >= 2
@@ -72,7 +70,8 @@ def _resolve_local_v1_endpoint(request: Request) -> str:
         else:
             parsed = urlparse(str(request.base_url))
             port = parsed.port if parsed.port is not None else 8888
-    return f"http://127.0.0.1:{int(port)}/v1"
+    host = dial_host(self_request_host(request.app.state, server))
+    return f"http://{host}:{int(port)}/v1"
 
 
 def _request_has_desktop_access_token(request: Request) -> bool:
@@ -218,14 +217,11 @@ def _bind_local_model_variants(
 def _inject_local_structured_response_format(
     recipe: dict[str, Any], local_provider_names: set[str]
 ) -> None:
-    """Inject an OpenAI ``response_format`` for each local llm-structured column.
-
-    Clones the model_config and repoints the column at the clone so llm-text /
-    llm-judge columns sharing the alias keep free-form sampling. Without this,
-    data_designer only adds a prompt-level "return JSON" hint, which small GGUFs
-    often break. Forwarding ``response_format`` lets llama-server apply
-    grammar-constrained sampling, guaranteeing parseable output.
-    """
+    """Inject an OpenAI ``response_format`` for each local llm-structured column. Clones the
+    model_config and repoints the column at the clone so llm-text / llm-judge columns sharing the
+    alias keep free-form sampling. Without this, data_designer only adds a prompt-level "return
+    JSON" hint, which small GGUFs often break. Forwarding ``response_format`` lets llama-server
+    apply grammar-constrained sampling, guaranteeing parseable output."""
     columns = recipe.get("columns")
     model_configs = recipe.get("model_configs")
     if not isinstance(columns, list) or not isinstance(model_configs, list):
@@ -242,9 +238,8 @@ def _inject_local_structured_response_format(
     if not alias_to_local_mc:
         return
 
-    # Clone per (alias, column) so each llm-structured column gets its own
-    # schema without leaking response_format onto other columns sharing the
-    # base alias.
+    # Clone per (alias, column) so each llm-structured column gets its own schema without leaking
+    # response_format onto other columns sharing the base alias.
     seen_clone_aliases: set[str] = {
         mc.get("alias") for mc in model_configs if isinstance(mc.get("alias"), str)
     }
@@ -295,9 +290,9 @@ def _inject_local_structured_response_format(
                 "schema": output_format,
             },
         }
-        # Internal opt-in that re-enables the ```json fence data_designer's structured-output parser expects, which the
-        # spec-compliant default now omits.
-        # The flag rides through the OpenAI SDK's extra_body passthrough alongside response_format.
+        # Internal opt-in that re-enables the ```json fence data_designer's structured-output parser expects, which
+        # the spec-compliant default now omits. The flag rides through the OpenAI SDK's extra_body passthrough
+        # alongside response_format.
         extra_body["_unsloth_guided_fence"] = True
         params["extra_body"] = extra_body
         new_configs.append(clone)
@@ -312,12 +307,9 @@ def _inject_local_providers(
     request: Request,
     expect_gen: Optional[str] = None,
 ) -> Optional[int]:
-    """Mutate recipe in-place: point is_local providers at this server and mint
-    a short-lived internal sk-unsloth-* key for workflow auth.
-
-    Returns the minted key's row id (for the caller to revoke on completion), or
-    ``None`` when no local provider is reachable from an LLM column.
-    """
+    """Mutate recipe in-place: point is_local providers at this server and mint a short-lived internal
+    sk-unsloth-* key for workflow auth. Returns the minted key's row id (for the caller to revoke on
+    completion), or ``None`` when no local provider is reachable from an LLM column."""
     providers = recipe.get("model_providers")
     if not providers:
         return None
@@ -350,19 +342,17 @@ def _inject_local_providers(
     token = ""
     internal_key_id: Optional[int] = None
     if local_names & referenced_providers:
-        # Verify the selected local model is loaded before minting a key. Still
-        # a point-in-time check (TOCTOU); the /v1 endpoint returns a clear 400 if
-        # the model is unloaded or swapped before the subprocess calls it.
+        # Verify the selected local model is loaded before minting a key. Still a point-in-time check (TOCTOU); the
+        # /v1 endpoint returns a clear 400 if the model is unloaded or swapped before the subprocess calls it.
         _ensure_selected_local_model_loaded(recipe, local_names)
 
         from auth import storage
 
-        # Mint an internal sk-unsloth-* key scoped to this run via the unified
-        # API-key path. Marked internal so it's hidden from the user's key list;
-        # the caller revokes it when the job terminates.
+        # Mint an internal sk-unsloth-* key scoped to this run via the unified API-key path. Marked internal so it's
+        # hidden from the user's key list; the caller revokes it when the job terminates.
         expires_at = (datetime.now(timezone.utc) + timedelta(hours = 24)).isoformat()
         token, row = storage.create_api_key(
-            username = "unsloth",
+            username = current_account().username,
             name = storage.DATA_RECIPE_WORKFLOW_KEY_NAME,
             expires_at = expires_at,
             internal = True,
@@ -395,9 +385,9 @@ def _inject_local_providers(
         if mc.get("provider") in local_names:
             mc["skip_health_check"] = True
             # Disable thinking for local recipe inference: the <think> preamble roughly doubles tokens per row and
-            # pushes answers past data_designer's json-fence regex.
-            # Forwarded as chat_template_kwargs={enable_thinking: False} via extra_body so llama-server renders the
-            # template without it: llm-text columns get the latency cut, structured columns stop leaking think tags.
+            # pushes answers past data_designer's json-fence regex. Forwarded as chat_template_kwargs={enable_thinking:
+            # False} via extra_body so llama-server renders the template without it: llm-text columns get the latency
+            # cut, structured columns stop leaking think tags.
             params = mc.get("inference_parameters")
             if not isinstance(params, dict):
                 params = {}
@@ -828,7 +818,7 @@ async def job_events(request: Request, job_id: str):
             mgr.unsubscribe(sub)
 
     return StreamingResponse(
-        gen(),
+        account_event_stream(mgr, gen()),
         media_type = "text/event-stream",
         headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

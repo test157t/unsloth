@@ -1,8 +1,8 @@
 # Unsloth Docker Image
 
-Pre-built images for [Unsloth](https://github.com/unslothai/unsloth): fine-tune and run LLMs, vision, audio and diffusion models with no setup. Every image carries the full training stack (PyTorch 2.11 with CUDA 12.8, Unsloth, unsloth-zoo, bitsandbytes, xformers, TRL, PEFT), JupyterLab with the [Unsloth notebooks](https://github.com/unslothai/notebooks) pre-synced, and prebuilt llama.cpp and whisper.cpp for GGUF work.
+Pre-built images for [Unsloth](https://github.com/unslothai/unsloth): fine-tune and run LLMs, vision, audio and diffusion models with no setup. Every image carries the full training stack (PyTorch 2.11 with CUDA 12.8, Unsloth, unsloth-zoo, bitsandbytes, TRL, PEFT, plus xformers on `linux/amd64`), JupyterLab with the [Unsloth notebooks](https://github.com/unslothai/notebooks) pre-synced, and prebuilt llama.cpp and whisper.cpp for GGUF work.
 
-Source: [`docker/`](https://github.com/unslothai/unsloth/tree/main/docker) in the main repository. Guide: [docs.unsloth.ai](https://docs.unsloth.ai/get-started/install-and-update/docker).
+Source: [`docker/`](https://github.com/unslothai/unsloth/tree/main/docker) in the main repository. Guide: [docs.unsloth.ai](https://docs.unsloth.ai/get-started/install/docker).
 
 ## Tags
 
@@ -75,7 +75,7 @@ docker run -d -e UNSLOTH_ALLOW_CPU=1 -p 8000:8000 -p 8888:8888 unsloth/unsloth
 
 ## Supported GPUs
 
-Compiled for `sm_75 sm_80 sm_86 sm_90 sm_100 sm_120`: Turing (T4, RTX 20), Ampere (A100, A10, RTX 30), Ada (L4, L40, RTX 40), Hopper (H100, H200, GH200), Blackwell (B200, GB200, RTX 50, RTX PRO 6000) and GB10 (DGX Spark). The container prints the detected GPU on start and explains what to do when the driver is too old.
+Compiled for `sm_75 sm_80 sm_86 sm_90 sm_100 sm_120`: Turing (T4, RTX 20), Ampere (A100, A10, RTX 30), Ada (L4, L40, RTX 40), Hopper (H100, H200, GH200) and Blackwell (B200, GB200, RTX 50, RTX PRO 6000). GB10 (DGX Spark, `sm_121`) runs the `sm_120` binaries through Blackwell forward compatibility; only kernels compiled at run time, such as Triton, use the CUDA 13 compiler the container switches to on that GPU. The container prints the detected GPU on start and explains what to do when the driver is too old.
 
 Driver requirements:
 
@@ -101,10 +101,15 @@ Turing has no bfloat16; Unsloth falls back to float16 there. AMD GPUs are not su
 | `JUPYTER_PASSWORD` | JupyterLab password. Unset: generated once and printed in the logs. |
 | `JUPYTER_PORT` | JupyterLab port inside the container. Default `8888`. |
 | `SSH_KEY` or `PUBLIC_KEY` | OpenSSH public key for root login. Enables sshd on port 22. Password login is never enabled. |
-| `UNSLOTH_ALLOW_CPU=1` | Allow starting without a GPU. |
+| `UNSLOTH_ALLOW_CPU=1` | Allow starting without a GPU (`latest` already does). Dropped when a GPU is visible, where it would turn off Unsloth's training patches. |
 | `UNSLOTH_JUPYTER_CLOUDFLARE=1` | Publish JupyterLab through a Cloudflare quick tunnel and print the URL. |
 | `UNSLOTH_SKIP_NOTEBOOK_SYNC=1` | Do not refresh the notebooks from GitHub on start. |
 | `HF_TOKEN`, `WANDB_API_KEY` | Forwarded to Hugging Face and Weights and Biases. |
+
+On a host with no GPU, Studio, JupyterLab and its kernels, and login shells all run in
+CPU mode. A non-login `docker exec` is built from the image, not the container's first
+process, so `docker exec <c> python -c "import unsloth"` still reports that it needs a
+GPU: use `docker exec <c> bash -lc '...'` or `docker exec -e UNSLOTH_ALLOW_CPU=1 <c> ...`.
 
 ## Volumes
 
