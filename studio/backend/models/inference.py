@@ -187,9 +187,13 @@ class LoadRequest(BaseModel):
         description = (
             "Physical prompt micro-batch size for llama-server (--ubatch-size) "
             f"for this load ({BATCH_MIN}..{BATCH_MAX}). Omit for the llama.cpp "
-            "default (512). llama.cpp caps it at the batch size. Larger values "
-            "speed up prompt processing at the cost of compute-buffer VRAM. "
-            "Ignored for non-GGUF models."
+            "default (512), raised to a projector's own per-image ceiling when "
+            "its images would abort the server at 512: 1120 for Gemma 4, and "
+            "2048 for a projector whose family cannot be read. Every other "
+            "vision model keeps the 512 default. "
+            "llama.cpp caps it at the batch size. Larger values speed up prompt "
+            "processing at the cost of compute-buffer VRAM. Ignored for "
+            "non-GGUF models."
         ),
     )
     load_mode: Optional[Literal["auto", "none", "mmap", "mlock", "mmap+mlock", "dio"]] = Field(
@@ -315,11 +319,15 @@ class LoadRequest(BaseModel):
     tensor_split: Optional[List[float]] = Field(
         None,
         description = (
-            "Manual mode only: relative share of the model per GPU (--tensor-split), "
-            "in the order of the GPUs in use, e.g. [2, 1] for 2:1. Omit it to let "
-            "llama.cpp use its default, which splits by free VRAM. Any list given is "
-            "passed through as-is, so send [1, 1] to force an even split. Ignored "
-            "unless gpu_memory_mode is 'manual' with gpu_layers >= 0."
+            "Relative share of the model per GPU (--tensor-split), in the order of "
+            "the GPUs in use, e.g. [2, 1] for 2:1. Omit it to let llama.cpp use its "
+            "default, which splits by free VRAM. Values are relative, so [1, 1] "
+            "forces an even split and [3, 1] and [75, 25] mean the same thing. "
+            "In manual mode (gpu_layers >= 0) the list is passed through as-is. In "
+            "auto mode it applies only with tensor_parallel, and only when the "
+            "placement planner did not size the split itself; a ratio that does not "
+            "fit the planner's per-GPU budget is dropped rather than forwarded. "
+            "Ignored entirely when gpu_memory_mode is 'manual' with gpu_layers < 0."
         ),
     )
 
@@ -693,6 +701,13 @@ class ValidateModelResponse(BaseModel):
     valid: bool = Field(..., description = "Whether the model identifier looks valid")
     message: str = Field(..., description = "Human-readable validation message")
     identifier: Optional[str] = Field(None, description = "Resolved model identifier")
+    resident: bool = Field(
+        False,
+        description = (
+            "Whether the weights this identifier names are the ones already loaded. Decided "
+            "from the files, so an Ollama tag answers for whichever of its spellings loaded it."
+        ),
+    )
     display_name: Optional[str] = Field(None, description = "Display name derived from identifier")
     is_gguf: bool = Field(False, description = "Whether this is a GGUF model (llama.cpp)")
     is_diffusion: bool = Field(
@@ -1274,7 +1289,7 @@ class _InferenceRuntimeFields(BaseModel):
     )
     tensor_split: Optional[List[float]] = Field(
         None,
-        description = "Manual mode: relative model share per GPU (--tensor-split); None = default (split by free VRAM).",
+        description = "Relative model share per GPU (--tensor-split) used by the active load; None = default (split by free VRAM).",
     )
     n_layers: Optional[int] = Field(
         None,
@@ -1693,6 +1708,19 @@ class ImageContentPart(BaseModel):
     image_url: ImageUrl
 
 
+class VideoUrl(BaseModel):
+    """Video URL object: an inline data URI. Remote URLs are not fetched."""
+
+    url: str = Field(..., description = "data:video/mp4;base64,... (inline only)")
+
+
+class VideoContentPart(BaseModel):
+    """Video content part; served only through llama-server's ``input_video``."""
+
+    type: Literal["video_url"]
+    video_url: VideoUrl
+
+
 class InputDocumentContentPart(BaseModel):
     """Document (PDF / file) content part in a multimodal message.
 
@@ -1789,6 +1817,7 @@ _KNOWN_CONTENT_PART_TAGS = frozenset(
     {
         "text",
         "image_url",
+        "video_url",
         "input_audio",
         "input_document",
         "reasoning",
@@ -1810,6 +1839,7 @@ ContentPart = Annotated[
     Union[
         Annotated[TextContentPart, Tag("text")],
         Annotated[ImageContentPart, Tag("image_url")],
+        Annotated[VideoContentPart, Tag("video_url")],
         Annotated[InputAudioContentPart, Tag("input_audio")],
         Annotated[InputDocumentContentPart, Tag("input_document")],
         Annotated[OpenAIReasoningContentPart, Tag("reasoning")],
@@ -1853,7 +1883,7 @@ class ChatMessage(BaseModel):
     )
     name: Optional[str] = Field(
         None,
-        description = "OpenAI tool-result messages: name of the tool whose result this is.",
+        description = "Participant name, or the tool name on tool-result messages.",
     )
     extra_content: Optional[dict] = Field(
         None,
@@ -1877,8 +1907,14 @@ class ChatMessage(BaseModel):
             raise ValueError('"tool_calls" is only valid on role="assistant" messages.')
         if self.tool_call_id is not None and self.role != "tool":
             raise ValueError('"tool_call_id" is only valid on role="tool" messages.')
-        if self.name is not None and self.role != "tool":
-            raise ValueError('"name" is only valid on role="tool" messages.')
+        # llama-server renders the marker into whatever turn carried it, so off a user turn the
+        # result is template-dependent.
+        if (
+            self.role != "user"
+            and isinstance(self.content, list)
+            and any(isinstance(part, VideoContentPart) for part in self.content)
+        ):
+            raise ValueError(f'"video_url" parts are not valid on role="{self.role}" messages.')
 
         if self.role == "tool":
             # tool_call_id resolution happens at ChatCompletionRequest scope. OpenAI accepts empty tool
@@ -2108,7 +2144,7 @@ class ChatCompletionRequest(BaseModel):
         None,
         description = (
             "[x-unsloth] Base64-encoded video (mp4/mov/webm/mkv/avi) for video-input "
-            "models. GGUF only: llama-server samples frames with ffmpeg."
+            "models: a GGUF served by llama-server, or an MLX model whose processor reads video."
         ),
     )
     use_adapter: Optional[Union[bool, str]] = Field(
@@ -4126,10 +4162,10 @@ class DiffusionDownloadPlanEntry(BaseModel):
 
 
 class DiffusionDownloadPlanResponse(BaseModel):
-    """What to download before a load, so the Hub download manager can fetch it with the
-    same file scope the loader would. Empty entries mean nothing to download (local path)."""
+    """Files to stage before loading; plan_failed marks an incomplete listing."""
 
     entries: List[DiffusionDownloadPlanEntry] = Field(default_factory = list)
+    plan_failed: bool = Field(False, description = "Metadata discovery left the file list incomplete")
     total_bytes: int = Field(
         0, description = "Sum of the remaining download entries, 0 when ready or unknown"
     )

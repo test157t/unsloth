@@ -273,6 +273,19 @@ def test_the_budget_is_rechecked_after_an_idle_model_is_restored():
 def test_the_gallery_is_bounded_so_an_api_client_cannot_fill_the_disk(monkeypatch, tmp_path):
     monkeypatch.setattr(gallery, "gallery_dir", lambda: tmp_path)
     monkeypatch.setenv("UNSLOTH_AUDIO_GALLERY_MAX_CLIPS", "3")
+    # Rapid writes can share an mtime on Windows. Give this chronological
+    # pruning test distinct timestamps rather than relying on wall-clock ticks.
+    replace = gallery.os.replace
+    timestamp = 1_700_000_000
+
+    def replace_with_timestamp(source, target):
+        nonlocal timestamp
+        replace(source, target)
+        if str(target).endswith(".wav"):
+            timestamp += 1
+            gallery.os.utime(target, (timestamp, timestamp))
+
+    monkeypatch.setattr(gallery.os, "replace", replace_with_timestamp)
     meta = {
         "prompt": "p",
         "model": "m",

@@ -14,7 +14,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-from ..jsonable import to_jsonable, to_preview_jsonable
+from ..jsonable import to_jsonable, to_preview_jsonable_row
 from ..jsonl_export import write_jsonl_exports
 from .constants import (
     EVENT_JOB_CHECKPOINT,
@@ -345,7 +345,7 @@ def run_job_process(
             dataset = (
                 []
                 if results.dataset is None
-                else to_preview_jsonable(results.dataset.to_dict(orient = "records"))
+                else to_preview_jsonable_row(results.dataset.to_dict(orient = "records"))
             )
             processor_artifacts = (
                 None
