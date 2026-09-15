@@ -29,6 +29,40 @@ from models.inference import ChatCompletionRequest
 _ROUTE_SOURCE = pathlib.Path(__file__).resolve().parents[1] / "routes" / "inference.py"
 
 
+@pytest.mark.parametrize("suffix", ["", "/", "/v1", "/v1/"])
+def test_voiceforge_connection_test_uses_models_endpoint_without_auth(monkeypatch, suffix):
+    from models.providers import ProviderTestRequest
+    from routes import providers
+
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json={"data": [{"id": "omnivoice"}]})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            monkeypatch.setattr(ep_mod, "_http_client", client)
+            result = await providers.test_provider(
+                ProviderTestRequest(provider_type="voiceforge", base_url="http://127.0.0.1:8889" + suffix),
+                _current_subject="test", via_api_key=False,
+            )
+            assert result.success, result.message
+
+    asyncio.run(run())
+    assert len(requests) == 1
+    assert requests[0].url.path == "/v1/models"
+    assert "authorization" not in requests[0].headers
+
+
+def test_voiceforge_url_normalization_preserves_explicit_proxy_paths_and_other_providers():
+    for provider_type, base_url in (
+        ("voiceforge", "http://127.0.0.1:8889/voice/v1"),
+        ("custom", "http://127.0.0.1:8889"),
+    ):
+        assert ExternalProviderClient(provider_type, base_url, "").base_url == base_url
+
+
 def _capture_body(provider_type: str, **kwargs) -> dict:
     captured: dict = {}
 
@@ -102,6 +136,13 @@ def test_a_zero_value_is_forwarded_rather_than_read_as_unset():
     body = _capture_body("vllm", top_k = 0, min_p = 0.0)
     assert body["top_k"] == 0
     assert body["min_p"] == 0.0
+
+
+def test_grok_wire_body_omits_sampling_fields_when_proxy_marks_them_unset():
+    body = _capture_body("custom", temperature=None, top_p=None, presence_penalty=None,
+                         top_k=None, min_p=None, repetition_penalty=None)
+    for field in ("temperature", "top_p", "presence_penalty", "top_k", "min_p", "repetition_penalty"):
+        assert field not in body
 
 
 def test_the_schema_defaults_are_not_none_so_the_route_cannot_test_for_none():

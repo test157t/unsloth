@@ -9,7 +9,7 @@ import { encryptProviderApiKey } from "../api/providers-api";
 import { getExternalProviderApiKey } from "../external-providers";
 import { stripSearchImageTokens } from "../search-images/search-images";
 import { useExternalProvidersStore } from "../stores/external-providers-store";
-import { splitVoiceForgeSpeech } from "../voiceforge";
+import { splitVoiceForgeSpeech, voiceForgeRvcOptions } from "../voiceforge";
 
 /** Voice for a stored voiceURI. "default" resolves to the voice the platform marks as its
  *  default, so the "System default" choice means what it says instead of falling back to a
@@ -262,7 +262,7 @@ export async function generateCustomTtsAudio(
       "Connections are disabled. Turn on Enable connections in Settings → Connections to use a custom TTS endpoint.",
     );
   }
-  const { ttsProviderId, ttsProviderModel, ttsProviderVoice } =
+  const { ttsProviderId, ttsProviderModel, ttsProviderVoice, ttsVoiceForgeRvc } =
     useVoiceSettingsStore.getState();
   const model = ttsProviderModel.trim();
   const voice = ttsProviderVoice.trim() || "alloy";
@@ -281,6 +281,9 @@ export async function generateCustomTtsAudio(
     throw new Error(
       "The custom TTS connection no longer exists. Pick another connection in Settings → Voice.",
     );
+  }
+  if (provider.providerType === "voiceforge" && !ttsProviderVoice.trim()) {
+    throw new Error("Choose a VoiceForge voice in Settings → Voice.");
   }
   const legacyApiKey = provider.hasApiKey
     ? ""
@@ -332,6 +335,7 @@ export async function generateCustomTtsAudio(
         provider_base_url: provider.baseUrl,
         model,
         voice,
+        ...(provider.providerType === "voiceforge" ? voiceForgeRvcOptions(ttsVoiceForgeRvc) : {}),
         ...(encryptedApiKey ? { encrypted_api_key: encryptedApiKey } : {}),
       }),
       signal,
@@ -363,6 +367,7 @@ function speakWithBackendAudio(
     error?: unknown,
   ) => void,
   markRunning: () => void,
+  playbackReady: Promise<void> = Promise.resolve(),
 ): { cancel: () => void } {
   const { ttsRate, ttsVolume } = useVoiceSettingsStore.getState();
   const controller = new AbortController();
@@ -399,6 +404,8 @@ function speakWithBackendAudio(
           return;
         }
         audioUrl = url;
+        await playbackReady;
+        if (cancelled) return;
         audio = new Audio(url);
         audio.playbackRate = ttsRate;
         audio.volume = ttsVolume;
@@ -457,6 +464,18 @@ export class StudioSpeechSynthesisAdapter implements SpeechSynthesisAdapter {
   }
 
   speak(spokenText: string): SpeechSynthesisAdapter.Utterance {
+    return this.createSpeech(spokenText);
+  }
+
+  /** Synthesize ahead without playing until the queue hands over playback. */
+  prepare(spokenText: string) {
+    let start!: () => void;
+    const ready = new Promise<void>((resolve) => { start = resolve; });
+    const utterance = this.createSpeech(spokenText, ready);
+    return { utterance, start, cancel: () => { utterance.cancel(); start(); } };
+  }
+
+  private createSpeech(spokenText: string, playbackReady?: Promise<void>): SpeechSynthesisAdapter.Utterance {
     // Renderer markup: without this the reader says the token id out loud.
     const text = stripSearchImageTokens(spokenText);
     const subscribers = new Set<() => void>();
@@ -520,7 +539,7 @@ export class StudioSpeechSynthesisAdapter implements SpeechSynthesisAdapter {
         // UI state off these subscribe callbacks.
         res.status = { type: "running" };
         for (const handler of subscribers) handler();
-      });
+      }, playbackReady);
       cancelImpl = session.cancel;
       return res;
     }

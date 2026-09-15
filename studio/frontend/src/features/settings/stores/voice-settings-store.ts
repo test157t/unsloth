@@ -147,6 +147,7 @@ export interface VoiceSettingsState {
 
   /** Show the read-aloud button on assistant responses. */
   ttsEnabled: boolean;
+  ttsLiveEnabled: boolean;
   setTtsEnabled: (value: boolean) => void;
 
   /** "system": speechSynthesis voices. "studio": the loaded TTS audio model.
@@ -162,6 +163,7 @@ export interface VoiceSettingsState {
   setTtsProviderModel: (value: string) => void;
   /** Voice name sent to the custom endpoint; blank input defaults to alloy. */
   ttsProviderVoice: string;
+  ttsVoiceForgeRvc: string;
   setTtsProviderVoice: (value: string) => void;
 
   /** speechSynthesis voiceURI, or "default" for the system voice. */
@@ -329,6 +331,7 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>()(
       clearRecentDictations: () => set({ recentDictations: [] }),
 
       ttsEnabled: true,
+      ttsLiveEnabled: true,
       setTtsEnabled: (ttsEnabled) => set({ ttsEnabled }),
 
       ttsEngine: "system",
@@ -339,6 +342,7 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>()(
       ttsProviderModel: "",
       setTtsProviderModel: (ttsProviderModel) => set({ ttsProviderModel }),
       ttsProviderVoice: "",
+      ttsVoiceForgeRvc: "",
       setTtsProviderVoice: (ttsProviderVoice) => set({ ttsProviderVoice }),
 
       ttsVoiceURI: "default",
@@ -393,6 +397,7 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>()(
           recentDictations: normalizeRecentDictations(saved?.recentDictations),
           ttsEnabled:
             typeof saved?.ttsEnabled === "boolean" ? saved.ttsEnabled : true,
+          ttsLiveEnabled: typeof saved?.ttsLiveEnabled === "boolean" ? saved.ttsLiveEnabled : true,
           ttsEngine:
             saved?.ttsEngine === "studio" || saved?.ttsEngine === "custom"
               ? saved.ttsEngine
@@ -400,6 +405,7 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>()(
           ttsProviderId: asString(saved?.ttsProviderId, ""),
           ttsProviderModel: asString(saved?.ttsProviderModel, ""),
           ttsProviderVoice: asString(saved?.ttsProviderVoice, ""),
+          ttsVoiceForgeRvc: asString(saved?.ttsVoiceForgeRvc, ""),
           ttsVoiceURI: asString(saved?.ttsVoiceURI, "default"),
           ttsRate: clampNumber(saved?.ttsRate, 0.5, 2, 1),
           ttsPitch: clampNumber(saved?.ttsPitch, 0, 2, 1),

@@ -4318,6 +4318,9 @@ class AudioSpeechRequest(BaseModel):
     ``voice`` and ``speed`` are accepted for client compatibility but unused: no loaded
     TTS backend has voice or rate plumbing (CSM is fixed to speaker 0)."""
 
+    voiceforge_rvc_model: Optional[str] = Field(
+        None, description="VoiceForge RVC model; empty disables RVC, omitted uses server settings.",
+    )
     input: str = Field(..., min_length = 1, description = "The text to synthesize.")
     model: Optional[str] = Field(
         None,

@@ -417,6 +417,18 @@ def test_provider_id_routes_to_external_endpoint(monkeypatch):
     assert rows[0]["prompt_preview"] == "hi"
 
 
+@pytest.mark.parametrize("selection", ["", "Alice"])
+def test_voiceforge_rvc_selection_survives_speech_route(monkeypatch, selection):
+    cli, _, _ = _make_client(monkeypatch)
+    _, speech_calls = _install_external(monkeypatch)
+    original = routes_module.providers_db.get_provider
+    monkeypatch.setattr(routes_module.providers_db, "get_provider", lambda pid: {**original(pid), "provider_type": "voiceforge"})
+    response = cli.post("/v1/audio/speech", json={"input": "hi", "provider_id": "conn-1",
+        "model": "kokoro", "voice": "bf_emma", "voiceforge_rvc_model": selection})
+    assert response.status_code == 200
+    assert speech_calls[0]["voiceforge_rvc_model"] == selection
+
+
 def test_external_rejects_non_wav_response_format(monkeypatch):
     cli, _calls, _saved = _make_client(monkeypatch)
     created, speech_calls = _install_external(monkeypatch, media_type = "audio/mpeg")

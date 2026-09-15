@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { splitVoiceForgeSpeech, voiceForgeSettings } from "../src/features/chat/voiceforge.ts";
+import { splitVoiceForgeSpeech, voiceForgeSettings, voiceForgeRvcOptions } from "../src/features/chat/voiceforge.ts";
 import { registerBundlerResolver } from "./helpers/kit.ts";
 
 registerBundlerResolver();
+
+test("RVC selection distinguishes server settings, off, and an explicit model", () => {
+  assert.deepEqual(voiceForgeRvcOptions(""), {});
+  assert.deepEqual(voiceForgeRvcOptions("__off__"), { voiceforge_rvc_model: "" });
+  assert.deepEqual(voiceForgeRvcOptions("Alice"), { voiceforge_rvc_model: "Alice" });
+  assert.equal(voiceForgeSettings("another-server").ttsVoiceForgeRvc, "");
+});
+
+test("VoiceForge connection tests allow an empty key without making hosted providers keyless", async () => {
+  const { providerAllowsKeylessConnection } = await import("../src/features/chat/external-providers.ts");
+  assert.equal(providerAllowsKeylessConnection("voiceforge"), true);
+  assert.equal(providerAllowsKeylessConnection("llama_cpp"), true);
+  assert.equal(providerAllowsKeylessConnection("xai"), false);
+});
 
 test("VoiceForge retains its provider identity in saved connections", async () => {
   const { toExternalBackendProviderType } = await import("../src/features/chat/external-providers.ts");

@@ -1027,6 +1027,12 @@ class ExternalProviderClient:
         from core.inference.providers import validate_provider_base_url
 
         self.base_url = validate_provider_base_url(base_url)
+        # VoiceForge's audio API lives under /v1. Accept its server root too,
+        # so discovery and both audio operations use the same API prefix.
+        if self.provider_type == "voiceforge":
+            parsed_base = urlparse(self.base_url)
+            if not parsed_base.path.rstrip("/"):
+                self.base_url = parsed_base._replace(path="/v1").geturl()
         # Strip a legacy `/openai` suffix from Google-hosted bases so configs saved before the native switch still
         # route correctly. Custom proxy paths ending in `/openai` are left untouched.
         if self.provider_type == "gemini":
@@ -1085,10 +1091,10 @@ class ExternalProviderClient:
         self,
         messages: list[dict[str, Any]],
         model: str,
-        temperature: float = 0.7,
-        top_p: float = 0.95,
+        temperature: Optional[float] = 0.7,
+        top_p: Optional[float] = 0.95,
         max_tokens: Optional[int] = None,
-        presence_penalty: float = 0.0,
+        presence_penalty: Optional[float] = 0.0,
         top_k: Optional[int] = None,
         min_p: Optional[float] = None,
         repetition_penalty: Optional[float] = None,
@@ -1239,11 +1245,12 @@ class ExternalProviderClient:
             "model": model,
             "messages": messages,
             "stream": stream,
-            "temperature": temperature,
-            "top_p": top_p,
-            "presence_penalty": presence_penalty,
             **_continue_body,
         }
+        for field, value in (("temperature", temperature), ("top_p", top_p),
+                             ("presence_penalty", presence_penalty)):
+            if value is not None:
+                body[field] = value
         # Only alongside stream=True: the field is rejected on a non-streaming request.
         if stream and self.provider_type in _USAGE_STREAM_OPTION_PROVIDERS:
             body["stream_options"] = {"include_usage": True}
@@ -2200,7 +2207,7 @@ class ExternalProviderClient:
             "max_tokens": max_tokens or 1024,  # required by Anthropic
             "stream": True,
         }
-        if not sampling_removed:
+        if not sampling_removed and temperature is not None:
             body["temperature"] = temperature
         if top_k is not None and top_k > 0 and not sampling_removed:
             body["top_k"] = top_k
@@ -6213,6 +6220,7 @@ class ExternalProviderClient:
         response_format: str = "wav",
         speed: Optional[float] = None,
         instructions: Optional[str] = None,
+        voiceforge_rvc_model: Optional[str] = None,
     ) -> tuple[bytes, str]:
         """POST /audio/speech (OpenAI CreateSpeech). Returns (audio_bytes, media_type)."""
         body: dict[str, Any] = {
@@ -6226,6 +6234,12 @@ class ExternalProviderClient:
             body["speed"] = speed
         if instructions is not None:
             body["instructions"] = instructions
+        if voiceforge_rvc_model is not None:
+            if self.provider_type != "voiceforge":
+                raise ValueError("RVC selection requires a VoiceForge connection")
+            body["enable_rvc"] = bool(voiceforge_rvc_model)
+            if voiceforge_rvc_model:
+                body["rvc_model"] = voiceforge_rvc_model
         response = await _client().post(
             _append_provider_path(self.base_url, "/audio/speech"),
             headers = self._auth_headers(),
@@ -6292,6 +6306,15 @@ class ExternalProviderClient:
         if not media_type:
             media_type = "text/plain" if response_format == "text" else "application/json"
         return response.content, media_type
+
+    async def voiceforge_options(self) -> dict:
+        if self.provider_type != "voiceforge":
+            raise ValueError("Select a VoiceForge connection")
+        response = await _client().get(
+            f"{self.base_url}/audio/options", headers=self._auth_headers(), timeout=self._timeout,
+        )
+        response.raise_for_status()
+        return response.json()
 
     async def list_models(self) -> list[dict[str, Any]]:
         """GET /models to discover available models. Returns dicts with at least 'id'. All providers

@@ -77,6 +77,7 @@ import {
   supportsProviderMaxOutputTokens,
   supportsProviderReasoningToggle,
   supportsRemoteModelCatalog,
+  providerAllowsKeylessConnection,
   toExternalBackendProviderType,
 } from "./external-providers";
 import { useExternalProvidersStore } from "./stores/external-providers-store";
@@ -1241,7 +1242,7 @@ export function ChatProvidersSettings({
     if (
       !savedKey &&
       !provider.hasApiKey &&
-      !supportsRemoteModelCatalog(provider.providerType)
+      !providerAllowsKeylessConnection(provider.providerType)
     ) {
       if (isCustomProviderType(provider.providerType)) {
         await editProvider(provider);

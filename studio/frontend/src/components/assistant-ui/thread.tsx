@@ -251,6 +251,7 @@ import { DocumentPreviewMount } from "@/features/rag/components/document-preview
 import { useUserProfileStore } from "@/features/profile/stores/user-profile-store";
 import { usePublishedFrame } from "@/features/settings/hooks/use-published-frame";
 import { useVoiceSettingsStore } from "@/features/settings/stores/voice-settings-store";
+import { useLiveSpeechStore } from "@/features/chat/live-speech";
 import { applyQwenThinkingParams } from "@/features/chat/utils/qwen-params";
 import { isTauri } from "@/lib/api-base";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
@@ -8099,7 +8100,9 @@ const AssistantActionBar: FC = () => {
   const ttsEnabled = useVoiceSettingsStore((s) => s.ttsEnabled);
   // hideWhenRunning is thread-level, so a new run would hide this bar and its
   // only Stop reading control while read-aloud keeps playing; keep it shown.
-  const speaking = useAuiState(({ message }) => message.speech != null);
+  const messageId = useAuiState(({ message }) => message.id);
+  const liveSpeaking = useLiveSpeechStore((s) => s.messageId === messageId);
+  const speaking = useAuiState(({ message }) => message.speech != null) || liveSpeaking;
 
   return (
     <>
@@ -8133,7 +8136,7 @@ const AssistantActionBar: FC = () => {
         )}
         <ForkCountBadge />
         <DeleteMessageButton />
-        {ttsEnabled && (
+        {ttsEnabled && !liveSpeaking && (
           <MessagePrimitive.If speaking={false}>
             <ActionBarPrimitive.Speak asChild={true}>
               <TooltipIconButton tooltip="Read aloud" aria-label="Read aloud">
@@ -8144,6 +8147,9 @@ const AssistantActionBar: FC = () => {
         )}
         {/* Not gated on ttsEnabled: turning the setting off while a message
             is being read aloud must not remove the only stop control. */}
+        {liveSpeaking && <TooltipIconButton tooltip="Stop reading" aria-label="Stop reading" onClick={() => useLiveSpeechStore.getState().stop()}>
+          <VolumeXIcon strokeWidth={1.75} className="size-icon" />
+        </TooltipIconButton>}
         <MessagePrimitive.If speaking={true}>
           <ActionBarPrimitive.StopSpeaking asChild={true}>
             <TooltipIconButton

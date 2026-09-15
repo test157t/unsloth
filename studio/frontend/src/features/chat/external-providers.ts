@@ -359,6 +359,10 @@ export function supportsRemoteModelCatalog(
   );
 }
 
+export function providerAllowsKeylessConnection(providerType: string): boolean {
+  return providerType === "voiceforge" || supportsRemoteModelCatalog(providerType);
+}
+
 /** Presets that hide the API-key field. Ollama is not skipped: Ollama cloud requires a key;
  *  local servers leave the optional field empty. */
 export function customPresetSkipsApiKeyField(

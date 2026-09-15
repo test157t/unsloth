@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
+import { externalSamplingParams } from "../external-sampling";
 import { mlxRuntimeStateFrom } from "../lib/mlx-runtime-state";
 import {
   clearedServerTuningState,
@@ -5835,13 +5836,7 @@ export function createOpenAIStreamAdapter(
               // Never forwarded upstream (the proxy sends an explicit field list); the trailing assistant
               // turn is what asks a provider to continue.
               ...(continuation ? { continue_final_message: true } : {}),
-              // Reasoning-class models (OpenAI gpt-5.x / o3) reject temperature and top_p; forward only when supported.
-              ...(externalCapabilities?.temperature !== false
-                ? { temperature: params.temperature }
-                : {}),
-              ...(externalCapabilities?.topP !== false
-                ? { top_p: params.topP }
-                : {}),
+              ...externalSamplingParams(params, externalCapabilities),
               // Floor at the provider's documented min (Kimi thinking needs >=16k); clamp at the per-model max.
               max_tokens: Math.min(
                 Math.max(
@@ -5857,14 +5852,6 @@ export function createOpenAIStreamAdapter(
 
               ...(externalUsesStudioTools && resolvedThreadId
                 ? { thread_id: resolvedThreadId }
-                : {}),
-              ...(externalCapabilities?.topK ? { top_k: params.topK } : {}),
-              ...(externalCapabilities?.minP ? { min_p: params.minP } : {}),
-              ...(externalCapabilities?.repetitionPenalty
-                ? { repetition_penalty: params.repetitionPenalty }
-                : {}),
-              ...(externalCapabilities?.presencePenalty
-                ? { presence_penalty: params.presencePenalty }
                 : {}),
               // studioLocalCodeTools, not codeToolsEnabled: a Code pill that resolved to the provider's
               // sandbox is a hosted request and belongs below, where this body would 400 on permission_mode.

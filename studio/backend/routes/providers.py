@@ -59,6 +59,19 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(dependencies = [Depends(get_current_subject)])
 
 
+@router.get("/{provider_id}/voiceforge-options")
+async def voiceforge_options(provider_id: str, via_api_key: bool = Depends(authenticated_via_api_key)):
+    config = providers_db.get_provider(provider_id)
+    if not config or config["provider_type"] != "voiceforge" or not config.get("is_enabled"):
+        raise HTTPException(404, "Enabled VoiceForge connection not found")
+    api_key = resolve_provider_api_key_or_400(provider_id, None, allow_saved_key=not via_api_key)
+    client = ExternalProviderClient("voiceforge", config["base_url"], api_key, timeout=15)
+    try:
+        return await client.voiceforge_options()
+    except Exception as exc:
+        raise log_and_http_error(exc, 502, "Could not load VoiceForge options. Check the connection and restart VoiceForge with the updated server.", event="providers.voiceforge_options_failed", log=logger) from exc
+
+
 def _provider_response(row: dict) -> ProviderResponse:
     return ProviderResponse(
         id = row["id"],

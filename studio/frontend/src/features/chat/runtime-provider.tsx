@@ -41,6 +41,7 @@ import {
 import { toast } from "sonner";
 import { StudioDictationAdapter } from "./adapters/studio-dictation-adapter";
 import { StudioSpeechSynthesisAdapter } from "./adapters/studio-speech-synthesis-adapter";
+import { LiveSpeech } from "./live-speech";
 import {
   ThreadAutosaveHandle,
   createOpenAIStreamAdapter,
@@ -3381,6 +3382,7 @@ export function ChatRuntimeProvider({
           newThreadSwitchStateRef={newThreadSwitchStateRef}
         />
         <CancelRegistrar />
+        <LiveSpeech enabled={modelType === "base" && !pairId && !backgrounded} />
         {initialThreadId && (
           <ThreadAutoSwitch
             threadId={initialThreadId}

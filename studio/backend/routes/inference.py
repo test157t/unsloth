@@ -18235,6 +18235,8 @@ async def _external_tts_speech(body: AudioSpeechRequest, request: Request) -> Re
             response_format = (body.response_format or "wav").strip().lower(),
             speed = body.speed,
             instructions = body.instructions,
+            **({"voiceforge_rvc_model": body.voiceforge_rvc_model}
+               if body.voiceforge_rvc_model is not None else {}),
         )
     )
     disconnect_watcher = asyncio.create_task(
@@ -21533,6 +21535,9 @@ async def _proxy_to_external_provider(
     # `model_fields_set` separates "asked for 20" from "said nothing", and the provider keeps
     # its own default for the latter. Read before ANY write: a setattr marks a field explicit.
     _top_k_explicit = payload.top_k if "top_k" in payload.model_fields_set else None
+    _temperature_explicit = payload.temperature if "temperature" in payload.model_fields_set else None
+    _top_p_explicit = payload.top_p if "top_p" in payload.model_fields_set else None
+    _presence_penalty_explicit = payload.presence_penalty if "presence_penalty" in payload.model_fields_set else None
     _min_p_explicit = payload.min_p if "min_p" in payload.model_fields_set else None
     _repetition_penalty_explicit = (
         payload.repetition_penalty if "repetition_penalty" in payload.model_fields_set else None
@@ -21590,13 +21595,13 @@ async def _proxy_to_external_provider(
 
     async def _stream():
         _provider_kwargs = dict(
-            temperature = payload.temperature,
-            top_p = payload.top_p,
+            temperature = _temperature_explicit,
+            top_p = _top_p_explicit,
             # Honor max_completion_tokens when max_tokens is absent, so a
             # provider-routed request capped only by the newer field still gets
             # a limit instead of falling back to the provider default.
             max_tokens = _effective_max_tokens(payload),
-            presence_penalty = payload.presence_penalty,
+            presence_penalty = _presence_penalty_explicit,
             top_k = _top_k_explicit,
             min_p = _min_p_explicit,
             repetition_penalty = _repetition_penalty_explicit,

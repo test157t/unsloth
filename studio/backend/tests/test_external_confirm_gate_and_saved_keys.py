@@ -146,6 +146,23 @@ def _run(
 # ── the confirm gate reads the effective mode, not the raw flag ──────────────
 
 
+def test_grok_omitted_sampling_does_not_regain_local_schema_defaults(monkeypatch):
+    inf = _install(monkeypatch, "custom")
+    _run(inf, _payload(external_model="grok-4"))
+    sent = FakeExternalClient.last["passthrough"]
+    for field in ("temperature", "top_p", "presence_penalty", "top_k", "min_p", "repetition_penalty"):
+        assert sent[field] is None
+
+
+def test_grok_explicit_sampling_values_survive_proxy(monkeypatch):
+    inf = _install(monkeypatch, "custom")
+    _run(inf, _payload(external_model="grok-4", temperature=0, top_p=0.7, presence_penalty=0.2))
+    sent = FakeExternalClient.last["passthrough"]
+    assert sent["temperature"] == 0
+    assert sent["top_p"] == 0.7
+    assert sent["presence_penalty"] == 0.2
+
+
 def test_non_streaming_ask_mode_is_rejected_like_the_local_routes(monkeypatch):
     """``permission_mode: "ask"`` is how the UI asks for the gate.
 

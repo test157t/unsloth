@@ -59,6 +59,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { resetMicrophonePermission } from "../api/microphone-permission";
 import { DictationDictionaryView } from "../components/dictation-dictionary-view";
 import { RecentDictationsView } from "../components/recent-dictations-view";
+import { VoiceForgeSelectors } from "../components/voiceforge-selectors";
 import { SettingsRow } from "../components/settings-row";
 import { SettingsSection } from "../components/settings-section";
 import {
@@ -422,6 +423,7 @@ export function VoiceTab() {
     (s) => s.setDictationLanguage,
   );
   const ttsEnabled = useVoiceSettingsStore((s) => s.ttsEnabled);
+  const ttsLiveEnabled = useVoiceSettingsStore((s) => s.ttsLiveEnabled);
   const setTtsEnabled = useVoiceSettingsStore((s) => s.setTtsEnabled);
   const ttsEngine = useVoiceSettingsStore((s) => s.ttsEngine);
   const setTtsEngine = useVoiceSettingsStore((s) => s.setTtsEngine);
@@ -1021,6 +1023,7 @@ export function VoiceTab() {
                 </SelectContent>
               </Select>
             </SettingsRow>
+{sttConnections.some((p) => p.id === sttProviderId && p.providerType === "voiceforge") ? (<VoiceForgeSelectors key={sttProviderId} providerId={sttProviderId} kind="recognition" />) : (<>
             <SettingsRow
               label={t("settings.voice.dictation.customModelLabel")}
               description={t("settings.voice.dictation.customModelDescription")}
@@ -1033,6 +1036,7 @@ export function VoiceTab() {
                 className="w-56"
               />
             </SettingsRow>
+</>)}
           </>
         ) : null}
 
@@ -1321,6 +1325,11 @@ export function VoiceTab() {
             >
               <Switch checked={ttsEnabled} onCheckedChange={setTtsEnabled} />
             </SettingsRow>
+            {effectiveTtsEngine === "custom" && ttsConnections.some((p) => p.id === ttsProviderId && p.providerType === "voiceforge") && (
+              <SettingsRow label="Speak while generating" description="VoiceForge starts speaking completed phrases while the answer streams. Stop reading cancels the remaining speech.">
+                <Switch aria-label="Speak while generating" checked={ttsLiveEnabled} onCheckedChange={(ttsLiveEnabled) => useVoiceSettingsStore.setState({ ttsLiveEnabled })} />
+              </SettingsRow>
+            )}
 
             <SettingsRow
               label={t("settings.voice.readAloud.engineLabel")}
@@ -1396,6 +1405,7 @@ export function VoiceTab() {
                     </SelectContent>
                   </Select>
                 </SettingsRow>
+{ttsConnections.some((p) => p.id === ttsProviderId && p.providerType === "voiceforge") ? (<VoiceForgeSelectors key={ttsProviderId} providerId={ttsProviderId} kind="speech" />) : (<>
                 <SettingsRow
                   label={t("settings.voice.readAloud.customModelLabel")}
                 >
@@ -1421,6 +1431,7 @@ export function VoiceTab() {
                     aria-label={t("settings.voice.readAloud.voiceLabel")}
                   />
                 </SettingsRow>
+</>)}
               </>
             ) : effectiveTtsEngine === "studio" ? (
               <SettingsRow
