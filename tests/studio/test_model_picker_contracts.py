@@ -2649,16 +2649,22 @@ def test_auth_retries_tag_transport_failures_like_the_first_attempt():
     src = (WORKDIR / "studio" / "frontend" / "src" / "features" / "auth" / "api.ts").read_text(
         encoding = "utf-8"
     )
-    assert src.count("unslothTransportFailure: true") == 2, "one tag per message, in one helper"
-    tagger = src.split("function asTransportFailure", 1)[1].split("\n}\n", 1)[0]
+    tagger = src.split("async function asTransportFailure", 1)[1].split("\n}\n", 1)[0]
     assert "err instanceof TypeError" in tagger
     assert "navigator.onLine === false" in tagger
+    # Counted against the helper's own raises, not pinned to a number that a new message would trip.
+    assert tagger.count("unslothTransportFailure: true") == tagger.count("new Error(")
+    assert tagger.count("unslothTransportFailure: true") >= 2
+    assert src.count("unslothTransportFailure: true") == tagger.count(
+        "unslothTransportFailure: true"
+    ), "every tag belongs to the one helper"
     retry = src.split("async function retryWithCurrentToken", 1)[1]
     retry = retry.split("\n}\n", 1)[0]
     assert "fetchWithTauriNetworkRetry" in retry
-    assert "throw asTransportFailure(err);" in retry
+    # Awaited since #10520: dropping the await throws a pending promise and the tag is never seen.
+    assert "throw await asTransportFailure(err);" in retry
     first = src.split("export async function authFetch", 1)[1]
-    assert "throw asTransportFailure(err);" in first
+    assert "throw await asTransportFailure(err);" in first
 
 
 def test_adoption_takes_its_own_pin_before_moving_the_checkpoint():
@@ -2743,6 +2749,86 @@ def test_evicted_local_configs_drop_their_server_overrides():
     store = " ".join(_read("features/model-picker/model-config/per-model-config.ts").split())
     assert "evicted?: { modelId: string; ggufVariant: string | null }[]" in store
     assert "modelIdFromStorageKey(" in store and "ggufVariantFromStorageKey(" in store
+
+
+def test_reasoning_resets_reach_the_server_without_making_backfill_destructive():
+    api = " ".join(_read("features/model-picker/api/model-overrides.ts").split())
+    assert "options?.resetReasoningBudget && config?.reasoningBudget === -1" in api
+    assert "reasoning_budget: -1" in api
+    assert 'options?.resetReasoningBudgetMessage && config?.reasoningBudgetMessage === ""' in api
+    assert 'reasoning_budget_message: ""' in api
+
+    route = _read_backend("routes/settings.py")
+    assert "fields_set = payload.model_fields_set" in route
+    assert '"reasoning_budget" in fields_set and payload.reasoning_budget == -1' in route
+    assert (
+        '"reasoning_budget_message" in fields_set and payload.reasoning_budget_message == ""'
+        in route
+    )
+    assert "if not payload.fill_absent_fields and requested_extra_args:" in route
+
+    page = _read("features/model-picker/components/model-config-page.tsx")
+    assert "baseline.reasoningBudget !== -1" in page
+    assert "normalizedRuntimeConfig.reasoningBudget === -1" in page
+    assert 'baseline.reasoningBudgetMessage !== ""' in page
+    assert 'normalizedRuntimeConfig.reasoningBudgetMessage === ""' in page
+
+
+def test_a_recipe_restores_the_previous_model_at_its_reasoning_budget():
+    """Captured from /status beside the context request and replayed the same way; a recipe's
+    own target carries neither and runs at the defaults."""
+    src = _read("features/recipe-studio/hooks/use-recipe-executions.ts")
+    assert src.count("reasoningBudget: status.requested_reasoning_budget ?? -1,") == 2, src
+    assert (
+        src.count('reasoningBudgetMessage: status.requested_reasoning_budget_message ?? "",') == 2
+    ), src
+    assert "reasoning_budget: reasoningBudget ?? -1," in src
+    assert 'reasoning_budget_message: reasoningBudgetMessage ?? "",' in src
+    assert "(left.reasoningBudget ?? -1) === (right.reasoningBudget ?? -1)" in src
+
+    api = " ".join(_read("features/model-picker/api/model-overrides.ts").split())
+    assert "mirrors_reasoning_budget: true," in api
+
+
+def test_reasoning_settings_hydrate_from_a_server_authored_override():
+    """A row written by another browser or an API client carries the pair, and fromApiOverride has
+    to copy it or the panel shows local defaults and the next save writes them back."""
+    api = _read("features/model-picker/api/model-overrides.ts")
+    hydrate = api.split("export function fromApiOverride", 1)[1]
+    hydrate = hydrate[: hydrate.index("\n}")]
+    assert "reasoningBudget: override.reasoning_budget ?? local.reasoningBudget" in hydrate
+    assert "override.reasoning_budget_message ?? local.reasoningBudgetMessage" in hydrate
+
+
+def test_a_recipe_compares_the_requested_reasoning_budget():
+    """Requested, never effective: the effective pair folds in LLAMA_ARG_THINK_BUDGET*, which no
+    request can express, so comparing it would reload the weights on every run forever."""
+    src = _read("features/recipe-studio/hooks/use-recipe-executions.ts")
+    reuse = src.split("async function isLocalModelAlreadyLoaded", 1)[1]
+    reuse = reuse[: reuse.index("\n}")]
+    assert "status.requested_reasoning_budget" in reuse
+    assert (
+        "status.reasoning_budget" not in reuse
+    ), "the reuse check must compare the request, never the environment-resolved value"
+
+
+def test_validate_sends_reasoning_controls_before_the_runtime_unloads():
+    api = _read("features/chat/api/chat-api.ts")
+    validate_body = api.split("export async function validateModel", 1)[1].split(
+        "export async function", 1
+    )[0]
+    assert "reasoning_budget: payload.reasoning_budget ?? -1" in validate_body
+    assert 'reasoning_budget_message: payload.reasoning_budget_message ?? ""' in validate_body
+
+    runtime = _read("features/chat/hooks/use-chat-model-runtime.ts")
+    validation = runtime.index("const validation = await validateModel({")
+    unload = runtime.index("await unloadModel(", validation)
+    assert validation < unload
+    validate_payload = runtime[validation:unload]
+    assert "reasoning_budget:" in validate_payload
+    assert "validateReasoningBudget" in validate_payload
+    assert "reasoning_budget_message:" in validate_payload
+    assert "validateReasoningBudgetMessage" in validate_payload
 
 
 def test_backfill_compares_server_keys_by_normalized_identity():
