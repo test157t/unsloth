@@ -88,6 +88,7 @@ export function serializeConfigToYaml(
     warmup_steps: state.warmupSteps,
     max_steps: state.maxSteps,
     save_steps: state.saveSteps,
+    logging_steps: state.loggingSteps ?? 1,
     eval_steps: state.evalSteps,
     weight_decay: state.weightDecay,
     max_grad_norm: state.maxGradNorm,

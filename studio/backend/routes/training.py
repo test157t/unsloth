@@ -1758,6 +1758,7 @@ async def start_training(
             "warmup_ratio": request.warmup_ratio,
             "max_steps": request.max_steps,
             "save_steps": request.save_steps,
+            "logging_steps": request.logging_steps,
             "weight_decay": request.weight_decay,
             "max_grad_norm": request.max_grad_norm,
             "max_grad_value": request.max_grad_value,

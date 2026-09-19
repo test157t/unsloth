@@ -47,6 +47,7 @@ export interface TrainingStartRequest {
   warmup_ratio: number | null;
   max_steps: number | null;
   save_steps: number;
+  logging_steps: number;
   eval_steps: number;
   weight_decay: number;
   /** Gradient norm clipping threshold; zero disables clipping. */

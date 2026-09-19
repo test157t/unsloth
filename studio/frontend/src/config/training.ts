@@ -161,6 +161,7 @@ export const DEFAULT_HYPERPARAMS = {
   warmupSteps: 5,
   maxSteps: 60,
   saveSteps: 0,
+  loggingSteps: 1,
   evalSteps: 0.0,
   packing: false,
   trainOnCompletions: false,

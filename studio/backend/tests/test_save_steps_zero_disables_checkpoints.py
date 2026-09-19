@@ -66,10 +66,11 @@ def test_audio_training_args(trainer, tmp_path, save_steps, strategy, steps):
     transformers = pytest.importorskip("transformers")
 
     config = trainer._build_audio_training_args(
-        {"save_steps": save_steps, "max_steps": 8, "optim": "adamw_torch"}, str(tmp_path)
+        {"save_steps": save_steps, "logging_steps": 7, "max_steps": 8, "optim": "adamw_torch"}, str(tmp_path)
     )
     assert config["save_strategy"] == strategy
     assert config.get("save_steps") == steps
+    assert config["logging_steps"] == 7
 
     config.update(bf16 = False, fp16 = False, use_cpu = True, report_to = [])
     args = transformers.TrainingArguments(**config)
@@ -120,6 +121,7 @@ def test_generic_sft_config_args(trainer, tmp_path, monkeypatch, save_steps, str
         trainer._train_worker(
             {"dataset": rows, "final_format": "audio_bicodec"},
             save_steps = save_steps,
+            logging_steps = 7,
             batch_size = 2,
             gradient_accumulation_steps = 1,
             max_steps = 8,
@@ -130,6 +132,7 @@ def test_generic_sft_config_args(trainer, tmp_path, monkeypatch, save_steps, str
     assert captured, "the config was never built, so this asserts nothing"
     assert captured["save_strategy"] == strategy
     assert captured.get("save_steps") == steps
+    assert captured["logging_steps"] == 7
 
 
 @pytest.mark.parametrize("save_steps,strategy,steps", CASES)

@@ -137,6 +137,7 @@ export function buildTrainingStartPayload(
     warmup_ratio: isEmbedding ? 0.03 : null,
     max_steps: config.maxSteps,
     save_steps: config.saveSteps,
+    logging_steps: config.loggingSteps ?? 1,
     eval_steps: config.evalSteps,
     weight_decay: config.weightDecay,
     max_grad_norm: config.maxGradNorm,

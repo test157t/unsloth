@@ -27,6 +27,7 @@ interface BackendTrainingDefaults {
   warmup_ratio?: number;
   max_steps?: number;
   save_steps?: number;
+  logging_steps?: number;
   eval_steps?: number;
   weight_decay?: number;
   max_grad_norm?: number;

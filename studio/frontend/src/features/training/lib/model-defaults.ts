@@ -139,6 +139,8 @@ export function mapBackendModelConfigToTrainingPatch(
     }
   }
 
+  const loggingSteps = toNumber(training?.logging_steps);
+  if (loggingSteps !== undefined && Number.isInteger(loggingSteps) && loggingSteps >= 1 && loggingSteps <= 1_000_000) patch.loggingSteps = loggingSteps;
   const saveSteps = toNumber(training?.save_steps);
   if (saveSteps !== undefined) patch.saveSteps = saveSteps;
 

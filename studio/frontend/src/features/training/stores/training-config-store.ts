@@ -1331,6 +1331,9 @@ export const useTrainingConfigStore = create<TrainingConfigStore>()(
           notifyStreamingCompat(streamingPatch);
         },
         setSaveSteps: (saveSteps) => setUserEdit({ saveSteps }),
+        setLoggingSteps: (loggingSteps) => {
+          if (Number.isInteger(loggingSteps) && loggingSteps >= 1 && loggingSteps <= 1_000_000) setUserEdit({ loggingSteps });
+        },
         setEvalSteps: (evalSteps) => {
           const state = get();
           const streamingPatch = streamingCompatiblePatch({

@@ -246,6 +246,7 @@ def _build_training_worker_config(values: dict[str, Any]) -> dict[str, Any]:
         "warmup_ratio": values.get("warmup_ratio"),
         "max_steps": values.get("max_steps", 0),
         "save_steps": values.get("save_steps", 0),
+        "logging_steps": values.get("logging_steps", 1),
         "weight_decay": values.get("weight_decay", 0.001),
         "max_grad_norm": 1.0 if max_grad_norm is None else max_grad_norm,
         "max_grad_value": _coerce_optional_nonneg_float(

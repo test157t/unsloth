@@ -104,6 +104,7 @@ export interface TrainingConfigState {
   warmupSteps: number;
   maxSteps: number;
   saveSteps: number;
+  loggingSteps: number;
   evalSteps: number;
   packing: boolean;
   trainOnCompletions: boolean;
@@ -150,6 +151,7 @@ export type AdvancedSettingsBaseline = Partial<
     | "weightDecay"
     | "warmupSteps"
     | "saveSteps"
+    | "loggingSteps"
     | "evalSteps"
     | "randomSeed"
     | "packing"
@@ -241,6 +243,7 @@ export interface TrainingConfigActions {
   setWarmupSteps: (value: number) => void;
   setMaxSteps: (value: number) => void;
   setSaveSteps: (value: number) => void;
+  setLoggingSteps: (value: number) => void;
   setEvalSteps: (value: number) => void;
   setPacking: (value: boolean) => void;
   setTrainOnCompletions: (value: boolean) => void;

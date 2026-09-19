@@ -92,6 +92,7 @@ export function TrainingHyperparametersSection({
       maxGradNorm: state.maxGradNorm,
       warmupSteps: state.warmupSteps,
       saveSteps: state.saveSteps,
+      loggingSteps: state.loggingSteps,
       evalSteps: state.evalSteps,
       randomSeed: state.randomSeed,
       setOptimizerType: state.setOptimizerType,
@@ -103,6 +104,7 @@ export function TrainingHyperparametersSection({
       setWarmupSteps: state.setWarmupSteps,
       setEpochs: state.setEpochs,
       setSaveSteps: state.setSaveSteps,
+      setLoggingSteps: state.setLoggingSteps,
       setEvalSteps: state.setEvalSteps,
       setRandomSeed: state.setRandomSeed,
     })),
@@ -371,6 +373,21 @@ export function TrainingHyperparametersSection({
                 onChange={(event) =>
                   store.setSaveSteps(Number(event.target.value))
                 }
+                className="w-28 font-mono"
+              />
+            </ParamsRow>
+            <ParamsRow
+              label="Logging Steps"
+              tooltip="Log training metrics every N optimizer steps. Larger intervals reduce logging overhead and update loss charts less often."
+            >
+              <Input
+                type="number"
+                aria-label="Logging Steps"
+                min={1}
+                max={1_000_000}
+                step={1}
+                value={store.loggingSteps ?? 1}
+                onChange={(event) => store.setLoggingSteps(Number(event.target.value))}
                 className="w-28 font-mono"
               />
             </ParamsRow>

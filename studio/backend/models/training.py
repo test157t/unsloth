@@ -482,6 +482,7 @@ class TrainingStartRequest(BaseModel):
     warmup_ratio: Optional[float] = Field(None, description = "Warmup ratio")
     max_steps: Optional[int] = Field(None, description = "Maximum training steps")
     save_steps: int = Field(100, description = "Steps between checkpoints")
+    logging_steps: int = Field(1, strict = True, ge = 1, le = _MAX_STEPS, description = "Optimizer steps between training metric logs")
     weight_decay: float = Field(0.001, description = "Weight decay")
     # Finite as well as non-negative: JSON 1e309 floats to inf, which clears ge=0 but never binds, so
     # the run would train unclipped while reporting a threshold.
