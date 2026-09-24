@@ -316,7 +316,7 @@ function LearningRecipeCards({
 export function DataRecipesPage(): ReactElement {
   const signalReady = useAppShellReadySignal();
   const navigate = useNavigate();
-  const { recipes, ready } = useRecipes();
+  const { recipes, ready, error } = useRecipes();
   const [creatingRecipe, setCreatingRecipe] = useState(false);
   const [learningDialogOpen, setLearningDialogOpen] = useState(false);
   const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(
@@ -462,7 +462,7 @@ export function DataRecipesPage(): ReactElement {
           </DropdownMenu>
         </div>
 
-        {ready ? (
+        {error ? <p role="alert" className="mt-8 text-destructive">{error}</p> : ready ? (
           recipes.length === 0 ? (
             <Empty
               data-tour="recipes-templates"

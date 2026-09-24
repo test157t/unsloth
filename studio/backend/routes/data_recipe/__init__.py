@@ -21,12 +21,14 @@ from .jobs import router as jobs_router
 from .mcp import router as mcp_router
 from .seed import router as seed_router
 from .validate import router as validate_router
+from .saved import router as saved_router
 
 _header_authenticated = APIRouter(dependencies = [Depends(get_current_subject)])
 _header_authenticated.include_router(seed_router)
 _header_authenticated.include_router(validate_router)
 _header_authenticated.include_router(jobs_router)
 _header_authenticated.include_router(mcp_router)
+_header_authenticated.include_router(saved_router)
 
 router = APIRouter()
 # Kept out of the group above: the download link is fetched without a header, so it brings its
