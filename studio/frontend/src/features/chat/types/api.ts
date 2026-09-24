@@ -155,6 +155,8 @@ export interface ValidateModelResponse {
   /** Architecture only shipped by a newer transformers; UI pauses on the upgrade dialog. */
   requires_transformers_upgrade?: boolean;
   transformers_upgrade?: TransformersUpgradeInfo | null;
+  /** Replacement repository for an MLX BNB model or adapter base. */
+  mlx_loads_base_model?: string | null;
 }
 
 export interface GgufVariantDetail {
@@ -168,7 +170,6 @@ export interface GgufVariantDetail {
   /** The only missing artifact when the main GGUF is already cached. */
   pending_drafter_filename?: string | null;
   pending_drafter_size_bytes?: number;
-  shard_count?: number;
   downloaded?: boolean;
   update_available?: boolean;
   /** An interrupted download: some shards are missing, so it cannot load yet. */
@@ -665,6 +666,7 @@ export interface OpenAIChatCompletionsRequest {
   external_model?: string;
   encrypted_api_key?: string;
   provider_base_url?: string | null;
+  provider_api_type?: "chat_completions" | "responses";
   /** Boolean toggle for OpenAI/Anthropic ephemeral cache_control. For Gemini the backend also accepts
    *  a cached-content resource name, forwarded as `generationConfig.cachedContent`. */
   enable_prompt_caching?: boolean | string | null;
