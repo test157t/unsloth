@@ -81,6 +81,7 @@ import { WORKFLOW_TABS, type WorkflowId } from "@/features/images/workflows";
 /* eslint-enable no-restricted-imports */
 import { cn } from "@/lib/utils";
 import { createNavigationNonce } from "@/lib/navigation-nonce";
+import { useConversationNavigate } from "@/features/companion/use-conversation-navigate";
 import { copyToClipboardFrom } from "@/lib/copy-to-clipboard";
 import { isTauri } from "@/lib/api-base";
 import { useWebUpdateCheck } from "@/hooks/use-web-update-check";
@@ -143,7 +144,6 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { ArrowRightIcon, ChevronDown, GitBranchIcon, Moon } from "lucide-react";
 import {
   Link,
-  useNavigate,
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
@@ -883,7 +883,7 @@ export function AppSidebar() {
     setOpenMobile,
     state: sidebarState,
   } = useSidebar();
-  const navigate = useNavigate();
+  const navigate = useConversationNavigate();
   const router = useRouter();
   const imagesPageMode = useImageWorkflowStore((s) => s.pageMode);
 
@@ -1002,7 +1002,7 @@ export function AppSidebar() {
 
   const [shutdownOpen, setShutdownOpen] = useState(false);
 
-  const isChatRoute = pathname.startsWith("/chat");
+  const isChatRoute = pathname === "/chat" || pathname === "/companion" || pathname === "/code";
   const isStudioRoute = pathname === "/studio" || pathname.startsWith("/studio/");
   const [chatOpen, setChatOpen] = useState(true);
 
@@ -5111,6 +5111,24 @@ export function AppSidebar() {
       >
         <SidebarGroupContent>
           <SidebarMenu>
+            <NavItem
+              icon={PencilEdit02Icon}
+              label="Code"
+              active={pathname === "/code"}
+              onClick={() => {
+                void navigate({ to: "/code", search: isChatRoute ? search : storeThreadId ? { thread: storeThreadId } : {} });
+                closeMobileIfOpen();
+              }}
+            />
+            <NavItem
+              icon={UserCircleIcon}
+              label="Companion"
+              active={pathname === "/companion"}
+              onClick={() => {
+                void navigate({ to: "/companion", search: isChatRoute ? search : storeThreadId ? { thread: storeThreadId } : {} });
+                closeMobileIfOpen();
+              }}
+            />
             <NavItem
               icon={PencilEdit02Icon}
               label={

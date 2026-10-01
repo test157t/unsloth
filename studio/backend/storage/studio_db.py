@@ -442,6 +442,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     }
     if "root_path" not in chat_project_cols:
         conn.execute("ALTER TABLE chat_projects ADD COLUMN root_path TEXT")
+    if "repository_path" not in chat_project_cols:
+        conn.execute("ALTER TABLE chat_projects ADD COLUMN repository_path TEXT")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_chat_projects_archived_updated_at ON chat_projects(archived, updated_at)"
     )
@@ -2070,6 +2072,7 @@ def _chat_project_from_row(row: sqlite3.Row) -> dict:
         "name": data["name"],
         "instructions": data.get("instructions") or "",
         "rootPath": root_path or None,
+        "repositoryPath": data.get("repository_path") or None,
         "sandboxPath": os.path.join(root_path, "sandbox") if root_path else None,
         "archived": bool(data["archived"]),
         "createdAt": data["created_at"],
@@ -2852,6 +2855,7 @@ def upsert_chat_project(project: dict) -> dict:
 
 def update_chat_project(id: str, patch: dict) -> Optional[dict]:
     allowed = {
+        "repositoryPath": ("repository_path", patch.get("repositoryPath")),
         "name": ("name", patch.get("name")),
         "instructions": ("instructions", patch.get("instructions")),
         "archived": ("archived", 1 if patch.get("archived") else 0),

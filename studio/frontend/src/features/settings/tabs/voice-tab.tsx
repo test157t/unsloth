@@ -2,6 +2,7 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import { Button } from "@/components/ui/button";
+import { claimSpeechPlayback } from "@/features/chat/speech-playback-owner";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -768,6 +769,8 @@ export function VoiceTab() {
 
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
+  const releasePreviewOwnershipRef = useRef<() => void>(() => {});
+  const previewEpochRef = useRef(0);
   // Mirrors `previewing` so unmount cleanup can tell whether this tab owns
   // the current speechSynthesis utterance; read-aloud shares the global
   // synthesizer and must not be cancelled by merely closing settings.
@@ -780,6 +783,7 @@ export function VoiceTab() {
     setPreviewing(value);
     // Every exit from the generate await clears previewing, so clear both here.
     if (!value) setPreparingPreview(false);
+    if (!value) releasePreviewOwnershipRef.current();
   }, []);
 
   const releasePreviewAudio = useCallback(() => {
@@ -794,6 +798,7 @@ export function VoiceTab() {
 
   const stopPreview = useCallback(() => {
     if (!previewingRef.current) return;
+    previewEpochRef.current++;
     if (ownsSystemPreviewRef.current) {
       window.speechSynthesis?.cancel();
       ownsSystemPreviewRef.current = false;
@@ -812,6 +817,8 @@ export function VoiceTab() {
       stopPreview();
       return;
     }
+    const previewEpoch = ++previewEpochRef.current;
+    releasePreviewOwnershipRef.current = claimSpeechPlayback(stopPreview);
     if (effectiveTtsEngine !== "system") {
       const controller = new AbortController();
       previewAbortRef.current = controller;
@@ -837,10 +844,12 @@ export function VoiceTab() {
           audio.playbackRate = ttsRate;
         });
         audio.addEventListener("ended", () => {
+          if (previewEpoch !== previewEpochRef.current) return;
           releasePreviewAudio();
           markPreviewing(false);
         });
         audio.addEventListener("error", () => {
+          if (previewEpoch !== previewEpochRef.current) return;
           releasePreviewAudio();
           markPreviewing(false);
           toast.error(t("settings.voice.readAloud.previewFailed"));
@@ -848,6 +857,7 @@ export function VoiceTab() {
         previewAudioRef.current = audio;
         await audio.play();
       } catch (error) {
+        if (previewEpoch !== previewEpochRef.current) return;
         if (!controller.signal.aborted) {
           toast.error(
             error instanceof Error
@@ -861,15 +871,18 @@ export function VoiceTab() {
       return;
     }
     if (!StudioSpeechSynthesisAdapter.systemVoicesSupported()) {
+      releasePreviewOwnershipRef.current();
       toast.error(t("settings.voice.readAloud.notSupported"));
       return;
     }
     const utterance = createConfiguredUtterance(TTS_PREVIEW_TEXT);
     utterance.addEventListener("end", () => {
+      if (previewEpoch !== previewEpochRef.current) return;
       ownsSystemPreviewRef.current = false;
       markPreviewing(false);
     });
     utterance.addEventListener("error", () => {
+      if (previewEpoch !== previewEpochRef.current) return;
       ownsSystemPreviewRef.current = false;
       markPreviewing(false);
     });

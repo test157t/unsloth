@@ -31433,6 +31433,55 @@ def _sandbox_listing(sandbox_dir: str) -> "list[dict]":
     return files
 
 
+from pydantic import BaseModel, Field
+
+
+class CodeWorkspaceRequest(BaseModel):
+    session_id: str = Field(min_length = 1, max_length = 512)
+    action: Literal["read", "save", "status", "diff", "stage", "unstage", "commit", "review", "init", "ignore", "run"]
+    language: Literal["python", "javascript"] = "python"
+    filename: Optional[str] = Field(default = None, max_length = 2048)
+    content: str = Field(default = "", max_length = 2 * 1024 * 1024)
+    revision: Optional[str] = Field(default = None, max_length = 64)
+    message: Optional[str] = Field(default = None, max_length = 4000)
+
+
+@studio_router.post("/code-workspace")
+async def code_workspace_action(body: CodeWorkspaceRequest, request: Request):
+    """Owner-initiated edits in the same account-scoped workspace used by chat tools."""
+    await _authenticate_header_or_query(request, None)
+    from core.code_workspace import read_file, save_file, git_operation
+    from starlette.concurrency import run_in_threadpool
+
+    def perform():
+        root = _sandbox_dir_for(body.session_id, create = body.action == "save")
+        if body.action in ("read", "save"):
+            if not body.filename:
+                raise HTTPException(400, "Choose a file.")
+            # Reuse the sandbox route's identity and containment rules before editor-specific checks.
+            _contained_sandbox_path(body.session_id, body.filename)
+            if body.action == "read":
+                return read_file(root, body.filename)
+            return save_file(root, body.filename, body.content, body.revision)
+        # Git may run repository hooks/filters. Host execution follows Studio's owner boundary;
+        # managed accounts keep using their existing confined tools for those operations.
+        if not is_owner_context():
+            raise HTTPException(403, "Git controls require the Studio owner account.")
+        if body.action == "run":
+            from core.inference.tools import execute_tool
+            if body.language == "python":
+                return {"output": execute_tool("python", {"code": body.content}, session_id=body.session_id, timeout=60)}
+            import base64
+            encoded = base64.b64encode(body.content.encode("utf-8")).decode("ascii")
+            command = f'node -e "eval(Buffer.from(\'{encoded}\',\'base64\').toString())"'
+            return {"output": execute_tool("terminal", {"command": command}, session_id=body.session_id, timeout=60)}
+        if body.action == "review" and not (Path(root) / ".git").is_dir():
+            return {"isRepo": False, "status": []}
+        return git_operation(root, body.action, body.filename, body.message)
+
+    return await run_in_threadpool(perform)
+
+
 @router.get("/sandbox/{session_id}")
 async def list_sandbox_files(
     session_id: str,

@@ -4,6 +4,11 @@
 import { useAppShellReadySignal } from "@/components/app-readiness";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
+import { useConversationNavigate } from "@/features/companion/use-conversation-navigate";
+import { CodePanel } from "@/features/code/code-panel";
+import { CompanionPanel } from "@/features/companion/companion-panel";
+import { CompanionDivider } from "@/features/companion/companion-divider";
+import { isConversationWorkspace } from "@/features/companion/workspace-path";
 import { Navbar } from "@/components/navbar";
 import { SidebarEdgeTrigger } from "@/components/sidebar-edge-trigger";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -62,7 +67,6 @@ import {
   createRootRoute,
   redirect,
   useMatches,
-  useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
@@ -269,6 +273,8 @@ function CredentialBootstrapGate({
 const CHAT_ONLY_ALLOWED = new Set([
   "/",
   "/chat",
+  "/companion",
+  "/code",
   "/projects",
   "/library",
   "/hub",
@@ -361,9 +367,11 @@ function RootLayout() {
   const videoDisabled =
     videoNavHint(chatOnlyMeasured, chatOnlyReason) !== undefined;
   // Exact match: a prefix would treat /chatty as chat, hiding its not-found UI.
-  const isChatRoute = pathname === "/chat";
+  const isCodeRoute = pathname === "/code";
+  const isCompanionRoute = pathname === "/companion";
+  const isChatRoute = isConversationWorkspace(pathname);
   const { pinned, setPinned, togglePinned } = useSidebarPin();
-  const navigate = useNavigate();
+  const navigate = useConversationNavigate();
 
   // ChatPage is mounted persistently below (not via the /chat route) so an in-flight
   // generation survives leaving the tab: it mounts lazily on first /chat visit, then
@@ -722,12 +730,15 @@ function RootLayout() {
                 <div
                   className={
                     isChatRoute
-                      ? "flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden"
+                      ? `flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden ${isCodeRoute ? "studio-code-workspace" : isCompanionRoute ? "studio-companion-workspace" : ""}`
                       : "hidden"
                   }
                   inert={!isChatRoute || undefined}
                 >
-                  <ChatPage search={chatSearch} active={isChatRoute} />
+                  <div className="studio-conversation-surface flex min-h-0 min-w-0 flex-1 flex-col"><ChatPage search={chatSearch} active={isChatRoute} /></div>
+                  <CodePanel search={chatSearch} active={isCodeRoute} />
+                  {isCompanionRoute && <CompanionDivider />}
+                  {isCompanionRoute && <CompanionPanel search={chatSearch} />}
                 </div>
               )}
               {/* Same keep-alive treatment for Images so a long batch keeps generating off-tab; `active` force-closes its body-portaled overlays (model selector, recipe popover, aspect dropdown) so none bleed over another tab while hidden. */}

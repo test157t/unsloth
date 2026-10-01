@@ -1,0 +1,3138 @@
+/* Adapted ErisHub styles, scoped to Studio feature surfaces. */
+.eris-surface{--text:var(--foreground);--muted:var(--muted-foreground);--panel:var(--background);--accent:#a78bfa;--border:color-mix(in srgb,var(--foreground) 15%,transparent);--info:#a5b4fc;}
+.eris-surface .ui-control,
+.eris-surface .text_pole {
+  border-radius: var(--ui-control-radius);
+}
+
+@keyframes boot-grid-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(68px, 68px, 0); }
+}
+
+@keyframes boot-orbit {
+  from { transform: translate3d(-7%, -4%, 0) rotate(0deg) scale(0.95); }
+  to { transform: translate3d(6%, 4%, 0) rotate(18deg) scale(1.05); }
+}
+
+@keyframes boot-progress {
+  0% { background-position: 160% 0; opacity: 0.55; }
+  50% { opacity: 1; }
+  100% { background-position: -60% 0; opacity: 0.55; }
+}
+
+@keyframes boot-ring-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes boot-core-pulse {
+  0%, 100% { opacity: 0.72; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+.eris-surface .message-tools,
+.eris-surface .button-row,
+.eris-surface .chat-utilities,
+.eris-surface .agent-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.eris-surface .message-editor { display: grid; gap: 0.65rem; }
+.eris-surface .message-editor textarea { min-height: 120px; resize: vertical; }
+
+.eris-surface .hypno-choice-stack {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.eris-surface .hypno-choice-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.72rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--accent-fill);
+}
+
+.eris-surface .hypno-choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.eris-surface .hypno-choice-row button,
+.eris-surface .hypno-call-choice-dismiss {
+  border: 1px solid var(--accent-line-strong);
+  border-radius: 999px;
+  padding: 0.45rem 0.82rem;
+  color: var(--text-strong);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 76%, transparent), color-mix(in srgb, var(--accent-2) 78%, transparent));
+  cursor: pointer;
+}
+
+.eris-surface .hypno-choice-row button:hover,
+.eris-surface .hypno-call-choice-dismiss:hover {
+  border-color: var(--line-bright);
+  transform: translateY(-1px);
+}
+
+.eris-surface .hypno-call-choice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 0 1rem clamp(7.5rem, 15vh, 11rem);
+  pointer-events: none;
+}
+
+.eris-surface .hypno-call-choice-card {
+  pointer-events: auto;
+  display: grid;
+  gap: 0.8rem;
+  min-width: min(92vw, 360px);
+  max-width: min(92vw, 560px);
+  padding: 1rem;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--radius-md);
+  background: radial-gradient(circle at top, color-mix(in srgb, var(--accent) 32%, var(--surface)), color-mix(in srgb, var(--bg-2) 92%, transparent));
+  box-shadow: var(--shadow), 0 0 42px var(--accent-glow);
+  text-align: center;
+}
+
+.eris-surface .hypno-call-choice-card .hypno-choice-row {
+  justify-content: center;
+}
+
+.eris-surface .hypno-call-choice-dismiss {
+  justify-self: center;
+  opacity: 0.78;
+}
+.eris-surface .voiceforge-call-controls {
+  grid-area: call;
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.eris-surface .voiceforge-call-level {
+  position: relative;
+  width: 8px;
+  height: 38px;
+  overflow: hidden;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+}
+
+.eris-surface .voiceforge-call-level span {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent-3), var(--accent));
+  transition: height 80ms linear;
+}
+
+.eris-surface .utility-icon,
+.eris-surface .voiceforge-call-mic-button,
+.eris-surface .voiceforge-call-button,
+.eris-surface .send-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--ui-control-radius);
+  background: var(--surface-overlay);
+  color: color-mix(in srgb, var(--text) 88%, transparent);
+  box-shadow: inset 0 1px 0 var(--line-subtle), var(--shadow-soft);
+  padding: 0;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.eris-surface .utility-icon:hover:not(:disabled),
+.eris-surface .voiceforge-call-mic-button:hover:not(:disabled),
+.eris-surface .voiceforge-call-button:hover:not(:disabled),
+.eris-surface .send-icon:hover:not(:disabled) {
+  border-color: var(--accent-line-strong);
+  background: var(--accent-fill);
+}
+
+.eris-surface .voiceforge-call-button.active {
+  border-color: color-mix(in srgb, var(--success) 50%, transparent);
+  background: var(--success-bg);
+  color: color-mix(in srgb, var(--success) 72%, white);
+}
+
+.eris-surface .voiceforge-call-mic-button.muted {
+  border-color: var(--danger-line-strong);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.eris-surface .voiceforge-call-volume {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.eris-surface .voiceforge-call-volume-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--ui-control-radius);
+  background: var(--surface-overlay);
+  color: color-mix(in srgb, var(--text) 88%, transparent);
+  padding: 0;
+}
+
+.eris-surface .voiceforge-call-volume-slider {
+  position: absolute;
+  bottom: calc(100% + 0.55rem);
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 122px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(0.25rem);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.eris-surface .voiceforge-call-volume:hover .voiceforge-call-volume-slider,
+.eris-surface .voiceforge-call-volume:focus-within .voiceforge-call-volume-slider {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%);
+}
+
+.eris-surface .voiceforge-call-volume-slider input[type="range"] {
+  width: 22px;
+  height: 98px;
+  accent-color: var(--accent);
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.eris-surface .vrm-runtime-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.eris-surface .vrm-runtime-layer canvas {
+  width: 100vw !important;
+  height: 100vh !important;
+  display: block;
+}
+
+.eris-surface .vrm-hitbox-runtime-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.eris-surface .vrm-hitbox-runtime-button {
+  position: absolute;
+  border: 1px solid color-mix(in srgb, var(--info) 38%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--info) 5%, transparent);
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.eris-surface .vrm-hitbox-runtime-button:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+}
+
+.eris-surface #voiceforge_call_overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  overflow: hidden;
+  display: none;
+  --vf-call-accent: color-mix(in srgb, var(--accent) 72%, transparent);
+  --overlay-position-x: 50%;
+  --overlay-position-y: 50%;
+  --overlay-scale: 1;
+}
+
+.eris-surface #voiceforge_call_overlay.vf-hypnotic-effects-active .vf-call-backdrop {
+  animation: vfCallBreathe 5.5s ease-in-out infinite;
+}
+
+.eris-surface .vf-call-backdrop-layer.hypno-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, transparent) 1px, transparent 1px);
+  background-size: 72px 72px;
+  opacity: 0;
+}
+
+.eris-surface #voiceforge_call_overlay.vf-hypnotic-effects-active .vf-call-backdrop-layer.hypno-grid {
+  opacity: 0.28;
+  animation: vfCallGrid 18s linear infinite;
+}
+
+@keyframes vfCallImpact {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.35); }
+  22% { opacity: 0.68; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.9); }
+}
+
+@keyframes vfCallGrid {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(72px, 72px, 0); }
+}
+
+@keyframes vfRing {
+  from { opacity: 0.9; transform: scale(0.72); }
+  to { opacity: 0; transform: scale(1.35); }
+}
+
+@keyframes vf-whisper-hypnotic {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  12% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1.1) rotate(3deg);
+  }
+  35% {
+    opacity: 0.5;
+    transform: translate(-50%, -52%) scale(1) rotate(-2deg);
+  }
+  65% {
+    opacity: 0.3;
+    transform: translate(-50%, -54%) scale(0.95) rotate(1deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -58%) scale(0.8) rotate(-3deg);
+  }
+}
+
+@keyframes vfCallBreathe {
+  0%, 100% { opacity: 0.72; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+.eris-surface .prompt-editor-grid {
+  display: block;
+}
+
+.eris-surface .prompt-editor-grid label {
+  display: block;
+  margin: 0 0 0.6rem;
+}
+
+.eris-surface .prompt-editor-grid textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.24rem;
+  resize: vertical;
+}
+
+.eris-surface .collapsible-agent-editor-section {
+  padding: 0.55rem;
+}
+
+.eris-surface .agent-editor-section-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  padding: 0;
+  color: var(--text-strong);
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.eris-surface .agent-editor-section-toggle small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.eris-surface .agent-editor-section-toggle .material-symbols-outlined {
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+
+.eris-surface .collapsible-agent-editor-section > .field-grid,
+.eris-surface .collapsible-agent-editor-section > label {
+  margin-top: 0.65rem;
+}
+
+.eris-surface .prompt-editor-grid label:first-child textarea {
+  height: 220px;
+  min-height: 160px;
+}
+
+.eris-surface .prompt-editor-grid label:nth-child(2) textarea {
+  height: 120px;
+  min-height: 90px;
+}
+
+.eris-surface .prompt-editor-grid label:nth-child(3) textarea {
+  height: 82px;
+  min-height: 64px;
+}
+
+@media (max-width: 1100px) {
+
+  .eris-surface .prompt-editor-grid label:first-child textarea {
+    height: 170px;
+    min-height: 130px;
+  }
+
+  .eris-surface .prompt-editor-grid label:nth-child(2) textarea {
+    height: 104px;
+    min-height: 82px;
+  }
+
+  .eris-surface .prompt-editor-grid label:nth-child(3) textarea {
+    height: 78px;
+    min-height: 64px;
+  }
+}
+
+.eris-surface .llama-cpp-panel .inline-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.eris-surface .llama-cpp-panel .inline-button-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.eris-surface .llama-cpp-panel details.voiceforge-section { margin-top: 0.55rem; }
+.eris-surface .llama-cpp-panel details.voiceforge-section .voiceforge-section-content { gap: 0.5rem; }
+
+.eris-surface .embody-native-panel {
+  gap: 0.5rem;
+}
+
+.eris-surface .embody-native-section {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 24%, transparent);
+  overflow: hidden;
+}
+
+.eris-surface .embody-native-section summary {
+  cursor: pointer;
+  list-style: none;
+  border-bottom: 1px solid var(--accent-line);
+  background: linear-gradient(135deg, var(--accent-fill), color-mix(in srgb, var(--bg) 14%, transparent));
+  color: var(--text-strong);
+  font-weight: 780;
+  padding: 0.72rem 0.82rem;
+}
+
+.eris-surface .embody-native-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.eris-surface .embody-native-section summary::after {
+  content: "▸";
+  float: right;
+  color: var(--accent);
+}
+
+.eris-surface .embody-native-section[open] summary::after {
+  content: "▾";
+}
+
+.eris-surface .embody-native-section-content {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.82rem;
+}
+
+.eris-surface .voiceforge-voice-entry {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 26%, transparent);
+  overflow: hidden;
+}
+
+.eris-surface .voiceforge-voice-entry > summary.voice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  cursor: pointer;
+  list-style: none;
+  background: linear-gradient(135deg, var(--accent-fill), color-mix(in srgb, var(--bg) 18%, transparent));
+  padding: 0.7rem 0.82rem;
+}
+
+.eris-surface .voiceforge-voice-entry > summary.voice-header::-webkit-details-marker {
+  display: none;
+}
+
+.eris-surface .voiceforge-bg-track {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 92px 92px auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.eris-surface .voiceforge-bg-audio-container {
+  grid-template-columns: minmax(180px, 1fr) auto;
+}
+
+.eris-surface .embody-upstream-panel .drawer,
+.eris-surface .embody-upstream-panel .inline-drawer,
+.eris-surface .embody-upstream-panel .embody-intiface-card,
+.eris-surface .embody-upstream-panel #vrm_settings,
+.eris-surface .embody-upstream-panel #tts_settings {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 24%, transparent);
+}
+
+.eris-surface .embody-upstream-panel .drawer-toggle,
+.eris-surface .embody-upstream-panel .inline-drawer-toggle,
+.eris-surface .embody-upstream-panel h4 {
+  color: var(--accent);
+}
+
+.eris-surface .embody-upstream-panel .closedDrawer,
+.eris-surface .embody-upstream-panel .inline-drawer-content,
+.eris-surface .embody-upstream-panel .drawer-content {
+  display: block;
+}
+
+.eris-surface .embody-upstream-panel .menu_button,
+.eris-surface .embody-upstream-panel button {
+  cursor: pointer;
+}
+
+.eris-surface .intiface-builder-editors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.eris-surface .intiface-builder-editors label,
+.eris-surface .vrm-hitarea-row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.eris-surface .vrm-hitarea-grid,
+.eris-surface .vrm-classify-grid,
+.eris-surface .vrm-blend-group-grid {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.eris-surface .vrm-hitarea-row,
+.eris-surface .vrm-classify-row {
+  display: grid;
+  align-items: center;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 18%, transparent);
+  padding: 0.55rem;
+}
+
+.eris-surface .vrm-hitarea-row {
+  grid-template-columns: 8rem minmax(10rem, 0.7fr) minmax(12rem, 1fr) minmax(14rem, 1fr) minmax(16rem, 1.3fr);
+}
+
+.eris-surface .vrm-classify-row {
+  grid-template-columns: 9rem minmax(10rem, 0.8fr) minmax(12rem, 1fr) minmax(16rem, 1.4fr);
+}
+
+.eris-surface .vrm-hitarea-row strong,
+.eris-surface .vrm-classify-row strong,
+.eris-surface .vrm-blend-header strong {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+}
+
+.eris-surface .vrm-select-with-replay,
+.eris-surface .vrm-blend-header,
+.eris-surface .vrm-blend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.eris-surface .vrm-select-with-replay select {
+  flex: 1;
+}
+
+.eris-surface .vrm-blend-group-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-top: 0.7rem;
+}
+
+.eris-surface .vrm-blend-group {
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 20%, transparent);
+  padding: 0.7rem;
+}
+
+.eris-surface .vrm-blend-header {
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.eris-surface .vrm-blend-row {
+  display: grid;
+  grid-template-columns: 5rem 1fr 2rem;
+  color: var(--muted-2);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 900px) {
+  .eris-surface .intiface-builder-editors,
+  .eris-surface .vrm-hitarea-row,
+  .eris-surface .vrm-classify-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.eris-surface .intiface-native-panel {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.eris-surface .intiface-native-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--warning);
+  font-size: 1.05rem;
+}
+
+.eris-surface .intiface-native-title a {
+  color: var(--muted-2);
+}
+
+.eris-surface .intiface-native-drawer {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning-bg) 58%, var(--surface));
+  overflow: hidden;
+}
+
+.eris-surface .intiface-native-drawer summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+  padding: 0.75rem 0.85rem;
+}
+
+.eris-surface .intiface-native-drawer summary::-webkit-details-marker {
+  display: none;
+}
+
+.eris-surface .intiface-native-drawer-content {
+  border-top: 1px solid var(--line-subtle);
+  background: color-mix(in srgb, var(--bg) 24%, transparent);
+  color: var(--muted-2);
+  padding: 0.75rem 0.85rem;
+}
+
+.eris-surface #intiface-media-menu .intiface-media-toolbar .text_pole {
+  min-width: 0;
+  border-color: color-mix(in srgb, var(--warning) 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  color: var(--warning);
+}
+
+.eris-surface .intiface-json-editor {
+  min-height: 180px;
+  font-family: Consolas, monospace;
+  font-size: 0.75rem;
+  resize: vertical;
+}
+
+.eris-surface .intiface-native-drawer-content textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.eris-surface .native-voiceforge-section,
+.eris-surface .voiceforge-main-panel {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--bg) 34%, transparent));
+  padding: 0.65rem;
+}
+
+.eris-surface .voiceforge-main-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.58rem;
+  align-items: stretch;
+}
+
+.eris-surface .voiceforge-connect-toggle {
+  grid-column: 1 / -1;
+}
+
+.eris-surface .voiceforge-connection-status {
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.eris-surface .voiceforge-connection-status.connected {
+  color: var(--warning);
+}
+
+.eris-surface .voiceforge-connection-status.error {
+  color: var(--danger);
+}
+
+.eris-surface .voiceforge-status-dot {
+  color: var(--accent);
+}
+
+.eris-surface .voiceforge-connection-status.connected .voiceforge-status-dot {
+  color: var(--success);
+}
+
+.eris-surface .voiceforge-connection-status.error .voiceforge-status-dot {
+  color: var(--danger);
+}
+
+.eris-surface .voiceforge-modules-status,
+.eris-surface .voiceforge-discovery-status {
+  color: var(--warning);
+}
+
+.eris-surface .voiceforge-connect-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.eris-surface .voiceforge-connect-button {
+  align-self: center;
+}
+
+.eris-surface .voiceforge-section-header,
+.eris-surface .voiceforge-subsection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 760;
+}
+
+.eris-surface .native-voiceforge-section > .voiceforge-section-header {
+  margin: -0.65rem -0.65rem 0;
+  border-bottom: 1px solid var(--accent-line);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  padding: 0.55rem 0.72rem;
+}
+
+.eris-surface .voiceforge-section-header::-webkit-details-marker,
+.eris-surface .voiceforge-subsection-header::-webkit-details-marker {
+  display: none;
+}
+
+.eris-surface .voiceforge-section-content,
+.eris-surface .voiceforge-subsection-content {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.55rem;
+}
+
+.eris-surface .voiceforge-subsection {
+  margin-top: 0.45rem;
+}
+
+.eris-surface .voiceforge-subsection-header {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  padding: 0.5rem 0.65rem;
+}
+
+.eris-surface .voiceforge-section label,
+.eris-surface .voiceforge-main-panel label,
+.eris-surface .voiceforge-subsection label {
+  display: grid;
+  gap: 0.32rem;
+  color: var(--muted);
+}
+
+.eris-surface .voiceforge-section .checkbox_label,
+.eris-surface .voiceforge-subsection .checkbox_label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text);
+}
+
+.eris-surface .voiceforge-section .checkbox_label input,
+.eris-surface .voiceforge-subsection .checkbox_label input {
+  width: auto;
+}
+
+.eris-surface .embody-native-panel input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+}
+
+.eris-surface .embody-native-panel input[type="range"] {
+  accent-color: var(--accent);
+}
+
+.eris-surface .embody-native-panel .native-voiceforge-section,
+.eris-surface .embody-native-panel .voiceforge-main-panel,
+.eris-surface .embody-native-panel .voice-section-collapsible,
+.eris-surface .embody-native-panel .vrm-section-collapsible,
+.eris-surface .embody-native-panel .audio-ui-block,
+.eris-surface .embody-native-panel .callmode-vf-bg-block {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--bg) 34%, transparent));
+  box-shadow: inset 0 1px 0 var(--line-subtle);
+}
+
+.eris-surface .embody-native-panel .voice-section-collapsible,
+.eris-surface .embody-native-panel .vrm-section-collapsible,
+.eris-surface .embody-native-panel .audio-ui-block,
+.eris-surface .embody-native-panel .callmode-vf-bg-block {
+  padding: 0.55rem 0.65rem;
+}
+
+.eris-surface .embody-native-panel .callmode-vf-bg-block {
+  margin-top: 0.65rem;
+}
+
+.eris-surface .embody-native-panel .voice-section-collapsible > .section-header,
+.eris-surface .embody-native-panel .vrm-section-collapsible > .vrm-section-header {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.65rem;
+}
+
+.eris-surface .embody-native-panel .voice-section-collapsible > .section-header i,
+.eris-surface .embody-native-panel .vrm-section-collapsible > .vrm-section-header i,
+.eris-surface .embody-native-panel .voiceforge-subsection-header i,
+.eris-surface .embody-native-panel .voiceforge-section-header i {
+  color: var(--accent);
+}
+
+.eris-surface .embody-native-panel .voice-section-collapsible .section-content,
+.eris-surface .embody-native-panel .vrm-section-collapsible > .vrm-section-content {
+  padding: 0.55rem 0 0;
+}
+
+.eris-surface .text_pole {
+  width: 100%;
+}
+
+.eris-surface .menu_button {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--ui-control-radius);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text);
+  padding: 0.42rem 0.65rem;
+}
+
+.eris-surface .menu_button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.eris-surface .voiceforge-provider-settings,
+.eris-surface .voiceforge-inline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.eris-surface .vrm-tab-native {
+  position: relative;
+}
+
+.eris-surface .vrm-preview-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.eris-surface .vrm-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.eris-surface .vrm-stage canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.eris-surface .vrm-stage-status {
+  position: fixed;
+  left: 0.75rem;
+  top: 0.75rem;
+  bottom: auto;
+  max-width: min(520px, calc(100% - 1.5rem));
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  color: var(--accent);
+  font-size: 0.78rem;
+  padding: 0.35rem 0.5rem;
+  z-index: 100000;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.eris-surface #vrm-canvas:not(.editor-vrm-stage) {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  pointer-events: none !important;
+  z-index: var(--vrm-canvas-z-index, 1) !important;
+}
+
+.eris-surface .chat-vrm-stage {
+  position: fixed;
+  z-index: 1;
+}
+
+.eris-surface .chat-page .chat-log,
+.eris-surface .chat-page .composer-shell,
+.eris-surface .chat-page .chat-manager-overlay,
+.eris-surface .editor-presence-preview .editor-preview-height-handle {
+  position: relative;
+  z-index: 2;
+}
+
+.eris-surface .editor-presence-preview {
+  position: relative;
+  overflow: hidden;
+}
+
+.eris-surface .editor-vrm-stage {
+  z-index: 1;
+}
+
+.eris-surface #vrm-canvas.editor-vrm-stage {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: auto !important;
+}
+
+.eris-surface .vrm-native-panel {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+}
+
+.eris-surface .vrm-native-panel .native-voiceforge-section {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--bg) 34%, transparent));
+  border-color: var(--accent-line);
+  padding: 0.65rem;
+  overflow: hidden;
+}
+
+.eris-surface .vrm-native-panel .native-voiceforge-section[open] {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--bg) 34%, transparent));
+}
+
+.eris-surface .vrm-native-panel .native-voiceforge-section > .voiceforge-section-header {
+  margin: -0.65rem -0.65rem 0;
+  min-height: 2.35rem;
+  border-bottom: 1px solid var(--accent-line);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 0.55rem 0.72rem;
+}
+
+.eris-surface .vrm-native-panel .native-voiceforge-section > .voiceforge-section-header i,
+.eris-surface .vrm-native-panel .native-voiceforge-section > .voiceforge-section-header span {
+  color: var(--accent);
+}
+
+.eris-surface .vrm-native-panel .native-voiceforge-section[open] > .voiceforge-section-header {
+  color: var(--text);
+}
+
+.eris-surface .vrm-native-panel .voiceforge-section-content {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.55rem 0 0;
+}
+
+.eris-surface .vrm-native-panel .checkbox_label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: fit-content;
+}
+
+.eris-surface .vrm-native-panel .checkbox_label small {
+  white-space: nowrap;
+}
+
+.eris-surface .vrm-character-map-cards {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.eris-surface .vrm-character-card {
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  overflow: hidden;
+}
+
+.eris-surface .vrm-character-card > summary.vrm-character-card-header {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto auto auto auto;
+  gap: 0.8rem;
+  align-items: center;
+  min-height: 4rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.78rem 0.95rem;
+}
+
+.eris-surface .vrm-character-card > summary.vrm-character-card-header::-webkit-details-marker {
+  display: none;
+}
+
+.eris-surface .vrm-character-card-header strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.eris-surface .vrm-character-card-header span {
+  color: color-mix(in srgb, var(--text) 25%, transparent);
+  font-size: 0.88rem;
+}
+
+.eris-surface .vrm-icon-button {
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--text) 55%, transparent);
+  padding: 0.15rem;
+}
+
+.eris-surface .vrm-character-card-content {
+  display: grid;
+  gap: 1rem;
+  padding: 0.4rem 0.95rem 0.85rem;
+}
+
+.eris-surface .vrm-character-card-content label {
+  display: grid;
+  gap: 0.55rem;
+  color: var(--text);
+}
+
+.eris-surface .vrm-model-select-div,
+.eris-surface .vrm-character-select-div,
+.eris-surface .vrm-select-div,
+.eris-surface .vrm-slider-reset-div,
+.eris-surface .vrm-color-div,
+.eris-surface .vrm-blend-shape-add {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.eris-surface .vrm-blend-shape-groups {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.eris-surface .vrm-blend-shape-group {
+  border: 1px solid color-mix(in srgb, var(--warning) 18%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+  overflow: hidden;
+}
+
+.eris-surface .vrm-blend-shape-title {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 2.4rem;
+  padding: 0 0.75rem;
+}
+
+.eris-surface .vrm-blend-shape-title::-webkit-details-marker {
+  display: none;
+}
+
+.eris-surface .vrm-blend-shape-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eris-surface .vrm-blend-shape-title span {
+  color: var(--muted-2);
+  font-size: 0.78rem;
+  margin-left: auto;
+}
+
+.eris-surface .vrm-blend-shape-weights {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem 0;
+}
+
+.eris-surface .vrm-blend-shape-weight,
+.eris-surface .vrm-blend-shape-intensity {
+  align-items: center;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(7rem, 1fr) minmax(8rem, 2fr) 2.5rem;
+  margin: 0;
+}
+
+.eris-surface .vrm-blend-shape-intensity {
+  padding: 0.65rem 0.75rem 0.75rem;
+}
+
+.eris-surface .vrm-blend-shape-weight strong,
+.eris-surface .vrm-blend-shape-intensity strong {
+  text-align: right;
+}
+
+.eris-surface .vrm-character-card .text_pole,
+.eris-surface .vrm-native-panel .text_pole {
+  min-height: 2.1rem;
+  border-color: var(--line-subtle);
+  background: color-mix(in srgb, var(--bg) 58%, transparent);
+}
+
+.eris-surface .vrm-parameter {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.42fr) minmax(220px, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.eris-surface .vrm-parameter-title {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.eris-surface .vrm-parameter-title label {
+  display: inline;
+}
+
+.eris-surface .vrm-character-card-content .vrm-parameter-title label,
+.eris-surface .vrm-section-collapsible .vrm-parameter-title label {
+  display: inline;
+  white-space: nowrap;
+}
+
+.eris-surface .vrm-section-collapsible .vrm-parameter {
+  grid-template-columns: minmax(340px, 0.45fr) minmax(220px, 1fr);
+}
+
+.eris-surface .vrm-slider-div {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.eris-surface .vrm-slider-div small,
+.eris-surface .vrm-character-card small {
+  color: var(--warning);
+}
+
+.eris-surface #vrm_model_loading {
+  margin: 0;
+  color: var(--text);
+}
+
+.eris-surface .vrm-section-collapsible {
+  border: 1px solid color-mix(in srgb, var(--warning) 8%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  overflow: hidden;
+}
+
+.eris-surface .vrm-section-collapsible > .vrm-section-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  min-height: 2.45rem;
+  list-style: none;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-weight: 800;
+  padding: 0.55rem 0.85rem;
+}
+
+.eris-surface .vrm-section-collapsible > .vrm-section-header::after,
+.eris-surface .vrm-section-collapsible[open] > .vrm-section-header::after {
+  content: none;
+}
+
+.eris-surface .vrm-section-collapsible > .vrm-section-header::-webkit-details-marker {
+  display: none;
+}
+
+.eris-surface .vrm-section-collapsible > .vrm-section-header::marker {
+  content: "";
+  font-size: 0;
+}
+
+.eris-surface .vrm-section-collapsible > .vrm-section-content {
+  display: grid;
+  gap: 0.72rem;
+  padding: 0.8rem;
+}
+
+.eris-surface .vrm-mapping-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.eris-surface .vrm-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.4fr) repeat(3, minmax(140px, 1fr));
+  gap: 0.55rem;
+  align-items: end;
+  border: 1px solid color-mix(in srgb, var(--warning) 8%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 34%, transparent);
+  padding: 0.55rem;
+}
+
+.eris-surface .vrm-mapping-row strong {
+  color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .eris-surface .vrm-parameter,
+  .eris-surface .vrm-character-card > summary.vrm-character-card-header,
+  .eris-surface .vrm-mapping-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.eris-surface .voiceforge-indented-field {
+  display: grid;
+  gap: 0.55rem;
+  margin-left: 1.25rem;
+}
+
+.eris-surface .voiceforge-map-tools,
+.eris-surface .voiceforge-range-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.eris-surface .voiceforge-range-row input[type="range"] {
+  flex: 1;
+}
+
+.eris-surface .voiceforge-range-row span {
+  min-width: 3.5rem;
+  color: var(--accent);
+  text-align: right;
+}
+
+.eris-surface .voiceforge-json-map {
+  min-height: 220px;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+}
+
+.eris-surface .voiceforge-call-intro {
+  margin: 0 0 0.65rem;
+}
+
+.eris-surface #voiceforge_call_mic_level_track {
+  position: relative;
+  height: 0.65rem;
+  overflow: hidden;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 34%, transparent);
+}
+
+.eris-surface #voiceforge_call_mic_level_fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+}
+
+.eris-surface #voiceforge_call_mic_gate_marker {
+  position: absolute;
+  top: -0.2rem;
+  bottom: -0.2rem;
+  width: 2px;
+  background: var(--text-strong);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--text) 35%, transparent);
+}
+
+.eris-surface .organizer-controls .button-row {
+  justify-content: flex-end;
+}
+
+.eris-surface .empty-module-state {
+  border: 1px dashed var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+  color: var(--muted);
+  padding: 0.78rem;
+}
+
+.eris-surface .editor-page {
+  grid-template-columns: minmax(180px, var(--col-rail, 260px)) 5px minmax(420px, 1fr) 5px minmax(240px, var(--col-right, 340px));
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  height: 100vh;
+  height: 100dvh;
+  gap: 0;
+  position: relative;
+  border: 1px solid var(--accent-line);
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 26rem),
+    radial-gradient(circle at 85% 0%, color-mix(in srgb, var(--accent-2) 8%, transparent), transparent 30rem),
+    var(--surface-overlay);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  padding: clamp(0.7rem, 1.4vw, 1rem) clamp(0.7rem, 1.4vw, 1rem) 4.4rem;
+}
+
+.eris-surface .editor-rail,
+.eris-surface .editor-col-chat,
+.eris-surface .editor-workspace,
+.eris-surface .editor-main-grid,
+.eris-surface .editor-tools-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.eris-surface .editor-rail {
+  gap: 0.62rem;
+}
+
+.eris-surface .editor-workspace,
+.eris-surface .editor-tools-panel,
+.eris-surface .editor-panel {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.eris-surface .editor-workspace {
+  min-width: 420px;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.eris-surface .editor-rail {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg) 36%, transparent);
+  padding: 0.5rem;
+  gap: 0.62rem;
+}
+
+.eris-surface .editor-rail > .editor-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.eris-surface .editor-col-chat {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg) 36%, transparent);
+  padding: 0.5rem;
+}
+
+.eris-surface .editor-col-chat .editor-chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.72rem;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  transform: none;
+  isolation: auto;
+  justify-content: flex-start;
+  scrollbar-gutter: stable;
+}
+
+.eris-surface .editor-col-divider {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.1s;
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+}
+
+.eris-surface .editor-col-divider:hover {
+  background: var(--accent-fill-strong);
+}
+
+.eris-surface .editor-rail-tabs {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.2rem;
+  min-height: 30px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 32%, transparent);
+  padding: 0.14rem;
+}
+
+.eris-surface .editor-rail-tabs button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-2);
+  font-size: 0.64rem;
+  font-weight: 850;
+  box-shadow: none;
+  min-height: 0;
+  padding: 0.1rem 0.2rem;
+  text-transform: uppercase;
+}
+
+.eris-surface .editor-rail-tabs button.active {
+  background: var(--accent-fill);
+  color: var(--accent);
+}
+
+.eris-surface .editor-rail-tabs button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  transform: none;
+}
+
+.eris-surface .editor-page .button-row button {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--ui-control-radius);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.26rem 0.46rem;
+  box-shadow: none;
+}
+
+.eris-surface .editor-page .button-row button:hover:not(:disabled) {
+  border-color: var(--accent-line-strong);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--text);
+  box-shadow: none;
+  transform: none;
+}
+
+.eris-surface .editor-panel {
+  align-content: start;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  box-shadow: inset 0 1px 0 var(--line-subtle);
+  padding: 0.72rem;
+}
+
+.eris-surface .editor-file-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.44rem;
+}
+
+.eris-surface .editor-panel-heading,
+.eris-surface .editor-code-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.eris-surface .editor-project-path {
+  display: grid;
+  gap: 0.24rem;
+  min-width: min(520px, 44vw);
+  color: var(--muted-2);
+  font-size: 0.72rem;
+}
+
+.eris-surface .editor-project-path input {
+  border-radius: 11px;
+  border: 1px solid var(--accent-line);
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  padding: 0.38rem 0.55rem;
+}
+
+.eris-surface .editor-panel-heading button,
+.eris-surface .editor-tools-panel .button-row button,
+.eris-surface .editor-tools-panel form button {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--ui-control-radius);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.26rem 0.46rem;
+  box-shadow: none;
+}
+
+.eris-surface .editor-panel-heading button:hover:not(:disabled),
+.eris-surface .editor-tools-panel .button-row button:hover:not(:disabled),
+.eris-surface .editor-tools-panel form button:hover:not(:disabled) {
+  border-color: var(--accent-line-strong);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: none;
+  color: var(--text);
+  transform: none;
+}
+
+.eris-surface .editor-project-list,
+.eris-surface .editor-file-list,
+.eris-surface .editor-search-results {
+  display: grid;
+  align-content: start;
+  gap: 0.44rem;
+}
+
+.eris-surface .editor-search-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.eris-surface .editor-search-panel .editor-search-results {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.eris-surface .editor-search-panel .editor-search-results > .editor-project-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.eris-surface .editor-file-list button,
+.eris-surface .editor-search-results button,
+.eris-surface .editor-project-list button {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 18rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--text) 5%, transparent), color-mix(in srgb, var(--text) 1%, transparent)),
+    var(--surface-overlay);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 color-mix(in srgb, var(--accent-3) 8%, transparent);
+  color: var(--text);
+  padding: 0.54rem 0.6rem;
+  text-align: left;
+  font-size: 0.76rem;
+}
+
+.eris-surface .editor-project-list button:hover:not(:disabled),
+.eris-surface .editor-project-list button.active,
+.eris-surface .editor-search-results button:hover:not(:disabled),
+.eris-surface .editor-search-results button.active {
+  border-color: var(--accent-line-strong);
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 18rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--text) 7%, transparent), color-mix(in srgb, var(--text) 1%, transparent)),
+    var(--surface-overlay);
+  box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 5%, transparent), inset 0 1px 0 color-mix(in srgb, var(--accent-3) 12%, transparent);
+  transform: none;
+}
+
+.eris-surface .editor-project-list strong {
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+
+.eris-surface .editor-project-list span {
+  color: var(--text);
+  font-size: 0.64rem;
+}
+
+.eris-surface .editor-project-list button strong {
+  color: var(--accent);
+  line-height: 1.2;
+  font-size: 0.86rem;
+}
+
+.eris-surface .editor-project-list button .project-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.42rem;
+  min-width: 0;
+}
+
+.eris-surface .editor-search-results button .project-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.42rem;
+  min-width: 0;
+}
+
+.eris-surface .editor-project-list button .project-card-heading span {
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--warning);
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 0.12rem 0.4rem;
+  text-transform: uppercase;
+}
+
+.eris-surface .editor-search-results button .project-card-heading span {
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--warning);
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 0.12rem 0.4rem;
+  text-transform: uppercase;
+}
+
+.eris-surface .editor-project-card {
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  padding: 0.42rem 0.55rem;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.eris-surface .editor-project-card:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+.eris-surface .editor-project-card:focus-within {
+  outline: 2px solid var(--accent-line-strong);
+  outline-offset: 2px;
+}
+.eris-surface .editor-project-card.disabled {
+  opacity: 0.5;
+}
+.eris-surface .editor-project-card.disabled:hover {
+  border-color: transparent;
+  background: transparent;
+}
+
+.eris-surface .editor-project-card .project-card-heading {
+  cursor: pointer;
+}
+
+.eris-surface .editor-project-card.expanded {
+  border-color: var(--accent-line);
+  background: var(--surface-panel);
+}
+
+.eris-surface .project-expanded-section .editor-summary-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.eris-surface .project-expanded-section .editor-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.eris-surface .project-expanded-section .editor-summary-head span {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.eris-surface .project-expanded-section .editor-summary-head button {
+  font-size: 0.68rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.eris-surface .project-expanded-section .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.eris-surface .project-expanded-section .button-row button {
+  font-size: 0.72rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.eris-surface .editor-project-card .editor-project-summary {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 560;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0.3rem 0 0;
+}
+
+.eris-surface .editor-project-list button .editor-project-summary {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 560;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.eris-surface .editor-search-results button .editor-project-summary {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 560;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.eris-surface .editor-project-list strong,
+.eris-surface .editor-file-list strong,
+.eris-surface .editor-project-list span,
+.eris-surface .editor-file-list span,
+.eris-surface .editor-search-results strong,
+.eris-surface .editor-search-results span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eris-surface .editor-file-list span,
+.eris-surface .editor-muted,
+.eris-surface .editor-code-meta {
+  color: var(--muted-2);
+  font-size: 0.78rem;
+}
+
+.eris-surface .editor-workspace {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow-y: auto;
+}
+
+
+
+.eris-surface .editor-file-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  border-bottom: 1px solid var(--accent-line);
+  padding-bottom: 0.38rem;
+}
+
+.eris-surface .editor-open-tabs {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  gap: 0.3rem;
+}
+
+.eris-surface .editor-open-tab {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--control-radius);
+  background: var(--surface-panel);
+  overflow: hidden;
+}
+
+.eris-surface .editor-open-tab.active {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.eris-surface .editor-open-tabs > button,
+.eris-surface .editor-open-tab > button:first-child {
+  flex: 0 1 auto;
+  max-width: min(420px, 48vw);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.28rem 0.52rem;
+  box-shadow: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eris-surface .editor-open-tabs > button.active,
+.eris-surface .editor-open-tab.active > button:first-child {
+  color: var(--text);
+}
+
+.eris-surface .editor-open-tabs > button:hover:not(:disabled),
+.eris-surface .editor-open-tab > button:first-child:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.eris-surface .editor-tab-close {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  border: 0;
+  border-left: 1px solid var(--accent-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--danger-text);
+  box-shadow: none;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.eris-surface .editor-tab-close:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  transform: none;
+}
+
+.eris-surface .editor-file-bar input {
+  width: min(320px, 42%);
+  flex: 1 1 auto;
+  min-width: 140px;
+  height: 32px;
+  border-radius: 9px;
+  border-color: var(--accent-line);
+  background: var(--glass);
+  font-size: 0.78rem;
+  padding: 0.32rem 0.5rem;
+}
+
+.eris-surface .editor-file-name {
+  display: grid;
+  gap: 0.28rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.eris-surface .editor-filter-input {
+  flex: 1;
+  min-width: 80px;
+  max-width: 260px;
+  min-height: 28px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.eris-surface .editor-code-panel {
+  align-content: stretch;
+  height: 100%;
+  min-height: 0;
+  gap: 0.24rem;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 0.42rem 0.5rem 0.26rem;
+}
+
+.eris-surface .editor-main-grid {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.eris-surface .editor-code-frame {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.eris-surface .editor-line-gutter {
+  flex: none;
+  width: 4ch;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: end;
+  border-right: 1px solid var(--accent-line);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
+  color: color-mix(in srgb, var(--accent-3) 42%, transparent);
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.92rem;
+  line-height: 1.48;
+  padding: 0.78rem 0.1rem;
+  user-select: none;
+}
+
+.eris-surface .editor-code-input-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.eris-surface .editor-llm-completion {
+  position: absolute;
+  z-index: 4;
+  max-width: min(760px, calc(100% - 1rem));
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+  color: var(--muted);
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 0.3rem 0.42rem;
+}
+
+.eris-surface .editor-llm-completion span {
+  color: var(--code-completion);
+}
+
+.eris-surface .editor-line-height-fix {
+  min-height: 0;
+}
+
+.eris-surface .editor-code-frame textarea,
+.eris-surface .editor-tools-panel textarea {
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.92rem;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  line-height: 1.48;
+  tab-size: 2;
+  resize: none;
+}
+
+.eris-surface .editor-text-mirror {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0.78rem 0.62rem;
+  border: 0;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: var(--text);
+  background: transparent;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.92rem;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  line-height: 1.48;
+  tab-size: 2;
+  user-select: none;
+}
+.eris-surface .editor-text-mirror div {
+  min-height: 1.48em;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 22px;
+}
+.eris-surface .tk-keyword { color: var(--code-keyword); }
+.eris-surface .tk-string { color: var(--code-string); }
+.eris-surface .tk-number { color: var(--code-number); }
+.eris-surface .tk-comment { color: var(--code-comment); }
+.eris-surface .tk-function { color: var(--code-function); }
+.eris-surface .tk-jsx-tag { color: var(--code-tag); }
+.eris-surface .editor-line-gutter span {
+  min-height: 1.48em;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 22px;
+}
+.eris-surface .editor-code-frame textarea {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0.78rem 0.62rem;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  resize: none;
+  color: transparent;
+  caret-color: var(--code-caret);
+  background: transparent;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.92rem;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  line-height: 1.48;
+  tab-size: 2;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  box-shadow: none;
+}
+.eris-surface .editor-code-frame textarea:focus {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.eris-surface .editor-code-frame textarea::selection {
+  background: color-mix(in srgb, var(--code-comment) 50%, transparent);
+  color: transparent;
+}
+
+.eris-surface .editor-git-diff-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.eris-surface .editor-git-diff {
+  min-height: 140px;
+  max-height: 300px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--accent-line);
+  border-radius: 10px;
+  background: var(--surface-overlay);
+  color: var(--text);
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 0.5rem;
+  white-space: pre;
+}
+
+.eris-surface .editor-git-diff-line {
+  display: block;
+}
+
+.eris-surface .editor-git-diff-line.added {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.eris-surface .editor-git-diff-line.removed {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.eris-surface .editor-context-card {
+  display: grid;
+  gap: 0.3rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  padding: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.eris-surface .editor-context-card strong {
+  display: block;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.eris-surface .editor-context-card span {
+  display: block;
+}
+.eris-surface .editor-git-files {
+  display: grid;
+  gap: 0.24rem;
+}
+.eris-surface .editor-git-file-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--control-radius);
+  background: var(--surface-panel);
+  padding: 0.24rem 0.4rem;
+  font-size: 0.72rem;
+}
+.eris-surface .editor-git-file-row strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.eris-surface .editor-git-code {
+  flex: none;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+.eris-surface .editor-git-init-btn,
+.eris-surface .editor-git-file-row button,
+.eris-surface .editor-scm-panel .button-row button {
+  flex: none;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--control-radius);
+  background: var(--surface-panel);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.22rem 0.44rem;
+  box-shadow: none;
+  letter-spacing: normal;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+.eris-surface .editor-git-init-btn:hover:not(:disabled),
+.eris-surface .editor-git-file-row button:hover:not(:disabled),
+.eris-surface .editor-scm-panel .button-row button:hover:not(:disabled) {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+  color: var(--text);
+  box-shadow: none;
+  transform: none;
+}
+
+.eris-surface .editor-code-frame textarea::selection {
+  background: color-mix(in srgb, var(--code-comment) 50%, transparent);
+  color: transparent;
+}
+
+.eris-surface .editor-presence-preview {
+  position: relative;
+  z-index: auto;
+  display: grid;
+  align-items: end;
+  width: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 12rem),
+    var(--glass);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 var(--line-subtle);
+  pointer-events: auto;
+}
+
+.eris-surface .editor-preview-height-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 3;
+}
+
+.eris-surface .editor-presence-background,
+.eris-surface .editor-presence-background::after,
+.eris-surface .editor-presence-background img,
+.eris-surface .editor-presence-background video {
+  position: absolute;
+  inset: 0;
+}
+
+.eris-surface .editor-presence-background::after {
+  content: "";
+  background: rgba(0, 0, 0, var(--chat-bg-dim));
+}
+
+.eris-surface .editor-presence-background img,
+.eris-surface .editor-presence-background video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.9;
+  filter: var(--chat-bg-filter);
+  transform: scale(1.02);
+}
+
+.eris-surface .editor-presence-background {
+  pointer-events: none;
+}
+
+.eris-surface .editor-preview-drag-handle {
+  position: absolute;
+  top: 0.45rem;
+  left: 0.45rem;
+  z-index: 2;
+  border-radius: 999px;
+  border: 1px solid var(--accent-line);
+  background: var(--glass);
+  color: var(--muted-2);
+  font-size: 0.66rem;
+  font-weight: 700;
+  box-shadow: none;
+  padding: 0.18rem 0.45rem;
+}
+
+.eris-surface .editor-preview-drag-handle:hover:not(:disabled) {
+  transform: none;
+}
+
+.eris-surface .editor-preview-resize-handle {
+  position: absolute;
+  right: 0.26rem;
+  bottom: 0.26rem;
+  z-index: 2;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-line);
+  background: var(--glass);
+  box-shadow: none;
+  cursor: nwse-resize;
+  padding: 0;
+}
+
+.eris-surface .editor-preview-resize-handle:hover:not(:disabled) {
+  transform: none;
+}
+
+.eris-surface .editor-error-text {
+  position: absolute;
+  right: clamp(0.72rem, 2vw, 1.25rem);
+  bottom: 7.7rem;
+  left: auto;
+  z-index: 10;
+  max-width: min(520px, calc(100vw - 2rem));
+}
+
+.eris-surface .image-generation-prompt-editor {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  font-family: inherit;
+  padding: 0.25rem;
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-input);
+  color: var(--text);
+  resize: vertical;
+}
+
+@media (max-width: 760px) {
+  .eris-surface .utility-icon,
+  .eris-surface .voiceforge-call-mic-button,
+  .eris-surface .voiceforge-call-volume-button,
+  .eris-surface .voiceforge-call-button,
+  .eris-surface .send-icon { width: 100%; }
+}
+
+/* Compact ErisHub shell: hidden nav, no persistent top chrome, fullscreen chat. */
+
+@media (max-width: 760px) {
+  .eris-surface .utility-icon,
+  .eris-surface .voiceforge-call-mic-button,
+  .eris-surface .voiceforge-call-volume-button,
+  .eris-surface .voiceforge-call-button,
+  .eris-surface .send-icon {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+}
+
+/* Responsive Hub settings pages. */
+
+/* Compact density: settings pages should be information-dense, not touch-target billboards. */
+
+/* Background picker: larger previews, fewer columns, no collapsed video rows. */
+
+.eris-surface .editor-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.eris-surface .editor-dialog {
+  display: grid;
+  gap: 0.72rem;
+  width: min(420px, 90vw);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background: var(--glass);
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+}
+
+.eris-surface .editor-project-editor {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.44rem;
+  border: 1px solid var(--accent-line);
+  border-radius: 13px;
+  background: var(--surface-panel);
+  padding: 0.55rem;
+  min-width: 0;
+  min-height: 100%;
+}
+
+.eris-surface .editor-summary-row {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.44rem;
+  min-height: 0;
+}
+
+.eris-surface .editor-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--text-strong);
+  font-size: 0.78rem;
+}
+
+.eris-surface .editor-summary-head button {
+  white-space: nowrap;
+}
+
+.eris-surface .editor-project-editor .editor-file-name,
+.eris-surface .editor-project-editor input,
+.eris-surface .editor-project-editor textarea {
+  min-width: 0;
+  width: 100%;
+}
+
+.eris-surface .editor-project-editor .editor-file-name {
+  color: var(--accent);
+}
+
+.eris-surface .editor-project-editor textarea {
+  color: var(--text-strong);
+  min-height: 0;
+  height: 100%;
+}
+
+.eris-surface .editor-project-editor textarea {
+  resize: none;
+}
+
+/* Settings owns Provider/Agent layout; nested panels must not behave like top-level overlays. */
+
+.eris-surface .agent-detail-identity-panel .collapsible-agent-editor-section {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+@keyframes agent-avatar-border-glow {
+  0%, 100% {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+
+  50% {
+    border-color: color-mix(in srgb, var(--accent-3) 68%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-3) 20%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 10px color-mix(in srgb, var(--success) 12%, transparent);
+  }
+}
+
+.eris-surface .agent-profile-editor {
+  display: grid;
+  gap: 0.9rem;
+  border-top: 1px solid var(--accent-line);
+  padding: 0.82rem;
+}
+
+.eris-surface .agent-expanded-column .agent-profile-editor {
+  border-top: 0;
+  padding: 0.82rem;
+}
+
+.eris-surface .agent-editor-section {
+  display: grid;
+  gap: 0.64rem;
+}
+
+.eris-surface .agent-editor-section h4 {
+  margin: 0;
+  color: var(--accent-3);
+  font-size: 0.86rem;
+  letter-spacing: -0.02em;
+}
+
+.eris-surface .hypno-session-tracker {
+  display: grid;
+  gap: 0.55rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 12rem),
+    color-mix(in srgb, var(--bg) 34%, transparent);
+  padding: 0.82rem;
+}
+
+.eris-surface .hypno-evolution-tree {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 14rem),
+    radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--success) 8%, transparent), transparent 12rem),
+    color-mix(in srgb, var(--bg) 36%, transparent);
+  padding: 0.9rem;
+}
+
+.eris-surface .theme-card-editor {
+  display: grid;
+  gap: 0.72rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--theme-card-line-subtle);
+}
+
+.eris-surface .theme-card .native-voiceforge-section,
+.eris-surface .theme-card .voiceforge-section-header,
+.eris-surface .theme-card .text_pole,
+.eris-surface .theme-card button {
+  border-color: var(--theme-card-accent-line);
+}
+
+.eris-surface .theme-card .native-voiceforge-section {
+  background: linear-gradient(135deg, var(--theme-card-accent-fill), color-mix(in srgb, var(--theme-card-bg) 34%, transparent));
+}
+
+.eris-surface .theme-card .voiceforge-section-header {
+  background: var(--theme-card-accent-fill);
+  color: var(--theme-card-accent);
+}
+
+.eris-surface .theme-card .text_pole {
+  background: color-mix(in srgb, var(--theme-card-bg) 64%, transparent);
+  color: var(--theme-card-text);
+}
+
+.eris-surface .native-voiceforge-panel .theme-card input[type="checkbox"],
+.eris-surface .native-voiceforge-panel .theme-card input[type="range"] {
+  accent-color: var(--theme-card-accent);
+}
+
+.eris-surface .native-voiceforge-panel .theme-card input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--theme-card-accent) 88%, transparent), color-mix(in srgb, var(--theme-card-accent-3) 55%, transparent));
+  border-radius: 999px;
+}
+
+.eris-surface .native-voiceforge-panel .theme-card input[type="range"]::-moz-range-track {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--theme-card-accent) 88%, transparent), color-mix(in srgb, var(--theme-card-accent-3) 55%, transparent));
+  border-radius: 999px;
+}
+
+.eris-surface .native-voiceforge-panel .theme-card input[type="range"]::-webkit-slider-thumb {
+  border-color: color-mix(in srgb, var(--theme-card-text) 88%, transparent);
+  background: var(--theme-card-accent);
+}
+
+.eris-surface .native-voiceforge-panel .theme-card input[type="range"]::-moz-range-thumb {
+  border-color: color-mix(in srgb, var(--theme-card-text) 88%, transparent);
+  background: var(--theme-card-accent);
+}
+
+.eris-surface .native-voiceforge-panel .theme-card .voiceforge-range-row span {
+  color: var(--theme-card-accent);
+}
+
+.eris-surface .hypno-tree-context,
+.eris-surface .hypno-skill-tree-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.eris-surface .hypno-tree-context span,
+.eris-surface .hypno-skill-tree-topline span,
+.eris-surface .hypno-skill-node span {
+  border: 1px solid var(--line-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  padding: 0.2rem 0.52rem;
+}
+
+.eris-surface .hypno-skill-tree,
+.eris-surface .hypno-tree-context-details {
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  padding: 0.72rem;
+}
+
+.eris-surface .hypno-skill-tree,
+.eris-surface .hypno-tree-context-details {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.eris-surface .hypno-skill-tree {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 45%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 30%),
+    radial-gradient(circle at 68% 48%, color-mix(in srgb, var(--accent-3) 14%, transparent), transparent 36%),
+    linear-gradient(135deg, color-mix(in srgb, var(--bg) 18%, transparent), color-mix(in srgb, black 22%, transparent));
+  position: relative;
+}
+
+.eris-surface .hypno-skill-tree::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 20%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--accent) 7%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px, 88px 88px, 88px 88px;
+  mask-image: radial-gradient(ellipse at center, black, transparent 82%);
+  opacity: 0.55;
+}
+
+.eris-surface .hypno-skill-tree-topline,
+.eris-surface .hypno-skill-map,
+.eris-surface .hypno-skill-path,
+.eris-surface .hypno-skill-current-wrap,
+.eris-surface .hypno-skill-branches {
+  position: relative;
+  z-index: 1;
+}
+
+.eris-surface .hypno-skill-map {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.58fr) minmax(210px, 0.78fr) minmax(260px, 1.3fr);
+  gap: 1.25rem;
+  min-height: 300px;
+  align-items: center;
+}
+
+.eris-surface .hypno-skill-path,
+.eris-surface .hypno-skill-branches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.eris-surface .hypno-skill-path {
+  display: grid;
+  gap: 0.72rem;
+  max-height: 300px;
+  overflow: auto;
+  padding-right: 0.85rem;
+}
+
+.eris-surface .hypno-skill-path::before,
+.eris-surface .hypno-skill-branches::before {
+  content: "";
+  position: absolute;
+  top: 0.6rem;
+  bottom: 0.6rem;
+  width: 1px;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--accent) 72%, transparent), transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.eris-surface .hypno-skill-path::before {
+  right: 0.15rem;
+}
+
+.eris-surface .hypno-skill-branches::before {
+  left: -0.55rem;
+}
+
+.eris-surface .hypno-skill-current-wrap {
+  display: grid;
+  justify-items: center;
+  align-self: stretch;
+  align-content: center;
+}
+
+.eris-surface .hypno-skill-branches {
+  display: grid;
+  gap: 0.74rem;
+  align-content: center;
+}
+
+.eris-surface .hypno-skill-node {
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  min-width: 0;
+  padding: 0;
+  position: relative;
+}
+
+.eris-surface .hypno-skill-node::before {
+  display: none;
+}
+
+.eris-surface .hypno-skill-node.path {
+  min-height: 56px;
+  opacity: 0.86;
+}
+
+.eris-surface .hypno-skill-node.path.origin {
+  opacity: 1;
+}
+
+.eris-surface .hypno-skill-node.current {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  width: min(390px, 100%);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent) inset, 0 0 38px color-mix(in srgb, var(--accent) 15%, transparent);
+  padding: 0.82rem;
+}
+
+.eris-surface .hypno-skill-node.branch {
+  min-height: 0;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.eris-surface .hypno-skill-node.branch::after {
+  content: "";
+  position: absolute;
+  left: -1.25rem;
+  top: 50%;
+  width: 1.25rem;
+  height: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 60%, transparent), transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 36%, transparent);
+}
+
+.eris-surface .hypno-skill-node.branch.active {
+  color: var(--text);
+}
+
+.eris-surface .hypno-skill-node.empty {
+  opacity: 0.72;
+}
+
+.eris-surface .hypno-skill-node-title,
+.eris-surface .hypno-branch-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.eris-surface .hypno-skill-current-copy,
+.eris-surface .hypno-map-node-label,
+.eris-surface .hypno-node-details {
+  display: grid;
+  gap: 0.26rem;
+}
+
+.eris-surface .hypno-map-node-core {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  background:
+    radial-gradient(circle at 35% 30%, color-mix(in srgb, white 18%, transparent), transparent 26%),
+    color-mix(in srgb, var(--surface) 78%, black);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 7%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 28%, transparent);
+  position: relative;
+}
+
+.eris-surface .hypno-map-node-core::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  z-index: 0;
+}
+
+.eris-surface .hypno-map-node-core span {
+  border: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.eris-surface .hypno-map-node-core.current-core {
+  width: 82px;
+  height: 82px;
+  border-color: var(--accent-line-strong);
+  box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 8%, transparent), 0 0 44px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.eris-surface .hypno-map-node-core.current-core::after {
+  inset: 11px;
+  background: color-mix(in srgb, var(--surface) 84%, black);
+}
+
+.eris-surface .hypno-map-node-core.branch-core {
+  width: 54px;
+  height: 54px;
+}
+
+.eris-surface .hypno-skill-node.branch.active .branch-core {
+  border-color: color-mix(in srgb, var(--accent-3) 74%, transparent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-3) 9%, transparent), 0 0 30px color-mix(in srgb, var(--accent-3) 34%, transparent);
+}
+
+.eris-surface .hypno-map-node-label {
+  min-width: 0;
+  max-width: 260px;
+  border: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, black 18%, transparent);
+  padding: 0.48rem 0.58rem;
+  backdrop-filter: blur(10px);
+}
+
+.eris-surface .hypno-skill-node.path .hypno-map-node-label {
+  max-width: 190px;
+}
+
+.eris-surface .hypno-skill-node.branch.active .hypno-map-node-label {
+  border-color: color-mix(in srgb, var(--accent-3) 46%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, black 18%);
+}
+
+.eris-surface .hypno-skill-node-title strong,
+.eris-surface .hypno-skill-node > strong {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.eris-surface .hypno-skill-node-title span {
+  border-color: color-mix(in srgb, var(--accent-3) 42%, transparent);
+  color: var(--accent-3);
+  text-transform: uppercase;
+}
+
+.eris-surface .hypno-skill-node small,
+.eris-surface .hypno-tree-context-details small {
+  color: var(--muted);
+  font-size: 0.73rem;
+}
+
+.eris-surface .hypno-node-details {
+  flex-basis: 100%;
+  margin-left: 4.25rem;
+  border-top: 1px solid var(--line-subtle);
+  margin-top: 0.12rem;
+  padding-top: 0.3rem;
+}
+
+.eris-surface .hypno-skill-node.current .hypno-node-details {
+  grid-column: 1 / -1;
+  margin-left: 0;
+}
+
+.eris-surface .hypno-node-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.eris-surface .hypno-tree-context-details summary {
+  cursor: pointer;
+  color: var(--text-strong);
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+.eris-surface .native-voiceforge-panel input[type="checkbox"],
+.eris-surface .native-voiceforge-panel input[type="range"] {
+  accent-color: var(--accent);
+}
+
+.eris-surface .native-voiceforge-panel .text_pole,
+.eris-surface .native-voiceforge-panel select,
+.eris-surface .native-voiceforge-panel textarea {
+  border-color: var(--accent-line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--text) 4%, transparent)),
+    color-mix(in srgb, var(--bg) 28%, transparent);
+}
+
+.eris-surface .native-voiceforge-panel .text_pole:focus,
+.eris-surface .native-voiceforge-panel select:focus,
+.eris-surface .native-voiceforge-panel textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent);
+  outline: none;
+}
+
+.eris-surface .native-voiceforge-panel input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 88%, transparent), color-mix(in srgb, var(--accent-3) 55%, transparent));
+  border-radius: 999px;
+}
+
+.eris-surface .native-voiceforge-panel input[type="range"]::-moz-range-track {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 88%, transparent), color-mix(in srgb, var(--accent-3) 55%, transparent));
+  border-radius: 999px;
+}
+
+.eris-surface .native-voiceforge-panel input[type="range"]::-webkit-slider-thumb {
+  border-color: color-mix(in srgb, var(--text) 88%, transparent);
+  background: var(--accent);
+}
+
+.eris-surface .native-voiceforge-panel input[type="range"]::-moz-range-thumb {
+  border-color: color-mix(in srgb, var(--text) 88%, transparent);
+  background: var(--accent);
+}
+
+.eris-surface .hypno-session-header,
+.eris-surface .hypno-stage-row,
+.eris-surface .hypno-session-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.eris-surface .hypno-session-header span {
+  border: 1px solid var(--line-subtle);
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.eris-surface .hypno-session-header span.active {
+  border-color: color-mix(in srgb, var(--success) 36%, transparent);
+  background: var(--success-bg);
+  color: color-mix(in srgb, var(--success) 72%, white);
+}
+
+.eris-surface .hypno-session-header span.paused {
+  border-color: color-mix(in srgb, var(--accent-3) 36%, transparent);
+  background: color-mix(in srgb, var(--accent-3) 10%, transparent);
+  color: var(--accent-3);
+}
+
+.eris-surface .hypno-stage-row span,
+.eris-surface .hypno-session-meta,
+.eris-surface .hypno-session-tracker small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.eris-surface .hypno-stage-row b {
+  color: var(--text-strong);
+  text-transform: capitalize;
+}
+
+.eris-surface .hypno-progress-bar {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.eris-surface .hypno-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent-3) 88%, transparent));
+}
+
+.eris-surface .hypno-branch-score-row span {
+  border: 1px solid var(--line-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.16rem 0.42rem;
+}
+
+@media (max-width: 680px) {
+  .eris-surface .hypno-skill-map {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .eris-surface .hypno-skill-path {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    max-height: none;
+    padding-right: 0;
+  }
+
+  .eris-surface .hypno-skill-path::before,
+  .eris-surface .hypno-skill-branches::before {
+    display: none;
+  }
+
+  .eris-surface .hypno-skill-node::before,
+  .eris-surface .hypno-skill-node.branch::after {
+    display: none;
+  }
+}
+
+/* Unified Settings surface. */
+
+.eris-surface .app-settings-page input,
+.eris-surface .app-settings-page select,
+.eris-surface .app-settings-page textarea,
+.eris-surface .app-settings-page .text_pole {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--ui-control-radius);
+  background: color-mix(in srgb, var(--bg) 40%, transparent);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 var(--line-subtle);
+  padding: 0.42rem 0.54rem;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.eris-surface .app-settings-page input:focus,
+.eris-surface .app-settings-page select:focus,
+.eris-surface .app-settings-page textarea:focus,
+.eris-surface .app-settings-page .text_pole:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent), inset 0 1px 0 var(--line-subtle);
+}
+
+.eris-surface .theme-card.open .theme-card-editor { position: fixed; z-index: 260; inset: 5vh auto auto 50%; width: min(760px, 92vw); max-height: 90vh; overflow: auto; transform: translateX(-50%); border: 1px solid var(--accent-line-strong); border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 0 0 100vmax rgba(3, 2, 8, 0.72), var(--shadow); padding: 0.85rem; }
+.eris-surface .theme-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.eris-surface .theme-editor-header > div { display: grid; gap: 0.15rem; }
+.eris-surface .theme-editor-header small { color: var(--muted); font-size: 0.72rem; }
+
+/* Editor mobile layout */
+@media (max-width: 820px) {
+  .eris-surface .editor-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 180px);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 0.38rem;
+    height: auto;
+    min-height: 100dvh;
+    padding: 0.38rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .eris-surface .editor-col-divider {
+    display: none;
+  }
+
+  .eris-surface .editor-rail {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-width: 0;
+    max-height: 30vh;
+    border-radius: 14px;
+    padding: 0.34rem;
+  }
+
+  .eris-surface .editor-workspace {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 200px;
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-overlay);
+    padding: 0.4rem;
+    overflow: hidden;
+  }
+
+  .eris-surface .editor-workspace .editor-main-grid {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .eris-surface .editor-workspace .editor-code-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    padding: 0.3rem 0.35rem 0.2rem;
+  }
+
+  .eris-surface .editor-workspace .editor-code-panel .editor-code-frame {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .eris-surface .editor-workspace .editor-code-panel .editor-code-frame textarea {
+    min-height: 80px;
+  }
+
+  .eris-surface .editor-workspace .editor-code-meta {
+    flex-shrink: 0;
+  }
+
+  .eris-surface .editor-col-chat {
+    grid-column: 2;
+    grid-row: 2;
+    border-radius: 14px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .eris-surface .editor-col-chat .editor-chat-log {
+    padding: 0.4rem;
+    flex: 1;
+    min-height: 60px;
+  }
+
+  .eris-surface .editor-presence-preview {
+    flex-shrink: 0;
+    aspect-ratio: 3 / 4;
+    max-height: 40vh;
+    min-height: 80px;
+    width: 100%;
+    border-radius: 12px;
+  }
+
+  .eris-surface .editor-presence-preview .editor-preview-height-handle {
+    display: none;
+  }
+
+  .eris-surface .editor-error-text {
+    position: relative;
+    margin: 0;
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+}
+
+/* Evolution panel. */
+
+/* Self-Improve Dialog */
+
+/* Mobile hub pages: override desktop width/margin that would otherwise win by cascade order. */
+
+.eris-surface .vrm-stage{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto}.eris-surface .vrm-stage canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}.eris-surface .voiceforge-panel{width:100%;max-width:none}.eris-surface input,.eris-surface select,.eris-surface textarea{color:var(--foreground);background:var(--background)}

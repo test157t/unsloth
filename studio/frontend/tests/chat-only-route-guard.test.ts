@@ -95,7 +95,7 @@ test("an unmeasured verdict still lets both pages wait it out", () => {
 
 test("the pages that self-gate are unaffected, and everything else still redirects", () => {
   // Allowed for the same reason /video now is: each explains itself instead of vanishing.
-  for (const path of ["/chat", "/export", "/images", "/api-monitor", "/data-recipes"]) {
+  for (const path of ["/chat", "/companion", "/code", "/export", "/images", "/api-monitor", "/data-recipes"]) {
     assert.equal(measuredChatOnly(path), false, `${path} no longer survives the guard`);
   }
   // Nothing was widened past the paths that opt in.

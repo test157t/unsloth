@@ -6,6 +6,9 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as voiceforge from "../src/features/chat/voiceforge.ts";
+import * as speechAnalyser from "../src/features/chat/speech-analyser.ts";
+import * as speechPlaybackOwner from "../src/features/chat/speech-playback-owner.ts";
 
 import { loadWithStubs } from "./helpers/module-stubs.ts";
 
@@ -68,6 +71,9 @@ function load(
       import.meta.url,
     ),
     {
+      "../voiceforge": voiceforge,
+      "../speech-playback-owner": speechPlaybackOwner,
+      "../speech-analyser": speechAnalyser,
       "@/features/auth": {
         authFetch: async (
           _input: string,

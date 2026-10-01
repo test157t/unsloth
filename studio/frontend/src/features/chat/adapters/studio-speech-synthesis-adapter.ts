@@ -10,6 +10,8 @@ import { getExternalProviderApiKey } from "../external-providers";
 import { stripSearchImageTokens } from "../search-images/search-images";
 import { useExternalProvidersStore } from "../stores/external-providers-store";
 import { splitVoiceForgeSpeech, voiceForgeRvcOptions } from "../voiceforge";
+import { claimSpeechPlayback } from "../speech-playback-owner";
+import { attachSpeechAnalyser } from "../speech-analyser";
 
 /** Voice for a stored voiceURI. "default" resolves to the voice the platform marks as its
  *  default, so the "System default" choice means what it says instead of falling back to a
@@ -375,9 +377,12 @@ function speakWithBackendAudio(
   let audioUrl: string | null = null;
   let cancelled = false;
   let finishPlayback: (() => void) | null = null;
+  let releaseAnalyser = () => {};
 
   // Release the element and its multi-MB WAV data URL as soon as playback ends.
   const cleanup = () => {
+    releaseAnalyser();
+    releaseAnalyser = () => {};
     if (audio) {
       audio.pause();
       audio.removeAttribute("src");
@@ -407,6 +412,7 @@ function speakWithBackendAudio(
         await playbackReady;
         if (cancelled) return;
         audio = new Audio(url);
+        releaseAnalyser = attachSpeechAnalyser(audio);
         audio.playbackRate = ttsRate;
         audio.volume = ttsVolume;
         // Reapply after metadata loads; some browsers reset playbackRate.
@@ -445,6 +451,11 @@ function speakWithBackendAudio(
 /** Text-to-speech for assistant messages. Reads Voice settings at speak time. Engines:
  *  "system" (speechSynthesis), "studio" (local TTS model), "custom" (a connection). */
 export class StudioSpeechSynthesisAdapter implements SpeechSynthesisAdapter {
+  private externallyOwned: boolean;
+
+  constructor(options: { externallyOwned?: boolean } = {}) {
+    this.externallyOwned = options.externallyOwned ?? false;
+  }
   /** Web Speech synthesis, used by the "system" engine. */
   static systemVoicesSupported(): boolean {
     return (
@@ -479,12 +490,14 @@ export class StudioSpeechSynthesisAdapter implements SpeechSynthesisAdapter {
     // Renderer markup: without this the reader says the token id out loud.
     const text = stripSearchImageTokens(spokenText);
     const subscribers = new Set<() => void>();
+    let releaseOwnership = () => {};
 
     const handleEnd = (
       reason: "finished" | "error" | "cancelled",
       error?: unknown,
     ) => {
       if (res.status.type === "ended") return;
+      releaseOwnership();
       // Surface genuine read-aloud failures; a cancelled or interrupted utterance is a normal stop,
       // not an error, and must not toast.
       if (
@@ -522,6 +535,18 @@ export class StudioSpeechSynthesisAdapter implements SpeechSynthesisAdapter {
         };
       },
     };
+
+    // A live queue owns all of its current/prefetched utterances together.
+    // Ordinary read-aloud owns one utterance and displaces the entire old queue.
+    if (!this.externallyOwned) {
+      const claim = () => {
+        if (res.status.type !== "ended") {
+          releaseOwnership = claimSpeechPlayback(() => res.cancel());
+        }
+      };
+      if (playbackReady) void playbackReady.then(claim);
+      else claim();
+    }
 
     // Fall back to the backend model when the runtime lacks Web Speech synthesis, so read-aloud
     // still works.

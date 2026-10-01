@@ -29,7 +29,9 @@ import { toast } from "@/lib/toast";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { MessageCircleIcon } from "@/lib/hugeicons-derived";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
+import { useConversationNavigate as useNavigate } from "@/features/companion/use-conversation-navigate";
+import { isConversationWorkspace } from "@/features/companion/workspace-path";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSettingsDialogStore } from "../stores/settings-dialog-store";
 import { useLibraryProjectLabels } from "./use-library-project-labels";
@@ -74,7 +76,7 @@ export function ArchivedChatsView() {
   const storeThreadId = useChatRuntimeStore((s) => s.activeThreadId);
   const openChatId = useRouterState({
     select: (s) => {
-      if (!s.location.pathname.startsWith("/chat")) return undefined;
+      if (!isConversationWorkspace(s.location.pathname)) return undefined;
       const search = s.location.search as Record<string, string | undefined>;
       return search.thread ?? search.compare ?? storeThreadId ?? undefined;
     },

@@ -88,7 +88,9 @@ import {
 } from "lucide-react";
 import { MessageCircleIcon } from "@/lib/hugeicons-derived";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
+import { useConversationNavigate as useNavigate } from "@/features/companion/use-conversation-navigate";
+import { isConversationWorkspace } from "@/features/companion/workspace-path";
 import { useEffect, useRef, useState } from "react";
 import { ArchivedChatsView } from "../components/archived-chats-dialog";
 import {
@@ -291,7 +293,7 @@ export function DataTab({ searchEntry }: { searchEntry?: string }) {
   // ArchivedChatsView: compare panes only live in the search params.
   const openChatId = useRouterState({
     select: (s) => {
-      if (!s.location.pathname.startsWith("/chat")) return undefined;
+      if (!isConversationWorkspace(s.location.pathname)) return undefined;
       const search = s.location.search as Record<string, string | undefined>;
       return search.thread ?? search.compare ?? storeThreadId ?? undefined;
     },

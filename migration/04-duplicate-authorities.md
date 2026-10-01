@@ -1,0 +1,26 @@
+# Authority and duplication ledger
+
+Multiple adapters are not inherently duplicate authority. This table separates confirmed ownership splits, capability-specific orchestration and duplication that would be introduced by careless porting.
+
+| ID / responsibility | Current authority | Finding | Target / cutover condition |
+|---|---|---|---|
+| A01 inference lifecycle | `LlamaCppBackend`, `InferenceOrchestrator` and existing backend selection | Existing backend-specific workers are intentional. ErisHub/Video-chat have independent llama paths in separate apps. | Retain Studio selection/lifecycle. No imported second supervisor. |
+| A02 conversation persistence | `storage/studio_db.py` through chat routes | Video-chat has a separate in-memory messages list; ErisHub has separate product state. Not duplicate active stores within Studio. | Companion refers to Studio account/thread/message IDs. Never import external history engine. |
+| A03 run lifecycle | `chat_generation_runs` supervisor/store plus direct streaming for external/media | Confirmed capability split; durable API explicitly rejects external/inline media. | Session owner delegates to current run cancellation; unify only with a scoped durable capability extension and regression proof. |
+| A04 tool loop | External `studio_tool_loop`; GGUF/safetensors loops share `ToolLoopController`, dispatcher and stream execution | Shared policy already exists; remaining backend loop differences are not yet proven redundant. | Reuse dispatcher/policy for companion tools. Any extraction requires local/external tool-loop contract tests. |
+| A05 MCP host | `mcp_client.py` sessions, routes/storage | stdio vs HTTP serialization and OAuth one-shot handling are transport policy, not permission to add another host. | Keep existing host. Do not port ErisHub registry/executor as a parallel engine. |
+| A06 connection credentials | Existing provider storage/resolution plus UI metadata | Browser global enable switch is intentionally frontend-only; backend provider enabled state is separate. | Preserve semantics until a tested account policy change is intentional. Do not invent a companion provider registry. |
+| A07 VoiceForge catalog | Backend options proxy/client; each `VoiceForgeSelectors` owns fetch state | Confirmed duplicate frontend discovery/cache state (recognition/speech instances), not duplicated inference. | One shared discovery query/cache per connection/revision; keep explicit refresh and cancellation. |
+| A08 speech settings | `useVoiceSettingsStore` in localStorage | One existing local selection authority; server provider record does not own device settings. | Split documented device versus account/profile fields deliberately; no silent second writable speech profile. |
+| A09 speech synthesis | `StudioSpeechSynthesisAdapter` -> existing backend route/client -> VoiceForge | Manual/live use same adapter. Phrase chunking and service request-size segmentation have different jobs. | Keep synthesis path; do not merge algorithms merely because both split text. |
+| A10 playback orchestration | assistant-ui manual speech state; live queue/local `useLiveSpeechStore`; preview callers require further tracing | Confirmed separate entrypoints; whether simultaneous playback can occur needs tests. | One session playback arbiter over existing adapter. Remove superseded coordination only after manual/live/preview/call tests. |
+| A11 ASR/microphone | Existing model dictation adapter, system speech adapter selected by existing facade | Multiple engines are selectable adapters, not a proven duplicate authority defect. | Call turn detector uses same capture/transcription contract. Do not port direct ErisHub ASR endpoint settings. |
+| A12 presentation | General Studio artifacts; ErisHub typed actions/state | Neither is an existing Studio companion session stage. | Companion owns typed presentation state; general Studio artifact tool remains separate functionality. No JS execution inside immersive stage. |
+| A13 session stop | Existing run cancel, speech cancel, recorder stop are separate | Missing coordinator across layers, not justification to replace every cancellation implementation. | One session stop invalidates session epoch, calls existing owners and preserves transcript. |
+| A14 config/data | Studio DB + deliberately local UI settings; independent external app stores | Importing ErisHub JSON stores wholesale would duplicate authority. | Port selected behaviors into existing account storage; add only genuinely new session state. |
+
+No active path has been deleted or replaced. No compatibility shim was created. Future shims must delegate to one owner and have an explicit removal test/date condition; owner preference rejects permanent parallel handling.
+
+## A15: Code editor workspace authority (September 24)
+
+The Code tab uses `sandboxSessionIdFor` and the existing backend sandbox/project resolver. Listing delegates to the existing sandbox route. New text-save and Git operations reference that resolved root; editor drafts are ephemeral UI state, not a second project or conversation database. Chat alongside Code is the same persistent ChatPage. ErisHub's project APIs, provider state and message store were not imported. See [scope](12-code-editor-integration.md).

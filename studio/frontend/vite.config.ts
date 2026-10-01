@@ -2,6 +2,7 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import path from "node:path";
+import fs from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { type Plugin, defineConfig } from "vite";
@@ -24,11 +25,28 @@ function smokeModuleDelay(): Plugin {
   };
 }
 
+// ErisHub's vendored renderer is a native ES-module graph in public/. Serve it
+// unchanged in development too, including Vite's dynamic-import query marker.
+function companionRuntime(): Plugin {
+  return {name:"companion-native-runtime",configureServer(server){
+    const root=path.resolve(server.config.publicDir,"companion-runtime");
+    server.middlewares.use((request,response,next)=>{
+      const pathname=new URL(request.url||"/","http://localhost").pathname;
+      if(!pathname.startsWith("/companion-runtime/"))return next();
+      const file=path.resolve(root,decodeURIComponent(pathname.slice("/companion-runtime/".length)));
+      if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile())return next();
+      const ext=path.extname(file);
+      response.setHeader("Content-Type",ext===".js"?"text/javascript":ext===".json"?"application/json":"application/octet-stream");
+      fs.createReadStream(file).pipe(response);
+    });
+  }};
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   // Reasoning's highlighter loads only the grammar it needs in its module worker.
   worker: { format: "es" },
-  plugins: [react(), tailwindcss(), smokeModuleDelay()],
+  plugins: [react(), tailwindcss(), companionRuntime(), smokeModuleDelay()],
   // Keep an unrelated PostCSS config in an ancestor directory from leaking
   // into Unsloth installs. Tailwind is provided by its dedicated Vite plugin.
   css: {

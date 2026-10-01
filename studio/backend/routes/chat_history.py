@@ -322,6 +322,7 @@ class ChatProject(BaseModel):
     instructions: str = ""
     rootPath: Optional[str] = None
     sandboxPath: Optional[str] = None
+    repositoryPath: Optional[str] = None
     archived: bool = False
     createdAt: int
     updatedAt: int
@@ -334,6 +335,7 @@ class ChatProjectDeleted(ChatProject):
 
 
 class ChatProjectPatch(BaseModel):
+    repositoryPath: Optional[str] = None
     name: Optional[str] = None
     instructions: Optional[str] = None
     archived: Optional[bool] = None
@@ -1194,6 +1196,16 @@ def patch_project(
     current_subject: str = Depends(get_current_subject),
 ):
     patch = payload.model_dump(exclude_unset = True)
+    if "repositoryPath" in patch:
+        from utils.account_context import is_owner_context
+        from pathlib import Path
+        if not is_owner_context():
+            raise HTTPException(403, "Repository folders require the Studio owner account.")
+        if patch["repositoryPath"]:
+            folder = Path(patch["repositoryPath"]).expanduser()
+            if not folder.is_absolute() or not folder.is_dir():
+                raise HTTPException(400, "Choose an existing absolute repository directory.")
+            patch["repositoryPath"] = str(folder.resolve())
     for field in ("name", "archived", "createdAt", "updatedAt"):
         if field in patch and patch[field] is None:
             raise HTTPException(status_code = 400, detail = f"{field} cannot be null")

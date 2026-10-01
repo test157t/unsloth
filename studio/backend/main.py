@@ -1661,6 +1661,10 @@ from utils.remote_access_settings import RemoteAccessStopResponseMiddleware  # n
 
 app.add_middleware(RemoteAccessStopResponseMiddleware)
 
+from routes.companion import router as companion_router
+app.include_router(companion_router, prefix = "/api/companion", tags = ["companion"])
+from routes.code import router as code_router
+app.include_router(code_router, prefix = "/api/code", tags = ["code"])
 app.include_router(auth_router, prefix = "/api/auth", tags = ["auth"])
 app.include_router(
     __import__("routes.accounts", fromlist = ["router"]).router,

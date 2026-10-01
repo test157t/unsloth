@@ -110,12 +110,13 @@ import {
   Telescope02Icon,
 } from "@hugeicons/core-free-icons";
 import { useAui } from "@assistant-ui/react";
+import { AvatarInteractionBridge } from "@/features/companion/interaction-bridge";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useNavigate } from "@tanstack/react-router";
 import {
   SaveTemporaryChatButton,
   TemporaryChatSaveBridge,
 } from "./components/temporary-chat-save";
+import { useConversationNavigate as useNavigate } from "@/features/companion/use-conversation-navigate";
 import { Tooltip as TooltipPrimitive } from "radix-ui";
 import {
   type CSSProperties,
@@ -4484,6 +4485,7 @@ export function ChatPage({
                     : undefined
                 }
               >
+                <AvatarInteractionBridge active={active && !baseBackgrounded} />
                 {baseView.mode === "project" ? (
                   <ProjectLanding
                     key={baseView.projectId}

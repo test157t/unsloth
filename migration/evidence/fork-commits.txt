@@ -1,0 +1,45 @@
+78a2485b7 Merge upstream/main while preserving fork integrations and server recipes
+a3638a51b Store saved recipes per account on the server with browser migration
+255b8c948 Expose training logging interval in schedule settings
+4eda19028 Merge upstream/main while preserving fork integrations and disabled Actions
+b92f180d3 Merge upstream/main while preserving fork recovery and VoiceForge integration
+0e55d017a test
+764e6bbe3 Merge upstream/main and preserve fork recovery with account isolation
+597c715c6 Merge upstream/main while preserving fork features and disabled Actions
+444c0b81e Preserve fork recipe recovery, tool nudge controls, and VoiceForge integration
+1c9613db4 Merge remote-tracking branch 'upstream/main'
+71a4a64de Improve Recipe Studio run recovery and agent workflows
+503995dac Fix built-in Recipe Studio tool validation
+d54809567 Merge remote-tracking branch 'upstream/main'
+e52119713 Add agentic tools to Recipe Studio workflows
+eeada08e4 Merge remote-tracking branch 'upstream/main'
+953efece7 sync 8
+c8c698c11 Merge remote-tracking branch 'upstream/main'
+8c20ade67 sync 7 test, de-mia defualts
+92a68996f test sync 6
+97fe0cc23 Merge upstream/main, keeping workflow CI deleted
+cce442b4d Merge branch 'main' of https://github.com/unslothai/unsloth
+5a9b4d5a5 Ignore the local Mia_Workflows folder
+d9e263ab3 Studio: add a deterministic extend-conversations step so models emit raw turns only
+a8ae05f08 Merge remote-tracking branch 'upstream/main'
+3ddeba5cc Repair merge: apply only the approved rewritten response to the last assistant turn
+c4de4d7de rem/sync
+439bdd1df Merge branch 'unslothai:main' into main
+dc7ca5522 Merge branch 'unslothai:main' into main
+bb4fc03ad Merge branch 'unslothai:main' into main
+91fbd1614 sync 5
+ac6b4ba49 Merge branch 'unslothai:main' into main
+d25133cfd sync 4
+cbe180665 sync3
+ceab157c3 sync2
+e2c26d68f sync
+59b81b4d5 Add sparse repair, persona and JSONL export
+90b63a1ba Merge branch 'unslothai:main' into main
+40e35e4ef Merge branch 'unslothai:main' into main
+554370bd5 Merge commit 'cab41f5b2' into mcp-removed
+cab41f5b2 theme
+e12367084 Revert "test tts"
+709ead063 Revert "maybe fixed idk"
+aa5645469 maybe fixed idk
+f5352aaa7 test tts
+48039f1e8 testing/wip

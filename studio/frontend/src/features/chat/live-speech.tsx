@@ -5,6 +5,7 @@ import { useVoiceSettingsStore } from "@/features/settings/stores/voice-settings
 import { useExternalProvidersStore } from "./stores/external-providers-store";
 import { StudioSpeechSynthesisAdapter } from "./adapters/studio-speech-synthesis-adapter";
 import { StreamingSpeechQueue } from "./streaming-speech";
+import { claimSpeechPlayback } from "./speech-playback-owner";
 
 export const useLiveSpeechStore = create<{ messageId: string | null; stop: () => void }>(() => ({ messageId: null, stop: () => {} }));
 
@@ -49,9 +50,12 @@ export function LiveSpeech({ enabled }: { enabled: boolean }) {
       const thread = aui.thread();
       // The runtime throws when stopSpeaking is called without active speech.
       if (thread.getState().speech) thread.stopSpeaking();
-      const queue = new StreamingSpeechQueue(new StudioSpeechSynthesisAdapter(), () => {
+      let releaseOwnership = () => {};
+      const queue = new StreamingSpeechQueue(new StudioSpeechSynthesisAdapter({ externallyOwned: true }), () => {
+        releaseOwnership();
         if (session.current?.queue === queue) useLiveSpeechStore.setState({ messageId: null });
       });
+      releaseOwnership = claimSpeechPlayback(() => queue.cancel());
       session.current = { queue, id: message.id, prefix: "", lastText: "" };
       useLiveSpeechStore.setState({ messageId: message.id, stop: () => queue.cancel() });
     }

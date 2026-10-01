@@ -10711,6 +10711,13 @@ def _get_project_workdir(session_id: str) -> str | None:
         # The project is gone but a chat forked out of it still shows cards for this sandbox, and the workspace was
         # kept for exactly that: the record answers for any id, and the folder-name guess needs a usable one.
         return _orphaned_project_workdir(project_id)
+    # The owner-selected repository is shared by editor and chat tools. It is not
+    # Studio-owned storage and is never included in project-folder deletion.
+    repository_path = project.get("repositoryPath")
+    if repository_path:
+        if not os.path.isdir(repository_path):
+            raise FileNotFoundError(f"Project repository is unavailable: {repository_path}")
+        return os.path.realpath(repository_path)
     root_path = project.get("rootPath")
     sandbox_path = project.get("sandboxPath")
     if not root_path or not sandbox_path:
@@ -11457,6 +11464,9 @@ def _get_workdir(session_id: str | None = None) -> str:
     global _workdirs
     key = _workdir_key(session_id)
     cached = _workdirs.get(key)
+    project_now = _get_project_workdir(session_id or "")
+    if cached is not None and project_now and os.path.realpath(cached) != project_now:
+        cached = None
     if cached is not None and not os.path.isdir(cached):
         cached = None
     if cached is not None and not _get_project_workdir(session_id or ""):
