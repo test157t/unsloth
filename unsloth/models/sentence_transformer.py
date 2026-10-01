@@ -71,6 +71,34 @@ import shutil
 _CREATE_TRANSFORMER_MODULE_LOCK = threading.RLock()
 
 
+def _ensure_sentence_attention_masks(model):
+    """Match Gemma3's advertised backend to its patched SDPA implementation."""
+    config = getattr(model, "config", None)
+    if getattr(config, "model_type", None) != "gemma3_text" or "flash" not in str(
+        getattr(config, "_attn_implementation", "")
+    ):
+        return False
+    # Zoo's Gemma3 attention preserves FP32 Q/K but consumes SDPA masks. With
+    # a Flash backend, Transformers omits those masks and ST can flatten rows;
+    # that implementation does not consume the resulting sequence boundaries.
+    patched = any(
+        getattr(module.forward, "__module__", "").startswith("unsloth_zoo.temporary_patches.gemma")
+        for module in model.modules()
+        if type(module).__name__ == "Gemma3Attention"
+    )
+    if patched:
+        if hasattr(model, "set_attn_implementation"):
+            model.set_attn_implementation("sdpa")
+        else:
+            config._attn_implementation = "sdpa"
+        logging.warning(
+            "Unsloth: Using SDPA for patched Gemma3 sentence attention to preserve "
+            "padding, sequence boundaries and bidirectional window masks."
+        )
+        return True
+    return False
+
+
 def _normalize_save_method(save_method):
     """Fold "MERGED_16BIT" and "merged 16bit" onto "merged_16bit". unsloth_save_model (save.py) normalizes case and spaces before validating, so the same spelling has to mean the same thing here, else a keyword call that worked before starts raising."""
     if isinstance(save_method, str):
@@ -857,12 +885,16 @@ class FastSentenceTransformer(FastModel):
         modeling_distilbert.DistilBertModel.forward = forward
 
     @staticmethod
-    def _has_add_pooling_layer(config, auto_model_class = None):
+    def _has_add_pooling_layer(
+        config,
+        auto_model_class = None,
+        **hub_kwargs,
+    ):
         """Check if the model class accepts the `add_pooling_layer` argument."""
         try:
             if auto_model_class is None:
                 auto_model_class = AutoModel
-            model_class = resolve_model_class(auto_model_class, config)
+            model_class = resolve_model_class(auto_model_class, config, **hub_kwargs)
 
             if model_class:
                 sig = inspect.signature(model_class.__init__)
@@ -1163,27 +1195,219 @@ class FastSentenceTransformer(FastModel):
         return transformer_module
 
     @staticmethod
+    def _resolve_module_class(
+        class_ref,
+        model_name,
+        trust_remote_code,
+        token = None,
+        cache_dir = None,
+        revision = None,
+    ):
+        """Resolve a modules.json "type" to a class, gated like sentence-transformers >= 6.0.
+
+        modules.json ships inside the model directory or Hub repo, so its "type" is untrusted
+        input: resolving it imports that dotted path and runs its top-level code in this process,
+        with no .py needed anywhere in the model folder. sentence-transformers 6.0 refuses any
+        class outside sentence_transformers.* without trust_remote_code (its #3801); since
+        _load_modules reimplements their module scan, that gate has to be mirrored here.
+        """
+        from sentence_transformers.util import import_from_string
+
+        if not isinstance(class_ref, str):
+            raise ValueError(
+                f"Unsloth: modules.json of {model_name} declares a module type that is not a string "
+                f"({class_ref!r}). Refusing to resolve it."
+            )
+
+        if class_ref.startswith("sentence_transformers."):
+            return FastSentenceTransformer._import_sentence_transformers_class(
+                class_ref, model_name
+            )
+
+        if not trust_remote_code:
+            # Not transformers' resolve_trust_remote_code: it appends a hf.co URL that is bogus for local dirs.
+            is_local_dir = isinstance(model_name, (str, os.PathLike)) and os.path.isdir(model_name)
+            location = (
+                os.path.abspath(model_name) if is_local_dir else f"https://hf.co/{model_name}"
+            )
+            raise ValueError(
+                f"Unsloth: The model {model_name} references the module class {class_ref!r}, which is not "
+                f"part of Sentence Transformers. Importing it executes third-party code. You can inspect the "
+                f"repository content at {location}.\n"
+                f"Please pass the argument `trust_remote_code=True` to allow custom code to be run."
+            )
+
+        # Consented: prefer the repo's own modeling file over a same-named installed package, like stock ST >= 6.
+        try:
+            from sentence_transformers.util import import_module_class
+        except ImportError:
+            # sentence-transformers < 6 has no dynamic-module resolver; the gate above still applies.
+            return import_from_string(class_ref)
+
+        return import_module_class(
+            class_ref,
+            model_name_or_path = model_name,
+            trust_remote_code = True,
+            revision = revision,
+            token = token,
+            cache_folder = cache_dir,
+        )
+
+    @staticmethod
+    def _import_sentence_transformers_class(class_ref, model_name):
+        """The prefix pins the import to the installed package, but not to a module class: the
+        same syntax names any attribute, and _load_modules then calls .load() on it."""
+        from sentence_transformers.util import import_from_string
+
+        if not class_ref.split(".")[-1] or not all(
+            part.isidentifier() for part in class_ref.split(".")
+        ):
+            raise ValueError(
+                f"Unsloth: The model {model_name} declares the module type {class_ref!r}, which is "
+                f"not a dotted class path. Refusing to resolve it."
+            )
+
+        resolved = import_from_string(class_ref)
+        module_name = getattr(resolved, "__module__", "") or ""
+        if not (
+            isinstance(resolved, type)
+            and issubclass(resolved, torch.nn.Module)
+            and module_name.split(".")[0] == "sentence_transformers"
+            and hasattr(resolved, "load")
+        ):
+            raise ValueError(
+                f"Unsloth: The model {model_name} declares the module type {class_ref!r}, which "
+                f"resolves to {resolved!r} rather than a sentence-transformers module class. "
+                f"Refusing to load it."
+            )
+        return resolved
+
+    @staticmethod
     def _is_transformer_module_ref(class_ref):
-        if class_ref in {
+        """Name ST's Transformer without importing anything, since importing to compare is the same
+        execution the gate refuses. Any other spelling is caught by `is Transformer` in
+        _load_modules, after gating; refusals all live in _resolve_module_class."""
+        if not isinstance(class_ref, str):
+            return False
+
+        return class_ref in {
             "sentence_transformers.models.Transformer",
             "sentence_transformers.models.transformer.Transformer",
             "sentence_transformers.base.modules.transformer.Transformer",
-        }:
-            return True
+        }
 
-        try:
-            from sentence_transformers.models import Transformer
-            from sentence_transformers.util import import_from_string
+    # Dense imports AND CALLS config["activation_function"], WordEmbeddings imports
+    # config["tokenizer_class"], Router/Asym import every config["types"] value, all ungated on
+    # some versions, so an allowed in-namespace "type" reaches them. Prefixes are upstream's own
+    # rules, applied unconditionally: util.import_module_class is not a version test, since 5.5
+    # exports it while its WordEmbeddings.load still calls import_from_string on tokenizer_class.
+    # Which config key each loader resolves as a dotted import path, keyed by the class
+    # that resolves it. By class and not by key name: SpladePooling lists
+    # activation_function in its own config_keys too, but the value there is the literal
+    # "relu" or "log1p_relu" and it is compared, never imported (SpladePooling.py:
+    # `if self.activation_function == "log1p_relu"`). Matching on the key name alone
+    # refused every SPLADE sparse model for naming a value that no loader imports.
+    #
+    # Complete for the module path as of 5.1: the only config-driven import_from_string
+    # calls in the package are Dense.load on activation_function, WordEmbeddings.load on
+    # tokenizer_class, Router.load on types, and SentenceTransformer's own modules.json
+    # type, which _resolve_module_class covers. Asym is an alias of Router from 5.0
+    # (`Asym = Router`), so it arrives here as Router; the entry is kept for versions
+    # where it is its own class.
+    _MODULE_CONFIG_CLASS_REFS = {
+        "Dense": (("activation_function", "torch."),),
+        "WordEmbeddings": (("tokenizer_class", "sentence_transformers."),),
+        "Router": (("types", "sentence_transformers."),),
+        "Asym": (("types", "sentence_transformers."),),
+    }
 
-            module_class = import_from_string(class_ref)
-            return module_class is Transformer
-        except (ImportError, AttributeError, TypeError, ValueError) as exception:
-            logging.debug(
-                "Unsloth: Could not resolve SentenceTransformer module ref %r: %s",
-                class_ref,
-                exception,
-            )
-            return False
+    @staticmethod
+    def _class_ref_rules(module_class):
+        """The key rules for this class, following its bases so a subclass is covered."""
+        rules = []
+        for ancestor in getattr(module_class, "__mro__", (module_class,)):
+            for rule in FastSentenceTransformer._MODULE_CONFIG_CLASS_REFS.get(
+                getattr(ancestor, "__name__", ""), ()
+            ):
+                if rule not in rules:
+                    rules.append(rule)
+        return tuple(rules)
+
+    # config_file_name only exists from 5: on 3.x/4.x these classes open their file by name.
+    _LEGACY_MODULE_CONFIG_FILES = {
+        "WordEmbeddings": "wordembedding_config.json",
+        "Router": "router_config.json",
+        "Asym": "router_config.json",
+        "CNN": "cnn_config.json",
+        "LSTM": "lstm_config.json",
+    }
+
+    @staticmethod
+    def _check_module_config_class_refs(
+        load_path, class_ref, model_name, trust_remote_code, module_class
+    ):
+        if trust_remote_code:
+            return
+
+        # Nothing to check unless this class is one that resolves a dotted path out of its
+        # own config. Every other module reads plain values, so looking for these keys in
+        # its config found a name nobody imports and refused a load that works.
+        rules = FastSentenceTransformer._class_ref_rules(module_class)
+        if not rules:
+            return
+
+        # Read what the loader will read: each module names its own file (Router
+        # "router_config.json", WordEmbeddings "wordembedding_config.json"), and Router falls back to
+        # "config.json", which is also Module's default and so Dense's. Hard-coding "config.json"
+        # would skip exactly the two modules this check exists for.
+        config_names = []
+        config_file_name = getattr(module_class, "config_file_name", None)
+        if isinstance(config_file_name, str):
+            config_names.append(config_file_name)
+        legacy = FastSentenceTransformer._LEGACY_MODULE_CONFIG_FILES.get(
+            getattr(module_class, "__name__", "")
+        )
+        if legacy is not None:
+            config_names.append(legacy)
+        config_names.append("config.json")
+
+        refs = []
+        for config_name in dict.fromkeys(config_names):
+            config_path = os.path.join(load_path, config_name)
+            if not os.path.isfile(config_path):
+                continue
+            try:
+                with open(config_path, encoding = "utf8") as f:
+                    config = json.load(f)
+            except (OSError, ValueError) as exception:
+                logging.debug(
+                    "Unsloth: Could not read module config %s: %s", config_path, exception
+                )
+                continue
+            if not isinstance(config, dict):
+                continue
+
+            for key, prefix in rules:
+                if key == "types":
+                    # Router keeps a mapping of route name to class, not a single ref.
+                    types = config.get("types")
+                    if isinstance(types, dict):
+                        refs += [
+                            ("types", value, prefix)
+                            for value in types.values()
+                            if isinstance(value, str)
+                        ]
+                elif isinstance(config.get(key), str):
+                    refs.append((key, config[key], prefix))
+
+        for key, value, prefix in refs:
+            if not value.startswith(prefix):
+                raise ValueError(
+                    f"Unsloth: The model {model_name} declares the module {class_ref} whose config "
+                    f"{key} is {value!r}, a class outside {prefix}*. Importing it executes third-party "
+                    f"code. Please pass the argument `trust_remote_code=True` to allow custom code to "
+                    f"be run."
+                )
 
     @staticmethod
     def _load_modules(
@@ -1198,8 +1422,8 @@ class FastSentenceTransformer(FastModel):
         revision = None,
     ) -> tuple[OrderedDict, bool]:
         """Load modules from modules.json, else fall back to hard-coded modules. Returns (modules, no_modules_json)."""
-        from sentence_transformers.util import import_from_string, load_dir_path
-        from sentence_transformers.models import Pooling, Normalize
+        from sentence_transformers.util import load_dir_path
+        from sentence_transformers.models import Pooling, Normalize, Transformer
 
         modules = OrderedDict()
         modules_json_path = FastSentenceTransformer._module_path(
@@ -1214,7 +1438,24 @@ class FastSentenceTransformer(FastModel):
                 class_ref = module_config["type"]
                 name = module_config.get("name", str(module_config.get("idx", len(modules))))
 
+                # Gate before any download: a refused type must fail the load outright, not fall
+                # through the "could not download" skip below. Resolved once, since a consented
+                # repo-local ref costs a Hub round trip.
+                module_class = None
                 if FastSentenceTransformer._is_transformer_module_ref(class_ref):
+                    is_transformer_module = True
+                else:
+                    module_class = FastSentenceTransformer._resolve_module_class(
+                        class_ref,
+                        model_name,
+                        trust_remote_code,
+                        token = token,
+                        cache_dir = cache_dir,
+                        revision = revision,
+                    )
+                    is_transformer_module = module_class is Transformer
+
+                if is_transformer_module:
                     transformer_module = FastSentenceTransformer._create_transformer_module(
                         model_name,
                         model,
@@ -1244,7 +1485,10 @@ class FastSentenceTransformer(FastModel):
                             print(f"Unsloth Warning: Could not download module {module_path}: {e}")
                             continue
 
-                    module_class = import_from_string(class_ref)
+                    FastSentenceTransformer._check_module_config_class_refs(
+                        load_path, class_ref, model_name, trust_remote_code, module_class
+                    )
+
                     try:
                         module = module_class.load(load_path)
                         modules[name] = module
@@ -1443,6 +1687,16 @@ class FastSentenceTransformer(FastModel):
                 "Run `pip install sentence-transformers` to install it."
             )
 
+        # Remote-class probes must use this load's trust, revision and hub options.
+        _remote_class_probe_kwargs = dict(
+            trust_remote_code = trust_remote_code,
+            revision = revision,
+            token = token,
+            cache_dir = kwargs.get("cache_folder", kwargs.get("cache_dir", None)),
+            local_files_only = kwargs.get("local_files_only", None),
+            proxies = kwargs.get("proxies", None),
+        )
+
         # The other leaf loaders resolve the "unsloth" sentinel by planning; this one declines. st_device below hands device_map to SentenceTransformer(device=), which ends in self.to(device): the sentinel raises there, and that same .to() would pull a split model back onto one card. The env-var opt-in is resolved too, or UNSLOTH_AUTO_DEVICE_MAP=1 asks for a plan without naming the sentinel.
         device_map = requested_device_map(device_map)
         # Always "sequential", never the asked-for name's own declined value: the st_device blocks normalise only dicts, "auto" and "sequential", so "balanced" would reach .to("balanced"). isinstance first, since a caller's explicit dict is unhashable and `in` alone raises.
@@ -1524,6 +1778,12 @@ class FastSentenceTransformer(FastModel):
                 st_kwargs["cache_folder"] = _st_cache
 
             st_model = SentenceTransformer(model_name, **st_kwargs)
+            if _ensure_sentence_attention_masks(
+                getattr(st_model[0], "auto_model", None)
+            ) and hasattr(st_model[0], "unpad_inputs"):
+                # Refresh ST's cached capability decision after changing the backend.
+                st_model[0].unpad_inputs = st_model[0].unpad_inputs
+            st_model._unsloth_trust_remote_code = trust_remote_code
             return st_model
 
         if "auto_model" not in kwargs:
@@ -1569,6 +1829,7 @@ class FastSentenceTransformer(FastModel):
                 config,
                 model_type = model_type,
                 disable_sdpa_model_names = DISABLE_SDPA_MODEL_NAMES,
+                **_remote_class_probe_kwargs,
             )
             supports_sdpa = encoder_attn_impl == "sdpa"
             if encoder_attn_impl is not None:
@@ -1700,6 +1961,7 @@ class FastSentenceTransformer(FastModel):
 
             st_model.push_to_hub_merged = types.MethodType(_push_to_hub_merged, st_model)
 
+            st_model._unsloth_trust_remote_code = trust_remote_code
             return st_model
 
         # Warn if using 4-bit with an encoder: it is slow due to dequantization overhead.
@@ -1709,7 +1971,7 @@ class FastSentenceTransformer(FastModel):
 
         if "add_pooling_layer" not in kwargs:
             supported = FastSentenceTransformer._has_add_pooling_layer(
-                config, kwargs.get("auto_model", AutoModel)
+                config, kwargs.get("auto_model", AutoModel), **_remote_class_probe_kwargs
             )
             if supported:
                 kwargs["add_pooling_layer"] = False
@@ -1795,6 +2057,8 @@ class FastSentenceTransformer(FastModel):
             )
         finally:
             os.environ["UNSLOTH_WARN_UNINITIALIZED"] = old_environ
+
+        _ensure_sentence_attention_masks(model)
 
         from sentence_transformers import SentenceTransformer
 
@@ -1950,6 +2214,7 @@ class FastSentenceTransformer(FastModel):
             print(f"Unsloth: Successfully pushed merged model to https://huggingface.co/{repo_id}")
 
         st_model.push_to_hub_merged = types.MethodType(_push_to_hub_merged, st_model)
+        st_model._unsloth_trust_remote_code = trust_remote_code
         return st_model
 
     @staticmethod
@@ -2335,6 +2600,17 @@ def _patch_st_trainer_load_from_checkpoint():
                 raise RuntimeError(f"Unsloth: Bad checkpoint module path for index {idx}.")
             if not hasattr(module_cls, "load"):
                 raise RuntimeError(f"Unsloth: Module {idx} cannot be reloaded.")
+            # The class is trusted, coming from the live model, but load() reads the checkpoint's
+            # own configs and some versions import dotted paths out of them.
+            FastSentenceTransformer._check_module_config_class_refs(
+                module_dir,
+                saved_type or module_cls.__name__,
+                root,
+                # The consent the model was loaded with. Hard-coding False would make a resume
+                # impossible for a model that legitimately needed it, with no way to say so here.
+                getattr(self.model, "_unsloth_trust_remote_code", False),
+                module_cls,
+            )
             fresh = module_cls.load(module_dir)
             if not isinstance(fresh, module_cls):
                 raise RuntimeError(f"Unsloth: Module {idx} reload returned wrong type.")

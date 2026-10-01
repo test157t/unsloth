@@ -2,76 +2,68 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import { createEmptyRecipePayload } from "@/features/recipe-studio";
-import { accountDatabaseName } from "@/lib/account-transition";
 import { normalizeNonEmptyName } from "@/utils";
-import Dexie from "dexie";
-import { authFetch } from "@/features/auth/api";
-import { toast } from "@/lib/toast";
 import { useEffect, useState } from "react";
 import type { RecipeRecord, SaveRecipeInput } from "../types";
+import { importLegacyRecipes } from "./legacy-import";
+import { RecipeApiError, recipeRequest } from "./recipes-api";
 
-// IndexedDB is read only for migration. All ongoing CRUD uses the account's server store.
-const listeners = new Set<() => void>();
 const recentRecipeCache = new Map<string, RecipeRecord>();
+const listeners = new Set<(recipes: RecipeRecord[]) => void>();
 let cachedRecipeList: RecipeRecord[] = [];
-let migration: Promise<void> | null = null;
-let migrationWarningShown = false;
+let recipeListReady = false;
+let recipeListRequest: Promise<RecipeRecord[]> | null = null;
+let mutationVersion = 0;
 
-async function request<T>(path = "", init?: RequestInit): Promise<T> {
-  const response = await authFetch(`/api/data-recipe/saved${path}`, init);
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(typeof body?.detail === "string" ? body.detail : `Recipe request failed (${response.status}).`);
-  }
-  return response.json() as Promise<T>;
-}
-
-async function migrateBrowserRecipes(): Promise<void> {
-  if (migration) return migration;
-  migration = (async () => {
-    const name = accountDatabaseName("unsloth-data-recipes");
-    if (!(await Dexie.exists(name))) return;
-    const legacy = new Dexie(name);
-    try {
-      await legacy.open();
-      const records = await legacy.table("recipes").toArray();
-      // Import in bounded batches; server receipts make retries idempotent.
-      for (let offset = 0; offset < records.length; offset += 25) {
-        await request("/import", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(records.slice(offset, offset + 25)),
-        });
-      }
-    } finally { legacy.close(); }
-  })().catch((error: unknown) => {
-    migration = null;
-    // Browser storage is only a recovery source; its unavailability must not
-    // prevent using the canonical server store.
-    if (!migrationWarningShown) {
-      migrationWarningShown = true;
-      toast.error(`Existing browser recipes could not be imported; their local copies are unchanged. ${error instanceof Error ? error.message : String(error)}`);
-    }
-  });
-  return migration;
-}
-
-export async function listRecipes(): Promise<RecipeRecord[]> {
-  await migrateBrowserRecipes();
-  const records = await request<RecipeRecord[]>();
-  cachedRecipeList = records;
+function publishRecipeList(recipes: RecipeRecord[]): RecipeRecord[] {
+  cachedRecipeList = [...recipes].sort((a, b) => b.updatedAt - a.updatedAt);
+  recipeListReady = true;
+  // The list is authoritative: a recipe deleted elsewhere must not reopen from the cache.
   recentRecipeCache.clear();
-  records.forEach((record) => recentRecipeCache.set(record.id, record));
-  return records;
+  for (const recipe of cachedRecipeList) {
+    recentRecipeCache.set(recipe.id, recipe);
+  }
+  for (const listener of listeners) {
+    listener(cachedRecipeList);
+  }
+  return cachedRecipeList;
 }
 
-export function preloadRecipes(): Promise<RecipeRecord[]> { return listRecipes(); }
+async function fetchRecipeList(): Promise<RecipeRecord[]> {
+  await importLegacyRecipes();
+  for (;;) {
+    // A save or delete that lands while the GET is in flight makes its answer stale.
+    const version = mutationVersion;
+    const { recipes } = await recipeRequest<{ recipes: RecipeRecord[] }>("");
+    if (version === mutationVersion) return publishRecipeList(recipes);
+  }
+}
+
+export function listRecipes(): Promise<RecipeRecord[]> {
+  recipeListRequest ??= fetchRecipeList().finally(() => {
+    recipeListRequest = null;
+  });
+  return recipeListRequest;
+}
+
+export function preloadRecipes(): Promise<RecipeRecord[]> {
+  return recipeListReady ? Promise.resolve(cachedRecipeList) : listRecipes();
+}
 
 export async function getRecipe(id: string): Promise<RecipeRecord | undefined> {
-  await migrateBrowserRecipes();
-  const response = await authFetch(`/api/data-recipe/saved/${encodeURIComponent(id)}`);
-  if (response.status === 404) return undefined;
-  if (!response.ok) throw new Error(`Could not load recipe (${response.status}).`);
-  return response.json();
+  await importLegacyRecipes();
+  try {
+    const record = await recipeRequest<RecipeRecord>(
+      `/${encodeURIComponent(id)}`,
+    );
+    recentRecipeCache.set(id, record);
+    return record;
+  } catch (error) {
+    if (error instanceof RecipeApiError && error.status === 404) {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 export function getCachedRecipe(id: string): RecipeRecord | null {
@@ -82,23 +74,59 @@ export function primeRecipeCache(record: RecipeRecord): void {
   recentRecipeCache.set(record.id, record);
 }
 
-export async function saveRecipe(input: SaveRecipeInput): Promise<RecipeRecord> {
-  await migrateBrowserRecipes();
-  const record = await request<RecipeRecord>("", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, name: normalizeNonEmptyName(input.name) }),
-  });
-  primeRecipeCache(record);
-  listeners.forEach((notify) => notify());
+export async function saveRecipe(
+  input: SaveRecipeInput,
+): Promise<RecipeRecord> {
+  const now = Date.now();
+  const id = input.id ?? crypto.randomUUID();
+  const existing = input.id
+    ? (recentRecipeCache.get(input.id) ?? (await getRecipe(input.id)))
+    : undefined;
+  let record: RecipeRecord;
+  try {
+    record = await recipeRequest<RecipeRecord>(`/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        id,
+        name: normalizeNonEmptyName(input.name),
+        payload: input.payload,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        learningRecipeId: input.learningRecipeId ?? existing?.learningRecipeId,
+        learningRecipeTitle:
+          input.learningRecipeTitle ?? existing?.learningRecipeTitle,
+        // Another window may have saved since this copy was read: the server refuses with 409.
+        baseUpdatedAt: input.baseUpdatedAt ?? existing?.updatedAt,
+      }),
+    });
+  } catch (error) {
+    if (error instanceof RecipeApiError && error.status === 409) {
+      recentRecipeCache.delete(id);
+    }
+    throw error;
+  }
+  mutationVersion += 1;
+  recentRecipeCache.set(id, record);
+  if (recipeListReady) {
+    publishRecipeList([
+      record,
+      ...cachedRecipeList.filter((recipe) => recipe.id !== id),
+    ]);
+  }
   return record;
 }
 
 export async function deleteRecipe(id: string): Promise<void> {
-  await migrateBrowserRecipes();
-  await request(`/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await recipeRequest<void>(`/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  mutationVersion += 1;
   recentRecipeCache.delete(id);
-  listeners.forEach((notify) => notify());
+  if (recipeListReady) {
+    publishRecipeList(cachedRecipeList.filter((recipe) => recipe.id !== id));
+  }
 }
+
 export function createRecipeDraft(): Promise<RecipeRecord> {
   return saveRecipe({
     name: "Unnamed",
@@ -119,29 +147,41 @@ export function createRecipeFromLearningRecipe(input: {
   });
 }
 
-export function useRecipes(): { recipes: RecipeRecord[]; ready: boolean; error: string | null } {
+export function useRecipes(enabled = true): {
+  recipes: RecipeRecord[];
+  ready: boolean;
+  error: string | null;
+} {
   const [recipes, setRecipes] = useState<RecipeRecord[]>(cachedRecipeList);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(recipeListReady);
+
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    let active = true;
-    let revision = 0;
-    const refresh = () => {
-      const current = ++revision;
-      void listRecipes().then((records) => {
-        if (active && current === revision) { setRecipes(records); setError(null); setReady(true); }
-      }).catch((reason: unknown) => {
-        if (active && current === revision) {
-          setError(reason instanceof Error ? reason.message : "Could not load saved recipes.");
-          setReady(true);
-        }
-      });
+    if (!enabled) return;
+    const listener = (value: RecipeRecord[]) => {
+      setRecipes(value);
+      setError(null);
+      setReady(true);
     };
-    listeners.add(refresh);
+    listeners.add(listener);
+    let active = true;
+    const refresh = () => { void listRecipes().catch((error) => {
+      if (!active) return;
+      setError(error instanceof Error ? error.message : "Could not load saved recipes.");
+      // biome-ignore lint/suspicious/noConsole: the page keeps its cached list
+      console.error("Load data recipes failed:", error);
+      setReady(true);
+    }); };
+    refresh();
     window.addEventListener("focus", refresh);
     const interval = window.setInterval(refresh, 15000);
-    refresh();
-    return () => { active = false; listeners.delete(refresh); window.removeEventListener("focus", refresh); window.clearInterval(interval); };
-  }, []);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(interval);
+      listeners.delete(listener);
+    };
+  }, [enabled]);
+
   return { recipes, ready, error };
 }

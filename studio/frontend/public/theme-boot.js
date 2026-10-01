@@ -21,11 +21,15 @@ try {
   root.classList.toggle("dark", dark);
   root.classList.toggle("light", !dark);
   root.style.colorScheme = dark ? "dark" : "light";
-  if (
-    palette === "classic" ||
-    palette === "minimal" ||
-    palette === "gothic"
-  ) {
+  // Keep in sync with COLOR_THEME_IDS ("standard" sets no attribute).
+  var palettes = [
+    "classic", "minimal", "gothic", "blueberry", "butterfly-pea", "cherry",
+    "cinnamon", "cotton-candy", "dragon-fruit", "earl-grey", "espresso",
+    "honey", "licorice", "macaron", "matcha", "mint", "neon-cyberpunk",
+    "oat-milk", "peach", "pina-paraiso", "plum", "tangerine", "taro",
+    "wasabi", "yuzu",
+  ];
+  if (palettes.indexOf(palette) !== -1) {
     root.setAttribute("data-palette", palette);
   }
 } catch (e) {}

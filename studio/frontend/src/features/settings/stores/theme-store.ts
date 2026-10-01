@@ -2,28 +2,23 @@
 // Copyright 2026-present the Unsloth AI Inc. team. All rights reserved. See /studio/LICENSE.AGPL-3.0
 
 import { useSyncExternalStore } from "react";
+import {
+  COLOR_THEME_IDS,
+  type ColorThemeId,
+  isColorThemeId,
+} from "../lib/color-themes";
 
 export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
-export type Palette = "standard" | "classic" | "minimal" | "gothic";
+export type Palette = ColorThemeId;
 
 const STORAGE_KEY = "theme";
 const PALETTE_STORAGE_KEY = "palette";
 
-export const PALETTES: readonly Palette[] = [
-  "standard",
-  "classic",
-  "minimal",
-  "gothic",
-];
+export const PALETTES: readonly Palette[] = COLOR_THEME_IDS;
 
 export function isPalette(value: unknown): value is Palette {
-  return (
-    value === "standard" ||
-    value === "classic" ||
-    value === "minimal" ||
-    value === "gothic"
-  );
+  return isColorThemeId(value);
 }
 
 // Persist a re-derived literal from a fixed allow-list rather than the argument,
@@ -34,12 +29,9 @@ const STORED_THEME: Record<Theme, Theme> = {
   dark: "dark",
   system: "system",
 };
-const STORED_PALETTE: Record<Palette, Palette> = {
-  standard: "standard",
-  classic: "classic",
-  minimal: "minimal",
-  gothic: "gothic",
-};
+const STORED_PALETTE = Object.fromEntries(
+  COLOR_THEME_IDS.map((id) => [id, id]),
+) as Record<Palette, Palette>;
 
 function readStoredTheme(): Theme {
   if (typeof window === "undefined") return "system";

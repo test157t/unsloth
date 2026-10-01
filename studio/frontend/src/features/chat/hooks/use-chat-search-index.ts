@@ -14,6 +14,7 @@ import {
   batchListChatMessages,
 } from "../api/chat-api";
 import { splitMcpImages } from "../api/mcp-images";
+import { isMcpUiToolResult } from "../mcp-apps/mcp-ui";
 import type { MessageRecord } from "../types";
 import { isCoalescedHistoryEvent } from "../utils/chat-history-revision";
 import {
@@ -45,6 +46,7 @@ export interface ChatSearchItem {
   projectId?: string | null;
 }
 
+// Messages are indexed for this many most recently updated threads; older chats match by title.
 const THREAD_LIMIT = 200;
 const SEARCH_REBUILD_DEBOUNCE_MS = 300;
 // Past the dialog's 180ms exit, so releasing uncached rows never lands mid-animation.
@@ -55,7 +57,7 @@ const BINARY_KEY = /b64|base64|^(images?|audio|video)$/i;
 
 // Readable text from tool args/results, dropping base64 image/audio blobs so they never
 // bloat the index.
-function searchableText(value: unknown, depth = 0): string {
+function searchableText(value: unknown, depth = 0, toolName?: string): string {
   if (typeof value === "string") {
     let text = splitMcpImages(value).text;
     const cut = text.indexOf("\n__IMAGES__:");
@@ -69,6 +71,10 @@ function searchableText(value: unknown, depth = 0): string {
     return value.map((v) => searchableText(v, depth + 1)).join(" ");
   }
   if (typeof value === "object") {
+    // A widget result is indexed by what was shown, not its up-to-1MB UI seed.
+    if (depth === 0 && isMcpUiToolResult(value, toolName ?? "")) {
+      return searchableText(value.text, 1);
+    }
     const out: string[] = [];
     for (const [k, v] of Object.entries(value)) {
       if (!BINARY_KEY.test(k)) out.push(searchableText(v, depth + 1));
@@ -117,7 +123,11 @@ function extractText(message: MessageRecord): string {
         typeof p.argsText === "string" ? p.argsText : p.args,
       );
       if (args) parts.push(args);
-      const result = searchableText(p.result);
+      const result = searchableText(
+        p.result,
+        0,
+        typeof p.toolName === "string" ? p.toolName : undefined,
+      );
       if (result) parts.push(result);
     } else if (p.type === "source") {
       for (const v of [p.title, p.url])
@@ -135,9 +145,7 @@ interface ChatSearchIndexBuild {
 // Exported for the bare-node cache harness: it must prove a failed read is not
 // indistinguishable from a completed empty history.
 export async function buildChatSearchIndex(): Promise<ChatSearchIndexBuild> {
-  const active = (
-    await listStoredChatThreads({ includeArchived: false })
-  ).slice(0, THREAD_LIMIT);
+  const active = await listStoredChatThreads({ includeArchived: false });
 
   const itemThreadIds = new Map<
     string,
@@ -180,17 +188,15 @@ export async function buildChatSearchIndex(): Promise<ChatSearchIndexBuild> {
     }
   }
 
-  const allThreadIds = Array.from(itemThreadIds.values()).flatMap(
-    (e) => e.threadIds,
-  );
-  let messagesByThread = await batchListChatMessages(allThreadIds).catch(
+  const loadedThreadIds = active.slice(0, THREAD_LIMIT).map((t) => t.id);
+  let messagesByThread = await batchListChatMessages(loadedThreadIds).catch(
     () => new Map<string, MessageRecord[]>(),
   );
   let complete = true;
 
   // Legacy-only chats can exist before server-side history import finishes. Fill only the
   // missing ids via the legacy path instead of one request per thread up front.
-  const missingThreadIds = allThreadIds.filter(
+  const missingThreadIds = loadedThreadIds.filter(
     (threadId) => !messagesByThread.has(threadId),
   );
   if (missingThreadIds.length > 0) {
@@ -219,7 +225,11 @@ export async function buildChatSearchIndex(): Promise<ChatSearchIndexBuild> {
       const arr = messagesByThread.get(tid);
       if (arr) merged.push(...arr);
     }
-    if (merged.length === 0) {
+    // A chat read as empty is skipped; one whose messages were never loaded keeps its title row.
+    if (
+      merged.length === 0 &&
+      threadIds.every((tid) => messagesByThread.has(tid))
+    ) {
       continue;
     }
     merged.sort((a, b) => b.createdAt - a.createdAt);
@@ -243,8 +253,9 @@ export async function buildChatSearchIndex(): Promise<ChatSearchIndexBuild> {
   return { items: results, complete };
 }
 
-// THREAD_LIMIT bounds rows, not bytes: a tool-heavy history would otherwise hold tens of
-// megabytes behind a closed dialog. Past this the index is rebuilt on each open.
+// THREAD_LIMIT bounds threads with indexed messages, not bytes: a tool-heavy history would
+// otherwise hold tens of megabytes behind a closed dialog. Past this the index is rebuilt on
+// each open.
 const MAX_CACHED_SEARCH_TEXT_CHARS = 4_000_000;
 
 // Last built index, kept across opens so reopening paints the previous rows at once and

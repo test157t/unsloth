@@ -6,6 +6,7 @@
 
 import asyncio
 import base64
+import contextlib
 import io
 import json as _json
 import mimetypes
@@ -35,7 +36,7 @@ from core.inference.sse_control_frames import sanitize_provider_sse_line
 # templated just like an in-process one (#7066). "custom" is a user-supplied OpenAI-compatible base_url, i.e. how a
 # self-hosted vLLM or llama.cpp registers without its preset. Unknown endpoint means assume a template applies:
 # sweeping a hosted API costs a space in delimiter-like text, not sweeping a local one costs a forged turn.
-_TEMPLATE_APPLYING_PROVIDERS = frozenset({"vllm", "llama_cpp", "ollama", "custom"})
+_TEMPLATE_APPLYING_PROVIDERS = frozenset({"vllm", "llama_cpp", "ollama", "custom", "lemonade"})
 
 # The subset documenting "continue_final_message" + "add_generation_prompt" on /v1/chat/completions.
 _CONTINUATION_FLAG_PROVIDERS = frozenset({"vllm", "llama_cpp"})
@@ -44,7 +45,7 @@ _CONTINUATION_FLAG_PROVIDERS = frozenset({"vllm", "llama_cpp"})
 # providers report no llama.cpp timings either, so the monitor has no token count to derive a speed from. Same caution
 # as the flag above: "custom" is any user-supplied base_url and a strict endpoint 400s on an unknown field. "openai"
 # is absent because it routes to /v1/responses, which reports usage on its own.
-_USAGE_STREAM_OPTION_PROVIDERS = frozenset({"vllm", "openrouter", "kimi"})
+_USAGE_STREAM_OPTION_PROVIDERS = frozenset({"vllm", "openrouter", "kimi", "lemonade"})
 
 # llama-server reads repeat_penalty, not repetition_penalty (as routes/inference does).
 _REPETITION_PENALTY_BODY_KEY = {"llama_cpp": "repeat_penalty"}
@@ -136,6 +137,18 @@ def _append_provider_path(base_url: str, endpoint: str) -> str:
     parts = urlsplit(base_url)
     path = f"{parts.path.rstrip('/')}/{endpoint.lstrip('/')}"
     return urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
+
+
+def caches_at_the_last_block(
+    provider_type: Optional[str], model: Optional[str], enable_prompt_caching: Optional[bool]
+) -> bool:
+    if enable_prompt_caching is False:
+        return False
+    if provider_type == "anthropic":
+        return True
+    return provider_type == "openrouter" and (model or "").strip().lower().lstrip("~").startswith(
+        "anthropic/"
+    )
 
 
 def _is_azure_openai_host(host: str) -> bool:
@@ -884,6 +897,8 @@ def _create_shared_http_client() -> httpx.AsyncClient:
 
 
 _http_client = _create_shared_http_client()
+# Studio's own loopback runtime: an env proxy would receive its key and prompts, or fail to reach it.
+_loopback_http_client = httpx.AsyncClient(trust_env = False)
 
 
 class _PinnedPublicTransport(httpx.AsyncBaseTransport):
@@ -1004,6 +1019,49 @@ def restore_account_clients(account_id: str) -> None:
     reactivated under a tombstone would never be cached again, so no pooling and no cookies."""
     with _managed_clients_lock:
         _retired_accounts.discard(account_id)
+
+
+def _rejects_max_tokens(status_code: int, error_text: str) -> bool:
+    """400 from an upstream that wants `max_completion_tokens` (Azure gpt-5.x / o-series behind custom gateways, #10787)."""
+    if status_code != 400:
+        return False
+    try:
+        err = _json.loads(error_text).get("error")
+    except Exception:
+        err = None
+    if isinstance(err, dict) and err.get("param") == "max_tokens":
+        return err.get("code") == "unsupported_parameter" or "max_completion_tokens" in str(
+            err.get("message", "")
+        )
+    return "max_tokens" in error_text and "max_completion_tokens" in error_text
+
+
+def _with_max_completion_tokens(body: dict[str, Any]) -> dict[str, Any]:
+    body = dict(body)
+    body["max_completion_tokens"] = body.pop("max_tokens")
+    return body
+
+
+@contextlib.asynccontextmanager
+async def _stream_post_retrying_max_tokens(
+    http: httpx.AsyncClient, url: str, body: dict[str, Any], **kwargs
+):
+    """`http.stream("POST", ...)` that resends once with `max_completion_tokens` if the upstream rejects `max_tokens`.
+    Nothing has been yielded to the caller at the status check, so the retry is invisible."""
+    async with http.stream("POST", url, json = body, **kwargs) as response:
+        retry = (
+            response.status_code == 400
+            and "max_tokens" in body
+            and _rejects_max_tokens(400, (await response.aread()).decode("utf-8", errors = "replace"))
+        )
+        if not retry:
+            yield response
+            return
+    logger.info("Upstream rejected max_tokens; retrying with max_completion_tokens")
+    async with http.stream(
+        "POST", url, json = _with_max_completion_tokens(body), **kwargs
+    ) as response:
+        yield response
 
 
 def _client() -> httpx.AsyncClient:
@@ -1359,15 +1417,16 @@ class ExternalProviderClient:
         timeout: float = 120.0,
         *,
         api_type: str = "chat_completions",
+        managed_loopback: bool = False,
     ):
         self.provider_type = provider_type
         self.api_type = api_type if provider_type == "custom" else "chat_completions"
-        # Single choke point for every outbound provider request (chat, models, responses, messages, containers): the
-        # URL is caller-controlled, so it is validated here even when a route already checked it. Routes turn the
-        # ValueError into a 400; reaching it here means a caller bypassed them.
         from core.inference.providers import validate_provider_base_url
 
-        self.base_url = validate_provider_base_url(base_url)
+        self.base_url = (
+            base_url.rstrip("/") if managed_loopback else validate_provider_base_url(base_url)
+        )
+        self._managed_loopback = managed_loopback
         # VoiceForge's audio API lives under /v1. Accept its server root too,
         # so discovery and both audio operations use the same API prefix.
         if self.provider_type == "voiceforge":
@@ -1471,6 +1530,8 @@ class ExternalProviderClient:
         continue_final_message: Optional[bool] = None,
         response_format: Optional[dict[str, Any]] = None,
         stream: bool = True,
+        preserve_thinking: Optional[bool] = None,
+        thread_id: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
         """Yield OpenAI-format SSE lines from the external provider. OpenAI-compatible providers
         forward lines verbatim; for Anthropic the native Messages API SSE is translated.
@@ -1640,6 +1701,9 @@ class ExternalProviderClient:
         for field in provider_info.get("body_omit", ()):
             body.pop(field, None)
 
+        if self.provider_type == "llama_cpp" and preserve_thinking is not None:
+            body["chat_template_kwargs"] = {"preserve_thinking": preserve_thinking}
+
         # Kimi thinking is a top-level body field. kimi-k2-thinking is always on (ignore the toggle); kimi-k2.6
         # defaults on, can be disabled. `keep: all` preserves every chunk for the UI panel.
         if self.provider_type == "kimi" and enable_thinking is not None:
@@ -1676,6 +1740,8 @@ class ExternalProviderClient:
                 body["reasoning_effort"] = effort
         elif self.provider_type == "ollama":
             _apply_ollama_reasoning_controls(body, enable_thinking, reasoning_effort)
+        elif self.provider_type == "lemonade":
+            _apply_fastflowlm_reasoning_controls(body, enable_thinking, reasoning_effort)
 
         # OpenRouter's unified `reasoning` field gates per-model thinking. Some routes
         # (`*_MANDATORY_REASONING_MODELS`) 400 on explicit off.
@@ -1690,6 +1756,17 @@ class ExternalProviderClient:
                     body["reasoning"] = {"enabled": False}
             elif enable_thinking is True:
                 body["reasoning"] = {"enabled": True}
+
+            # Claude caches only behind cache_control; the top-level form advances the breakpoint every turn. Other
+            # families cache automatically and the field is documented for Claude's providers only.
+            if caches_at_the_last_block("openrouter", model, enable_prompt_caching):
+                cache_control = {"type": "ephemeral"}
+                if prompt_cache_ttl == "1h":
+                    cache_control["ttl"] = "1h"
+                body["cache_control"] = cache_control
+            # Sticky routing keeps a conversation on the provider that holds its cache.
+            if thread_id:
+                body["session_id"] = str(thread_id)[:256]
 
             # OpenRouter web plugin works on every model id including meta-routers (unlike `:online`). Forced-function
             # tool_choice suppresses it, matching Gemini/Anthropic.
@@ -1735,10 +1812,10 @@ class ExternalProviderClient:
         )
 
         try:
-            async with _client().stream(
-                "POST",
+            async with _stream_post_retrying_max_tokens(
+                _loopback_http_client if getattr(self, "_managed_loopback", False) else _client(),
                 url,
-                json = body,
+                body,
                 headers = self._auth_headers(),
                 timeout = self._stream_timeout,
             ) as response:
@@ -1914,6 +1991,8 @@ class ExternalProviderClient:
                                                         continue
                                                     for ann in envelope.get("annotations") or []:
                                                         _record_or_url_citation(ann)
+                        if self.provider_type == "lemonade" and line.startswith("{"):
+                            line = _bare_json_error_as_sse(line) or line
                         # Verbatim relay, minus Unsloth's own UI control protocol: the frames this server writes to
                         # paint tool cards ride the same stream, so an endpoint that echoes them forges a card for a
                         # tool that never ran.
@@ -4575,6 +4654,9 @@ class ExternalProviderClient:
                 # 3.13 + httpcore 1.0.x GeneratorExit ordering).
                 lines_gen = response.aiter_lines().__aiter__()
                 final_finish_reason: Optional[str] = None
+                bare_json = ""
+                stream_error: Optional[str] = None
+                stream_error_message = ""
                 try:
                     while True:
                         try:
@@ -4583,9 +4665,18 @@ class ExternalProviderClient:
                             break
                         if not line.strip():
                             continue
-                        if not line.startswith("data:"):
+                        if line.startswith("data:"):
+                            data_str = line[len("data:") :].strip()
+                        elif bare_json or line.lstrip().startswith("{"):
+                            # Gemini sends a mid-stream error as bare multi-line JSON, not as a `data:` frame.
+                            bare_json += line
+                            try:
+                                _json.loads(bare_json)
+                            except ValueError:
+                                continue
+                            data_str, bare_json = bare_json, ""
+                        else:
                             continue
-                        data_str = line[len("data:") :].strip()
                         if not data_str or data_str == "[DONE]":
                             continue
                         try:
@@ -4598,6 +4689,19 @@ class ExternalProviderClient:
                             continue
                         if not isinstance(event, dict):
                             continue
+
+                        error = event.get("error")
+                        if isinstance(error, dict):
+                            code = error.get("code")
+                            stream_error = _error_sse_line(
+                                code if isinstance(code, int) else 502,
+                                _json.dumps(event),
+                                self.provider_type,
+                            )
+                            stream_error_message = str(
+                                error.get("message") or error.get("status") or code
+                            )
+                            break
 
                         # Latch usageMetadata across deltas -- the final fragment carries the complete totals.
                         usage_meta = event.get("usageMetadata")
@@ -4980,11 +5084,19 @@ class ExternalProviderClient:
                                 "type": "tool_end",
                                 "tool_call_id": web_search_tool_id,
                                 "result": (
-                                    "\n---\n".join(blocks) if blocks else "(search complete)"
+                                    f"(search aborted: {stream_error_message})"
+                                    if stream_error
+                                    else "\n---\n".join(blocks)
+                                    if blocks
+                                    else "(search complete)"
                                 ),
                             }
                         )
                         web_search_tool_ended = True
+
+                    if stream_error:
+                        yield stream_error
+                        return
 
                     if final_finish_reason:
                         # Gemini emits "STOP" even for a pure functionCall turn; override to "tool_calls" so OAI
@@ -6735,12 +6847,20 @@ class ExternalProviderClient:
             else:
                 body["max_tokens"] = max_tokens
 
+        url = f"{self.base_url}/chat/completions"
         response = await _client().post(
-            f"{self.base_url}/chat/completions",
+            url,
             json = body,
             headers = self._auth_headers(),
             timeout = self._timeout,
         )
+        if "max_tokens" in body and _rejects_max_tokens(response.status_code, response.text):
+            response = await _client().post(
+                url,
+                json = _with_max_completion_tokens(body),
+                headers = self._auth_headers(),
+                timeout = self._timeout,
+            )
         response.raise_for_status()
         return response.json()
 
@@ -6847,6 +6967,53 @@ class ExternalProviderClient:
         )
         response.raise_for_status()
         return response.json()
+
+    async def create_decision(
+        self, model: str, state: Any, questions: dict[str, dict[str, Any]]
+    ) -> dict[str, Any]:
+        def as_text(value: Any) -> Any:
+            return (
+                _json.dumps(value, ensure_ascii = False) if isinstance(value, (dict, list)) else value
+            )
+
+        sent = {}
+        for name, question in questions.items():
+            question = dict(question)
+            if "instructions" in question:
+                question["instructions"] = as_text(question["instructions"])
+            criteria = question.get("criteria")
+            if isinstance(criteria, dict):
+                question["criteria"] = {key: as_text(value) for key, value in criteria.items()}
+            elif isinstance(criteria, list):
+                question["criteria"] = [as_text(value) for value in criteria]
+            sent[name] = question
+        response = await _client().post(
+            re.sub(r"/systemone$", "", self.base_url.rstrip("/")) + "/systemone",
+            headers = self._auth_headers(),
+            json = {"model": model, "state": state, "questions": sent},
+            timeout = self._timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def list_decision_models(self) -> list[str]:
+        response = await _client().get(
+            re.sub(r"/systemone$", "", self.base_url.rstrip("/")) + "/models",
+            params = {"output_modalities": "decisions"},
+            headers = self._auth_headers(),
+            timeout = self._timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+        models = data.get("data") if isinstance(data, dict) else None
+        return [
+            model["id"]
+            for model in (models if isinstance(models, list) else [])
+            if isinstance(model, dict)
+            and isinstance(model.get("id"), str)
+            and isinstance(model.get("architecture"), dict)
+            and "decisions" in (model["architecture"].get("output_modalities") or [])
+        ]
 
     async def list_models(self) -> list[dict[str, Any]]:
         """GET /models to discover available models. Returns dicts with at least 'id'. All providers
@@ -7145,6 +7312,36 @@ _ANTHROPIC_ERROR_STATUS = {
     "timeout_error": 504,
     "overloaded_error": 529,
 }
+
+
+def _apply_fastflowlm_reasoning_controls(
+    body: dict[str, Any], enable_thinking: Optional[bool], reasoning_effort: Optional[str]
+) -> None:
+    """Translate reasoning controls to FastFlowLM's ``think`` field.
+
+    Explicit thinking preserves reasoning on length cutoffs; effort ``none`` disables it.
+    """
+    effort = (reasoning_effort or "").strip().lower()
+    if effort == "none":
+        body["think"] = False
+        return
+    if enable_thinking is not None:
+        body["think"] = bool(enable_thinking)
+    if effort in ("low", "medium", "high") and body.get("think", True):
+        body["reasoning_effort"] = effort
+
+
+def _bare_json_error_as_sse(line: str) -> Optional[str]:
+    try:
+        parsed = _json.loads(line)
+    except ValueError:
+        return None
+    if not isinstance(parsed, dict) or "error" not in parsed:
+        return None
+    error = parsed["error"]
+    if not isinstance(error, dict):
+        error = {"message": str(error), "type": "provider_error"}
+    return "data: " + _json.dumps({"error": error})
 
 
 def _error_sse_line(
